@@ -11,7 +11,7 @@ namespace Physics.Math {
         public float2 c1 => pos + width + height;
         public float2 c2 => pos - width + height;
         public float2 c3 => pos - width - height;
-        public float2 c4 => pos + width + height;
+        public float2 c4 => pos + width - height;
 
         public Rect(float2 p, float2 w, float2 h) {
             pos = p;
@@ -127,13 +127,13 @@ namespace Physics.Math {
             }
         }
 
-        // Returns the smallest offset that this shape must move by it touches
-        // 'other' at a single point. If the objects are overlapping, the sign
-        // of the returned value indicates the relative positions of the two
-        // projections.
+        // Returns the smallest offset that 'other' must move by so it touches
+        // this projection at a single point. If the objects are overlapping,
+        // the sign of the returned value indicates the relative positions of
+        // the two projections.
         public float GetSeparationVector(Projection other) {
-            float leftMove = other.x2 - x1;
-            float rightMove = other.x1 - x2;
+            float leftMove = x1 - other.x2;
+            float rightMove = x2 - other.x1;
             if (math.abs(leftMove) < math.abs(rightMove)) {
                 return leftMove;
             } else {
@@ -223,7 +223,7 @@ namespace Physics.Math {
 
             ComputeReferenceAndIncident(in r1, in r2, ref normal, out LineSegment reference, out LineSegment incident);
 
-            float2 refEdgeVec = math.normalize(reference.p2 - reference.p1);
+            float2 refEdgeVec = math.normalize(reference.p1 - reference.p2);
 
             if (!Clip(ref incident, refEdgeVec, math.dot(refEdgeVec, reference.p2))) {
                 return;

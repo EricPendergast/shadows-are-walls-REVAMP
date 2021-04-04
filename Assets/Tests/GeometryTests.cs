@@ -42,10 +42,30 @@ public class GeometryTests
 
     [Test]
     public void GetContacts1() {
-        Assert.AreSame(Geometry.GetIntersectData(
+        Compare((Geometry.Manifold)Geometry.GetIntersectData(
                 new Rect(new float2(0,0), new float2(2, 0), new float2(0, 2)),
                 new Rect(new float2(0,2), new float2(1, 0), new float2(0, 1))
                 ), 
-                new Geometry.Manifold());
+                new Geometry.Manifold{normal = new float2(0, 1), contact1 = new float2(-1, 1), contact2 = new float2(1, 1)});
+    }
+
+    private void Compare(Geometry.Manifold m1, Geometry.Manifold m2) {
+        Compare(m1.normal, m2.normal);
+        if (m1.contact2 == null || m2.contact2 == null) {
+            Assert.IsNull(m2.contact2);
+        } else {
+            Assert.IsTrue(
+                    (Equal(m1.contact1, m2.contact1) && Equal((float2)m1.contact2, (float2)m2.contact2)) ||
+                    (Equal(m1.contact1, (float2)m2.contact2) && Equal((float2)m1.contact2, m2.contact1)));
+        }
+    }
+
+    private bool Equal(float2 v1, float2 v2, float delta = .0001f) {
+        return math.abs(v1.x - v2.x) < delta && math.abs(v1.y - v2.y) < delta;
+    }
+
+    private void Compare(float2 v1, float2 v2, float delta=.0001f) {
+        Assert.AreEqual(v1.x, v2.x, delta);
+        Assert.AreEqual(v1.y, v2.y, delta);
     }
 }
