@@ -14,6 +14,7 @@ public class CollisionSystem : SystemBase {
         public Entity box1;
         public Entity box2;
         public float lambdaAccumulated;
+        public float lambda_tAccumulated;
         public float2 normal;
         public float2 contact;
 
@@ -26,6 +27,11 @@ public class CollisionSystem : SystemBase {
             // to float4, so J is split into 2 pieces.
             float3 J1 = new float3(-normal, -Lin.Cross(contact-box1.pos, normal));
             float3 J2 = new float3(normal, Lin.Cross(contact-box2.pos, normal));
+
+            float2 tangent = Lin.Cross(normal, -1);
+
+            float3 J1_t = new float3(tangent, Lin.Cross(contact-box1.pos, tangent));
+            float3 J2_t = new float3(-tangent, -Lin.Cross(contact-box2.pos, tangent));
             
             // Similar situation with M
             float3x3 M1_inv = new float3x3(
@@ -43,6 +49,7 @@ public class CollisionSystem : SystemBase {
             float3 v2 = new float3(box2.vel, box2.angVel);
 
             float m_c = 1 / (math.dot(math.mul(J1, M1_inv), J1) + math.dot(math.mul(J2, M2_inv), J2));
+            float m_t = 1 / (math.dot(math.mul(J1_t, M1_inv), J1_t) + math.dot(math.mul(J2_t, M2_inv), J2_t));
 
             float beta = .3f;
             float delta_slop = -.05f;
@@ -55,12 +62,15 @@ public class CollisionSystem : SystemBase {
             }
 
             float lambda = -m_c * (math.dot(J1, v1) + math.dot(J2, v2) + bias);
+            float lambda_t = -m_t * (math.dot(J1_t, v1) + math.dot(J2_t, v2));
 
-            ClampLambda(ref lambda);
+            // Frictional coefficient
+            float mu = .5f;
+            ClampLambdas(ref lambda, ref lambda_t, mu);
 
             // Impulse
-            float3 P_c1 = J1*lambda;
-            float3 P_c2 = J2*lambda;
+            float3 P_c1 = J1*lambda + J1_t*lambda_t;
+            float3 P_c2 = J2*lambda + J2_t*lambda_t;
 
             // Delta velocity
             float3 dv1 = math.mul(M1_inv, P_c1);
@@ -77,11 +87,14 @@ public class CollisionSystem : SystemBase {
             boxes[this.box2] = box2;
         }
 
-        private void ClampLambda(ref float lambda) {
+        private void ClampLambdas(ref float lambda, ref float lambda_t, float frictionCoefficient) {
             float oldAccumulated = lambdaAccumulated;
-            lambdaAccumulated += lambda;
-            lambdaAccumulated = math.max(lambdaAccumulated, 0);
+            lambdaAccumulated = math.max(lambdaAccumulated + lambda, 0);
             lambda = lambdaAccumulated - oldAccumulated;
+
+            float old_tAccumulated = lambda_tAccumulated;
+            lambda_tAccumulated = math.clamp(lambda_tAccumulated + lambda_t, -lambdaAccumulated*frictionCoefficient, lambdaAccumulated*frictionCoefficient);
+            lambda_t = lambda_tAccumulated - old_tAccumulated;
         }
     }
 
