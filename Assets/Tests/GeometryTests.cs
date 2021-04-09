@@ -42,11 +42,40 @@ public class GeometryTests
 
     [Test]
     public void GetContacts1() {
+        // Simple rectangles which have different edge windings
+        //
+        //       -------           
+        //     --|-----|--         
+        //     | ------- |         
+        //     -----------         
+        //                         
         Compare((Geometry.Manifold)Geometry.GetIntersectData(
-                new Rect(new float2(0,0), new float2(2, 0), new float2(0, 2)),
+                new Rect(new float2(0,0), new float2(0, 2), new float2(2, 0)),
                 new Rect(new float2(0,2), new float2(1, 0), new float2(0, 1))
                 ), 
                 new Geometry.Manifold{normal = new float2(0, 1), contact1 = new float2(-1, 1), contact2 = new float2(1, 1)});
+
+        //     ----------
+        //   --|------- |
+        //   | |------|--
+        //   |        |
+        //   ----------
+        Compare((Geometry.Manifold)Geometry.GetIntersectData(
+                new Rect(new float2(0,0), new float2(2, 0), new float2(0, 2)),
+                new Rect(new float2(1,2), new float2(2, 0), new float2(0, 1))
+                ), 
+                new Geometry.Manifold{normal = new float2(0, 1), contact1 = new float2(-1, 1), contact2 = new float2(2, 1)});
+
+        // ---------
+        // | ------|---
+        // --|------  |
+        //   |        |
+        //   ----------
+        Compare((Geometry.Manifold)Geometry.GetIntersectData(
+                new Rect(new float2(0,0), new float2(2, 0), new float2(0, 2)),
+                new Rect(new float2(-1,2), new float2(2, 0), new float2(0, 1))
+                ), 
+                new Geometry.Manifold{normal = new float2(0, 1), contact1 = new float2(-2, 1), contact2 = new float2(1, 1)});
     }
 
     private void Compare(Geometry.Manifold m1, Geometry.Manifold m2) {

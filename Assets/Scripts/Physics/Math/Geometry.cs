@@ -25,6 +25,12 @@ namespace Physics.Math {
             }
         }
 
+        public static Rect FromWidthHeightAngle(float2 p, float width, float height, float angle) {
+            float2 right = math.mul(float2x2.Rotate(angle), new float2(1, 0))*width/2;
+            float2 up = math.mul(float2x2.Rotate(angle), new float2(0, 1))*height/2;
+            return new Rect(p, right, up);
+        }
+
         //public bool Contains(float2 point) {
         //    return  math.abs(math.dot(point - pos, width)) < math.lengthsq(width) &&
         //            math.abs(math.dot(point - pos, height)) < math.lengthsq(height);

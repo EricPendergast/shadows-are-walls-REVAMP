@@ -2,9 +2,22 @@
 using Unity.Entities;
 using Unity.Mathematics;
 
-[GenerateAuthoringComponent]
+using Physics.Math;
+
 public struct Box : IComponentData {
     public float2 pos;
     public float rot;
-    public float radius;
+
+    public float2 vel;
+    public float angVel;
+
+    public float mass;
+    public float inertia;
+
+    public float width;
+    public float height;
+
+    public Rect ToRect() {
+        return Rect.FromWidthHeightAngle(pos, width, height, rot);
+    }
 }
