@@ -18,7 +18,7 @@ public class CollisionSystem : SystemBase {
         public float2 contact;
 
 
-        public void ApplyImpulse(ref ComponentDataFromEntity<Box> boxes) {
+        public void ApplyImpulse(ref ComponentDataFromEntity<Box> boxes, float dt) {
             Box box1 = boxes[this.box1];
             Box box2 = boxes[this.box2];
 
@@ -44,7 +44,15 @@ public class CollisionSystem : SystemBase {
 
             float m_c = 1 / (math.dot(math.mul(J1, M1_inv), J1) + math.dot(math.mul(J2, M2_inv), J2));
 
-            float bias = .00f;
+            float beta = .3f;
+            float delta_slop = -.05f;
+            float delta = -Geometry.GetOverlapOnAxis(box1.ToRect(), box2.ToRect(), normal);
+
+            float bias = 0;
+
+            if (delta < delta_slop) {
+                bias = beta/dt * (delta - delta_slop);
+            }
 
             float lambda = -m_c * (math.dot(J1, v1) + math.dot(J2, v2) + bias);
 
@@ -130,9 +138,11 @@ public class CollisionSystem : SystemBase {
             }
         }
 
+        float dt = Time.DeltaTime;
+
         for (int i = 0; i < 4; i++) {
             foreach (var constraint in boxBoxConstraints) {
-                constraint.ApplyImpulse(ref boxes);
+                constraint.ApplyImpulse(ref boxes, dt);
             }
         }
     }

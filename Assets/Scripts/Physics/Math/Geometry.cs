@@ -172,6 +172,10 @@ namespace Physics.Math {
             public float2? contact2;
         }
 
+        public static float GetOverlapOnAxis(in Rect r1, in Rect r2, float2 normal) {
+            return Project(r1, normal).GetOverlap(Project(r2, normal));
+        }
+
         public static Manifold? GetIntersectData(in Rect r1, in Rect r2) {
         
             FixedList64<float2> axes = new FixedList32<float2>();
@@ -197,11 +201,10 @@ namespace Physics.Math {
                         minSeparation = separation;
                         bestAxis = i;
                     }
+                } else {
+                    // If the shapes don't overlap on one axis, then they don't touch.
+                    return null;
                 }
-            }
-
-            if (bestAxis == -1) {
-                return null;
             }
 
             float2 axis = axes[bestAxis];
