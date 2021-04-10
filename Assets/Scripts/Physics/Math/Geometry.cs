@@ -176,7 +176,7 @@ namespace Physics.Math {
             return Project(r1, normal).GetOverlap(Project(r2, normal));
         }
 
-        public static Manifold? GetIntersectData(in Rect r1, in Rect r2) {
+        public static Manifold? GetIntersectData(in Rect r1, in Rect r2, float skin=.0f) {
         
             FixedList64<float2> axes = new FixedList32<float2>();
             axes.Add(r1.width);
@@ -189,44 +189,52 @@ namespace Physics.Math {
         
             // Says how far r1 must move along the best axis before it touches
             // r2 at a single point.
-            float minSeparation = 0;
-            int bestAxis = -1;
+            float minOverlap = math.INFINITY;
+            float2 bestAxis = float2.zero;
             
             for (int i = 0; i < axes.Length; i++) {
-                var r1Proj = Project(r1, axes[i]);
-                var r2Proj = Project(r2, axes[i]);
+                float2 ax = axes[i];
+                var r1Proj = Project(r1, ax);
+                var r2Proj = Project(r2, ax);
+
+                // Shortest translation of r2Proj so it touches r1Proj at one point
+                float separation = r1Proj.GetSeparationVector(r2Proj);
+                float overlap = separation;
+
                 if (r1Proj.Overlaps(r2Proj)) {
-                    float separation = r1Proj.GetSeparationVector(r2Proj);
-                    if (math.abs(separation) < math.abs(minSeparation) || bestAxis == -1) {
-                        minSeparation = separation;
-                        bestAxis = i;
+                    // Overlap should be positive if they overlap
+                    if (overlap < 0) {
+                        overlap = -overlap;
+                        ax = -ax;
                     }
                 } else {
-                    // If the shapes don't overlap on one axis, then they don't touch.
-                    return null;
+                    // Overlap should be negative if they don't overlap
+                    if (overlap > 0) {
+                        overlap = -overlap;
+                        ax = -ax;
+                    }
+                    if (overlap < -skin) {
+                        return null;
+                    }
+                }
+
+                if (overlap < minOverlap) {
+                    minOverlap = overlap;
+                    bestAxis = ax;
                 }
             }
 
-            float2 axis = axes[bestAxis];
-
-            // Make the separation be positive along the normal
-            if (minSeparation < 0) {
-                axis *= -1;
-                minSeparation *= -1;
-            }
-
-            
-            ComputeContacts(r1, r2, axis, out var contact1, out var contact2);
+            ComputeContacts(r1, r2, bestAxis, out var contact1, out var contact2, skin);
 
             if (contact1 == null) {
                 return null;
             } else {
-                Manifold manifold = new Manifold{normal = axis, contact1 = (float2)contact1, contact2 = contact2};
+                Manifold manifold = new Manifold{normal = bestAxis, contact1 = (float2)contact1, contact2 = contact2};
                 return manifold;
             }
         }
 
-        private static void ComputeContacts(in Rect r1, in Rect r2, float2 normal, out float2? contact1, out float2? contact2) {
+        private static void ComputeContacts(in Rect r1, in Rect r2, float2 normal, out float2? contact1, out float2? contact2, float skin) {
             contact1 = null;
             contact2 = null;
 
@@ -234,6 +242,7 @@ namespace Physics.Math {
 
             float2 refEdgeVec = math.normalize(reference.p1 - reference.p2);
 
+            
             if (!Clip(ref incident, refEdgeVec, math.dot(refEdgeVec, reference.p2))) {
                 return;
             }
@@ -243,7 +252,7 @@ namespace Physics.Math {
             }
 
             float2 refNorm = Lin.Cross(refEdgeVec, -1);
-            double max = math.dot(refNorm, reference.p1);
+            double max = math.dot(refNorm, reference.p1) + skin;
 
             if (math.dot(refNorm, incident.p1) < max) {
                 contact1 = incident.p1;
