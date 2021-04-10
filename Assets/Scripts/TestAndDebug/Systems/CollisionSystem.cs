@@ -1,7 +1,7 @@
 using Unity.Entities;
-using Unity.Transforms;
 using Unity.Collections;
 using Unity.Mathematics;
+using System.Collections.Generic;
 
 using Physics.Math;
 
@@ -157,6 +157,17 @@ public class CollisionSystem : SystemBase {
             foreach (var constraint in boxBoxConstraints) {
                 constraint.ApplyImpulse(ref boxes, dt);
             }
+        }
+    }
+
+    public struct DebugContactInfo {
+        public float2 normal;
+        public float2 contact;
+    }
+
+    public IEnumerable<DebugContactInfo> GetContactsForDebug() {
+        foreach (var constraint in boxBoxConstraints) {
+            yield return new DebugContactInfo{normal = constraint.normal, contact = constraint.contact};
         }
     }
 }
