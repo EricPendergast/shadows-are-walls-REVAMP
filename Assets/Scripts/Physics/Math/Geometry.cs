@@ -227,6 +227,10 @@ namespace Physics.Math {
                     }
                 }
 
+                // Weighting the overlap so that there is a slight preference
+                // for a downward pointing normal vector.
+                overlap += .001f * math.dot(new float2(0, 1), ax);
+
                 if (overlap < minOverlap) {
                     minOverlap = overlap;
                     bestAxis = ax;
