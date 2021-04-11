@@ -6,7 +6,7 @@ public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
     public float angularVelocity;
 
     public float mass = 1;
-    public float inertia = .1f;
+    //public float inertia = .1f;
 
     public float width = 1;
     public float height = 1;
@@ -21,9 +21,10 @@ public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
                 vel = velocity,
                 angVel = angularVelocity*Mathf.Deg2Rad,
                 mass = mass,
-                inertia = inertia,
+                inertia = mass*(width*width + height*height)/12,
                 width = transform.localScale.x*width,
-                height = transform.localScale.y*height
+                height = transform.localScale.y*height,
+                id = Random.Range(1, int.MaxValue)
             });
 
         if (gravityScale != 1) {

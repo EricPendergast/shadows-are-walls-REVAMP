@@ -17,7 +17,9 @@ public struct Box : IComponentData {
     public float width;
     public float height;
 
+    public int id;
+
     public Rect ToRect() {
-        return Rect.FromWidthHeightAngle(pos, width, height, rot);
+        return Rect.FromWidthHeightAngle(pos, width, height, rot, id);
     }
 }

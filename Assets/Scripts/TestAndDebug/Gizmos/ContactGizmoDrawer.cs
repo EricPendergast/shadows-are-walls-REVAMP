@@ -6,10 +6,16 @@ public class ContactGizmoDrawer : MonoBehaviour {
         if (Application.isPlaying) {
             var world = World.DefaultGameObjectInjectionWorld;
 
-            Gizmos.color = Color.red;
             foreach (var contact in world.GetOrCreateSystem<CollisionSystem>().GetContactsForDebug()) {
-                Gizmos.DrawSphere((Vector2)contact.contact, .05f);
+                Gizmos.color = Color.red;
+                //Gizmos.DrawSphere((Vector2)contact.contact, .01f);
                 Gizmos.DrawRay((Vector2)contact.contact, (Vector2)contact.normal);
+
+                Gizmos.color = new Color(
+                        (contact.id % 4591 % 256)/256.0f, 
+                        (contact.id % 5347 % 256)/265.0f,
+                        (contact.id % 3797 % 256)/265.0f);
+                Gizmos.DrawSphere((Vector2)contact.contact, .05f);
             }
         }
     }

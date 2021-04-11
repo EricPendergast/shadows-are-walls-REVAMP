@@ -4,11 +4,17 @@ using Unity.Mathematics;
 using System.Collections.Generic;
 
 using Physics.Math;
+using UnityEngine;
 
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
 [UpdateAfter(typeof(GravitySystem))]
 public class CollisionSystem : SystemBase {
     EntityQuery boxesQuery;
+    static bool accumulateImpulses = false;
+    static bool warmStarting = false;
+    static bool positionCorrection = false;
+    // In the future, this will be configurable on a per object basis
+    static float globalFriction = .0f;
 
     private struct BoxBoxConstraint {
         public Entity box1;
@@ -17,11 +23,23 @@ public class CollisionSystem : SystemBase {
         public float lambda_tAccumulated;
         public float2 normal;
         public float2 contact;
+        public int id;
 
+        public void PreStep(ref ComponentDataFromEntity<Box> boxes, float dt) {
+            if (warmStarting) {
+                // TODO: Apply lambdaAccumulated and lambda_tAccumulated
+            }
+        }
 
         public void ApplyImpulse(ref ComponentDataFromEntity<Box> boxes, float dt) {
             Box box1 = boxes[this.box1];
             Box box2 = boxes[this.box2];
+
+            float delta = -Geometry.GetOverlapOnAxis(box1.ToRect(), box2.ToRect(), normal);
+            // If not intersecting, and no impulse has been applied yet, do nothing
+            //if (delta > 0) {
+            //    return;
+            //}
 
             float3x3 M1_inv = new float3x3(
                 1/box1.mass, 0, 0,
@@ -34,6 +52,7 @@ public class CollisionSystem : SystemBase {
                 0, 0, 1/box2.inertia
             );
 
+            float lambda;
             {
                 // Ideally, we would have a float6 J, but the library only goes up
                 // to float4, so J is split into 2 pieces.
@@ -46,9 +65,8 @@ public class CollisionSystem : SystemBase {
 
                 float m_c = 1 / (math.dot(math.mul(J1, M1_inv), J1) + math.dot(math.mul(J2, M2_inv), J2));
 
-                float beta = .3f;
-                float delta_slop = -.005f;
-                float delta = -Geometry.GetOverlapOnAxis(box1.ToRect(), box2.ToRect(), normal);
+                float beta = positionCorrection ? .2f : 0;
+                float delta_slop = -.01f;
 
                 float bias = 0;
 
@@ -56,7 +74,7 @@ public class CollisionSystem : SystemBase {
                     bias = (beta/dt) * (delta - delta_slop);
                 }
 
-                float lambda = -m_c * (math.dot(J1, v1) + math.dot(J2, v2) + bias);
+                lambda = -m_c * (math.dot(J1, v1) + math.dot(J2, v2) + bias);
 
                 ClampLambda(ref lambda);
 
@@ -93,9 +111,9 @@ public class CollisionSystem : SystemBase {
                 float lambda_t = -m_t * (math.dot(J1_t, v1) + math.dot(J2_t, v2));
 
                 // Frictional coefficient
-                float mu = .5f;
+                float mu = globalFriction;
 
-                ClampLambda_t(ref lambda_t, mu);
+                ClampLambda_t(ref lambda_t, lambda,  mu);
 
                 float3 P_t1 = J1_t*lambda_t;
                 float3 P_t2 = J2_t*lambda_t;
@@ -118,29 +136,42 @@ public class CollisionSystem : SystemBase {
 
 
         private void ClampLambda(ref float lambda) {
-            float oldAccumulated = lambdaAccumulated;
-            lambdaAccumulated = math.max(lambdaAccumulated + lambda, 0);
-            lambda = lambdaAccumulated - oldAccumulated;
+            if (accumulateImpulses) {
+                float oldAccumulated = lambdaAccumulated;
+                lambdaAccumulated = math.max(lambdaAccumulated + lambda, 0);
+                lambda = lambdaAccumulated - oldAccumulated;
+            } else {
+                lambda = math.max(lambda, 0);
+            }
         }
 
-        private void ClampLambda_t(ref float lambda_t, float frictionCoefficient) {
-            float old_tAccumulated = lambda_tAccumulated;
-            lambda_tAccumulated = math.clamp(lambda_tAccumulated + lambda_t, -lambdaAccumulated*frictionCoefficient, lambdaAccumulated*frictionCoefficient);
-            lambda_t = lambda_tAccumulated - old_tAccumulated;
+        private void ClampLambda_t(ref float lambda_t, float lambda, float frictionCoefficient) {
+            if (accumulateImpulses) {
+                float old_tAccumulated = lambda_tAccumulated;
+                lambda_tAccumulated = math.clamp(lambda_tAccumulated + lambda_t, -lambdaAccumulated*frictionCoefficient, lambdaAccumulated*frictionCoefficient);
+                lambda_t = lambda_tAccumulated - old_tAccumulated;
+            } else {
+                lambda_t = math.clamp(lambda_t, -lambda*frictionCoefficient, lambda*frictionCoefficient);
+            }
         }
     }
 
     private NativeList<Entity> boxEntities;
     private NativeList<BoxBoxConstraint> boxBoxConstraints;
+    // Maps from contact id to the accumulated lambda of that contact last
+    // frame. Used for warm starting.
+    private NativeHashMap<int, float> prevLambdas;
 
     protected override void OnCreate() {
         boxEntities = new NativeList<Entity>(100, Allocator.Persistent);
         boxBoxConstraints = new NativeList<BoxBoxConstraint>(100, Allocator.Persistent);
+        prevLambdas = new NativeHashMap<int, float>(100, Allocator.Persistent);
     }
 
     protected override void OnDestroy() {
         boxEntities.Dispose();
         boxBoxConstraints.Dispose();
+        prevLambdas.Dispose();
     }
 
     protected override void OnUpdate() {
@@ -171,18 +202,23 @@ public class CollisionSystem : SystemBase {
                 );
 
                 if (manifoldNullable is Geometry.Manifold manifold) {
+
                     var constraint = 
                         new BoxBoxConstraint{
                             box1=box1, box2=box2, 
                             normal=manifold.normal, 
-                            contact=manifold.contact1
+                            contact=manifold.contact1.point,
+                            id=manifold.contact1.id,
                         };
 
                     boxBoxConstraints.Add(constraint);
 
-                    if (manifold.contact2 is float2 contact) {
-                        constraint.contact = contact;
+
+                    if (manifold.contact2 is Geometry.Contact contact) {
+                        constraint.contact = contact.point;
+                        constraint.id = contact.id;
                         boxBoxConstraints.Add(constraint);
+                        Debug.Assert(manifold.contact1.id != contact.id, "Duplicate contact ids within the same manifold");
                     }
                 }
             }
@@ -190,21 +226,42 @@ public class CollisionSystem : SystemBase {
 
         float dt = Time.DeltaTime;
 
-        for (int i = 0; i < 4; i++) {
-            foreach (var constraint in boxBoxConstraints) {
-                constraint.ApplyImpulse(ref boxes, dt);
+        for (int j = 0; j < boxBoxConstraints.Length; j++) {
+            var c = boxBoxConstraints[j];
+
+            c.PreStep(ref boxes, dt);
+
+            // TODO: Non readonly structs are EVIL
+            boxBoxConstraints[j] = c;
+        }
+
+        for (int i = 0; i < 10; i++) {
+            for (int j = 0; j < boxBoxConstraints.Length; j++) {
+                var c = boxBoxConstraints[j];
+
+                c.ApplyImpulse(ref boxes, dt);
+
+                // TODO: Non readonly structs are EVIL
+                boxBoxConstraints[j] = c;
             }
+        }
+
+        prevLambdas.Clear();
+        foreach (var constraint in boxBoxConstraints) {
+            Debug.Assert(!prevLambdas.ContainsKey(constraint.id), "Duplicate contact id");
+            prevLambdas[constraint.id] = constraint.lambdaAccumulated;
         }
     }
 
     public struct DebugContactInfo {
         public float2 normal;
         public float2 contact;
+        public int id;
     }
 
     public IEnumerable<DebugContactInfo> GetContactsForDebug() {
         foreach (var constraint in boxBoxConstraints) {
-            yield return new DebugContactInfo{normal = constraint.normal, contact = constraint.contact};
+            yield return new DebugContactInfo{normal = constraint.normal, contact = constraint.contact, id = constraint.id};
         }
     }
 }

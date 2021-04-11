@@ -7,13 +7,14 @@ namespace Physics.Math {
         public readonly float2 pos;
         public readonly float2 width;
         public readonly float2 height;
+        public readonly int id;
 
         public float2 c1 => pos + width + height;
         public float2 c2 => pos - width + height;
         public float2 c3 => pos - width - height;
         public float2 c4 => pos + width - height;
 
-        public Rect(float2 p, float2 w, float2 h) {
+        public Rect(float2 p, float2 w, float2 h, int id) {
             pos = p;
             // Ensuring counterclockwise winding
             if (Math.Lin.Cross(w, h) > 0) {
@@ -23,12 +24,13 @@ namespace Physics.Math {
                 width = h;
                 height = w;
             }
+            this.id = id;
         }
 
-        public static Rect FromWidthHeightAngle(float2 p, float width, float height, float angle) {
+        public static Rect FromWidthHeightAngle(float2 p, float width, float height, float angle, int id) {
             float2 right = math.mul(float2x2.Rotate(angle), new float2(1, 0))*width/2;
             float2 up = math.mul(float2x2.Rotate(angle), new float2(0, 1))*height/2;
-            return new Rect(p, right, up);
+            return new Rect(p, right, up, id);
         }
 
         //public bool Contains(float2 point) {
@@ -36,7 +38,8 @@ namespace Physics.Math {
         //            math.abs(math.dot(point - pos, height)) < math.lengthsq(height);
         //}
 
-        public LineSegment FurthestEdge(float2 normal) {
+        // Returns the edge with counter clockwise winding
+        public LineSegment FurthestEdge(float2 normal, out int edgeIdx) {
             int furthestIdx = FurthestVertex(normal);
             float2 furthest = GetVertex(furthestIdx);
 
@@ -47,8 +50,10 @@ namespace Physics.Math {
             float2 r = math.normalize(furthest - vRight);
 
             if (math.dot(r, normal) <= math.dot(l, normal)) {
+                edgeIdx = (furthestIdx - 1 + 4)%4;
                 return new LineSegment(vRight, furthest);
             } else {
+                edgeIdx = furthestIdx;
                 return new LineSegment(furthest, vLeft);
             }
         }
@@ -165,11 +170,15 @@ namespace Physics.Math {
     }
     public static class Geometry {
 
+        public struct Contact {
+            public float2 point;
+            public int id;
+        }
         public struct Manifold {
             public float2 normal;
             //float penetration;
-            public float2 contact1;
-            public float2? contact2;
+            public Contact contact1;
+            public Contact? contact2;
         }
 
         public static float GetOverlapOnAxis(in Rect r1, in Rect r2, float2 normal) {
@@ -229,25 +238,49 @@ namespace Physics.Math {
             if (contact1 == null) {
                 return null;
             } else {
-                Manifold manifold = new Manifold{normal = bestAxis, contact1 = (float2)contact1, contact2 = contact2};
+                Manifold manifold = new Manifold{normal = bestAxis, contact1 = (Contact)contact1, contact2 = contact2};
                 return manifold;
             }
         }
 
-        private static void ComputeContacts(in Rect r1, in Rect r2, float2 normal, out float2? contact1, out float2? contact2, float skin) {
+        private readonly struct EdgeId {
+            readonly public int shapeId;
+            readonly public int edgeIndex;
+            public EdgeId(int si, int ei) {
+                shapeId = si;
+                edgeIndex = ei;
+            }
+
+            public EdgeId WithIndexOffset(int offset) {
+                return new EdgeId(shapeId, ((edgeIndex + offset)%4 + 4)%4);
+            }
+        }
+
+
+        private static int GetContactId(EdgeId e1, EdgeId e2) {
+            if (e1.shapeId < e2.shapeId || (e1.shapeId == e2.shapeId && e1.edgeIndex < e2.edgeIndex)) {
+                return new int4(e1.shapeId, e1.edgeIndex, e2.shapeId, e2.edgeIndex).GetHashCode();
+            } else {
+                return new int4(e2.shapeId, e2.edgeIndex, e1.shapeId, e1.edgeIndex).GetHashCode();
+            }
+        }
+
+        private static void ComputeContacts(in Rect r1, in Rect r2, float2 normal, out Contact? contact1, out Contact? contact2, float skin) {
             contact1 = null;
             contact2 = null;
 
-            ComputeReferenceAndIncident(in r1, in r2, ref normal, out LineSegment reference, out LineSegment incident);
+            ComputeReferenceAndIncident(in r1, in r2, ref normal, out LineSegment reference, out LineSegment incident, out EdgeId referenceId, out EdgeId incidentId);
+
+            LineSegment incidentPrev = incident;
 
             float2 refEdgeVec = math.normalize(reference.p1 - reference.p2);
 
             
-            if (!Clip(ref incident, refEdgeVec, math.dot(refEdgeVec, reference.p2))) {
+            if (!Clip(ref incident, refEdgeVec, math.dot(refEdgeVec, reference.p2), out bool refP2IncP1Clip, out bool refP2IncP2Clip)) {
                 return;
             }
 
-            if (!Clip(ref incident, -refEdgeVec, math.dot(-refEdgeVec, reference.p1))) {
+            if (!Clip(ref incident, -refEdgeVec, math.dot(-refEdgeVec, reference.p1), out bool refP1IncP1Clip, out bool refP1IncP2Clip)) {
                 return;
             }
 
@@ -255,21 +288,44 @@ namespace Physics.Math {
             double max = math.dot(refNorm, reference.p1) + skin;
 
             if (math.dot(refNorm, incident.p1) < max) {
-                contact1 = incident.p1;
+
+                EdgeId contactEdgeId;
+                if (refP1IncP1Clip) {
+                    contactEdgeId = referenceId.WithIndexOffset(-1);
+                } else if (refP2IncP1Clip) {
+                    contactEdgeId = referenceId.WithIndexOffset(1);
+                } else {
+                    contactEdgeId = incidentId.WithIndexOffset(-1);
+                }
+
+                contact1 = new Contact{point=incident.p1, id=GetContactId(incidentId, contactEdgeId)};
             }
 
             if (math.dot(refNorm, incident.p2) < max) {
-                if (contact1 != null) {
-                    contact2 = incident.p2;
+
+                EdgeId contactEdgeId;
+                if (refP1IncP2Clip) {
+                    contactEdgeId = referenceId.WithIndexOffset(-1);
+                } else if (refP2IncP2Clip) {
+                    contactEdgeId = referenceId.WithIndexOffset(1);
                 } else {
-                    contact1 = incident.p2;
+                    contactEdgeId = incidentId.WithIndexOffset(1);
                 }
+
+                contact2 = new Contact{point=incident.p2, id=GetContactId(incidentId, contactEdgeId)};
+            }
+
+            if (contact1 == null) {
+                contact1 = contact2;
+                contact2 = null;
             }
         }
 
-        private static void ComputeReferenceAndIncident(in Rect r1, in Rect r2, ref float2 normal, out LineSegment reference, out LineSegment incident) {
-            LineSegment e1 = r1.FurthestEdge(normal);
-            LineSegment e2 = r2.FurthestEdge(-normal);
+        // Line segments are returned with counterclockwise winding, relative
+        // to the rect they are part of
+        private static void ComputeReferenceAndIncident(in Rect r1, in Rect r2, ref float2 normal, out LineSegment reference, out LineSegment incident, out EdgeId referenceId, out EdgeId incidentId) {
+            LineSegment e1 = r1.FurthestEdge(normal, out int e1Idx);
+            LineSegment e2 = r2.FurthestEdge(-normal, out int e2Idx);
 
             float2 e1Vec = math.normalize(e1.p2 - e1.p1);
             float2 e2Vec = math.normalize(e2.p2 - e2.p1);
@@ -278,9 +334,15 @@ namespace Physics.Math {
             if (math.abs(math.dot(e1Vec, normal)) <= math.abs(math.dot(e2Vec, normal))) {
                 reference = e1;
                 incident = e2;
+
+                referenceId = new EdgeId(r1.id, e1Idx);
+                incidentId = new EdgeId(r2.id, e2Idx);
             } else {
                 reference = e2;
                 incident = e1;
+
+                referenceId = new EdgeId(r2.id, e2Idx);
+                incidentId = new EdgeId(r1.id, e1Idx);
                 // Invert the normal so it points out of r2, because it is now
                 // the owner of the reference edge
                 normal *= -1;
@@ -288,10 +350,16 @@ namespace Physics.Math {
         }
 
         // Clips 'seg' so that no point on 'seg' lies further along 'normal' than 'maxDist'
-        // Returns false if the entire line segment was clipped
-        private static bool Clip(ref LineSegment seg, float2 normal, float maxDist) {
+        // Returns false if the entire line segment was clipped.
+        // Keeps the orientation of the line segment (e.g. if seg.p1 is clipped
+        // to p1', the returned line segment will be (p1', seg.p2) and never
+        // (seg.p2, p1') ).
+        private static bool Clip(ref LineSegment seg, float2 normal, float maxDist, out bool clippedP1, out bool clippedP2) {
             float d1 = math.dot(normal, seg.p1) - maxDist;
             float d2 = math.dot(normal, seg.p2) - maxDist;
+
+            clippedP1 = d1 < 0;
+            clippedP2 = d2 < 0;
 
             if (d1 * d2 < 0) {
                 float2 p1 = d1 >= 0 ? seg.p1 : seg.p2;
@@ -300,7 +368,7 @@ namespace Physics.Math {
                 float u = d1 / (d1 - d2);
                 p2 *= u;
                 p2 += seg.p1;
-                seg = new LineSegment(p1, p2);
+                seg = d1 >= 0 ? new LineSegment(p1, p2) : new LineSegment(p2, p1);
                 return true;
             } else {
                 if (d1 < 0) {
