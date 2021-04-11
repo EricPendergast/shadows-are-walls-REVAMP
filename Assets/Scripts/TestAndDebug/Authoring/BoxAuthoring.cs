@@ -14,6 +14,8 @@ public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
     public float gravityScale = 1;
 
     public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem) {
+        float w = transform.localScale.x*width;
+        float h = transform.localScale.y*height;
         dstManager.AddComponentData(entity, 
             new Box {
                 pos = (Vector2)transform.position,
@@ -21,9 +23,9 @@ public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
                 vel = velocity,
                 angVel = angularVelocity*Mathf.Deg2Rad,
                 mass = mass,
-                inertia = mass*(width*width + height*height)/12,
-                width = transform.localScale.x*width,
-                height = transform.localScale.y*height,
+                inertia = mass*(w*w + h*h)/12,
+                width = w,
+                height = h,
                 id = Random.Range(1, int.MaxValue)
             });
 

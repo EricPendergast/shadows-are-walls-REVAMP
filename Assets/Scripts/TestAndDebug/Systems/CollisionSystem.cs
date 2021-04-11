@@ -10,11 +10,11 @@ using UnityEngine;
 [UpdateAfter(typeof(GravitySystem))]
 public class CollisionSystem : SystemBase {
     EntityQuery boxesQuery;
-    static bool accumulateImpulses = false;
+    static bool accumulateImpulses = true;
     static bool warmStarting = false;
-    static bool positionCorrection = false;
+    static bool positionCorrection = true;
     // In the future, this will be configurable on a per object basis
-    static float globalFriction = .0f;
+    static float globalFriction = .5f;
 
     private struct BoxBoxConstraint {
         public Entity box1;
@@ -91,6 +91,45 @@ public class CollisionSystem : SystemBase {
 
                 box2.vel += dv2.xy;
                 box2.angVel += dv2.z;
+
+                ///////////////////////
+                /// From box2d lite ///
+                ///////////////////////
+
+                //float2 r1 = contact - box1.pos;
+                //float2 r2 = contact - box2.pos;
+                //
+                //float invMass1 = box1.mass == float.MaxValue ? 0 : 1/box1.mass;
+                //float invMass2 = box2.mass == float.MaxValue ? 0 : 1/box2.mass;
+                //float invI1 = box1.mass == float.MaxValue ? 0 : 1/box1.inertia;
+                //float invI2 = box2.mass == float.MaxValue ? 0 : 1/box2.inertia;
+                //
+                //// Relative velocity at contact
+                //float2 dv = box2.vel + Lin.Cross(box2.angVel, r2) - box1.vel - Lin.Cross(box1.angVel, r1);
+                //
+                //// Compute normal impulse
+                //float vn = math.dot(dv, normal);
+                //
+                //    float rn1 = math.dot(r1, normal);
+                //    float rn2 = math.dot(r2, normal);
+                //    float kNormal = (invMass1) + (invMass2);
+                //    kNormal += (invI1) * (math.dot(r1, r1) - rn1 * rn1) + (invI2) * (math.dot(r2, r2) - rn2 * rn2);
+                //    float massNormal = 1.0f / kNormal;
+                //
+                //float dPn = massNormal * (-vn);
+                //
+                //dPn = math.max(dPn, 0.0f);
+                //
+                //Debug.Log("dPn = " + dPn + " dv = " + dv.x + " " + dv.y + " mass normal = " + massNormal);
+                //
+                //// Apply contact impulse
+                //float2 Pn = dPn * normal;
+                //
+                //box1.vel -= invMass1 * Pn;
+                //box1.angVel -= invI1 * Lin.Cross(r1, Pn);
+                //
+                //box2.vel += invMass2 * Pn;
+                //box2.angVel += invI2 * Lin.Cross(r2, Pn);
             }
 
             ////////////////////////////////
