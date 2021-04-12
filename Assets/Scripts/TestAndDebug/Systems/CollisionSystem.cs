@@ -11,23 +11,80 @@ using UnityEngine;
 public class CollisionSystem : SystemBase {
     EntityQuery boxesQuery;
     static bool accumulateImpulses = true;
-    static bool warmStarting = false;
+    static bool warmStarting = true;
     static bool positionCorrection = true;
     // In the future, this will be configurable on a per object basis
-    static float globalFriction = .5f;
+    static float globalFriction = 2f;
 
     private struct BoxBoxConstraint {
         public Entity box1;
         public Entity box2;
-        public float lambdaAccumulated;
-        public float lambda_tAccumulated;
+        public Lambdas accumulatedLambdas;
         public float2 normal;
         public float2 contact;
         public int id;
 
+        float3x3 M1_inv;
+        float3x3 M2_inv;
+
+        // Ideally, we would have a float6 J, but the library only goes up
+        // to float4, so J is split into 2 pieces.
+        float3 J1_n;
+        float3 J2_n;
+
+        float m_c_n;
+
+        float3 J1_t;
+        float3 J2_t;
+
+        float m_c_t;
+
         public void PreStep(ref ComponentDataFromEntity<Box> boxes, float dt) {
-            if (warmStarting) {
-                // TODO: Apply lambdaAccumulated and lambda_tAccumulated
+            Box box1 = boxes[this.box1];
+            Box box2 = boxes[this.box2];
+
+            M1_inv = new float3x3(
+                1/box1.mass, 0, 0,
+                0, 1/box1.mass, 0,
+                0, 0, 1/box1.inertia
+            );
+            M2_inv = new float3x3(
+                1/box2.mass, 0, 0,
+                0, 1/box2.mass, 0,
+                0, 0, 1/box2.inertia
+            );
+
+            { // Normal precomputation
+                J1_n = new float3(-normal, -Lin.Cross(contact-box1.pos, normal));
+                J2_n = new float3(normal, Lin.Cross(contact-box2.pos, normal));
+
+                m_c_n = 1 / (math.dot(math.mul(J1_n, M1_inv), J1_n) + math.dot(math.mul(J2_n, M2_inv), J2_n));
+            }
+
+
+            { // Tangent precomputation (friction)
+                float2 tangent = Lin.Cross(normal, -1);
+
+                J1_t = new float3(tangent, Lin.Cross(contact-box1.pos, tangent));
+                J2_t = new float3(-tangent, -Lin.Cross(contact-box2.pos, tangent));
+                
+                m_c_t = 1 / (math.dot(math.mul(J1_t, M1_inv), J1_t) + math.dot(math.mul(J2_t, M2_inv), J2_t));
+            }
+
+            if (accumulateImpulses) {
+                // Impulse
+                float3 P_c1 = J1_n*accumulatedLambdas.n + J1_t*accumulatedLambdas.t;
+                float3 P_c2 = J2_n*accumulatedLambdas.n + J2_t*accumulatedLambdas.t;
+
+                // Delta velocity
+                float3 dv1 = math.mul(M1_inv, P_c1);
+                float3 dv2 = math.mul(M2_inv, P_c2);
+
+                box1.vel += dv1.xy;
+                box1.angVel += dv1.z;
+
+                box2.vel += dv2.xy;
+                box2.angVel += dv2.z;
             }
         }
 
@@ -41,29 +98,11 @@ public class CollisionSystem : SystemBase {
             //    return;
             //}
 
-            float3x3 M1_inv = new float3x3(
-                1/box1.mass, 0, 0,
-                0, 1/box1.mass, 0,
-                0, 0, 1/box1.inertia
-            );
-            float3x3 M2_inv = new float3x3(
-                1/box2.mass, 0, 0,
-                0, 1/box2.mass, 0,
-                0, 0, 1/box2.inertia
-            );
-
             float lambda;
             {
-                // Ideally, we would have a float6 J, but the library only goes up
-                // to float4, so J is split into 2 pieces.
-                float3 J1 = new float3(-normal, -Lin.Cross(contact-box1.pos, normal));
-                float3 J2 = new float3(normal, Lin.Cross(contact-box2.pos, normal));
-
-
                 float3 v1 = new float3(box1.vel, box1.angVel);
                 float3 v2 = new float3(box2.vel, box2.angVel);
 
-                float m_c = 1 / (math.dot(math.mul(J1, M1_inv), J1) + math.dot(math.mul(J2, M2_inv), J2));
 
                 float beta = positionCorrection ? .2f : 0;
                 float delta_slop = -.01f;
@@ -74,13 +113,13 @@ public class CollisionSystem : SystemBase {
                     bias = (beta/dt) * (delta - delta_slop);
                 }
 
-                lambda = -m_c * (math.dot(J1, v1) + math.dot(J2, v2) + bias);
+                lambda = -m_c_n * (math.dot(J1_n, v1) + math.dot(J2_n, v2) + bias);
 
                 ClampLambda(ref lambda);
 
                 // Impulse
-                float3 P_c1 = J1*lambda;
-                float3 P_c2 = J2*lambda;
+                float3 P_c1 = J1_n*lambda;
+                float3 P_c2 = J2_n*lambda;
 
                 // Delta velocity
                 float3 dv1 = math.mul(M1_inv, P_c1);
@@ -98,17 +137,10 @@ public class CollisionSystem : SystemBase {
             ////////////////////////////////
 
             {
-                float2 tangent = Lin.Cross(normal, -1);
-
-                float3 J1_t = new float3(tangent, Lin.Cross(contact-box1.pos, tangent));
-                float3 J2_t = new float3(-tangent, -Lin.Cross(contact-box2.pos, tangent));
-                
-                float m_t = 1 / (math.dot(math.mul(J1_t, M1_inv), J1_t) + math.dot(math.mul(J2_t, M2_inv), J2_t));
-
                 float3 v1 = new float3(box1.vel, box1.angVel);
                 float3 v2 = new float3(box2.vel, box2.angVel);
 
-                float lambda_t = -m_t * (math.dot(J1_t, v1) + math.dot(J2_t, v2));
+                float lambda_t = -m_c_t * (math.dot(J1_t, v1) + math.dot(J2_t, v2));
 
                 // Frictional coefficient
                 float mu = globalFriction;
@@ -137,9 +169,9 @@ public class CollisionSystem : SystemBase {
 
         private void ClampLambda(ref float lambda) {
             if (accumulateImpulses) {
-                float oldAccumulated = lambdaAccumulated;
-                lambdaAccumulated = math.max(lambdaAccumulated + lambda, 0);
-                lambda = lambdaAccumulated - oldAccumulated;
+                float oldAccumulated = accumulatedLambdas.n;
+                accumulatedLambdas.n = math.max(accumulatedLambdas.n + lambda, 0);
+                lambda = accumulatedLambdas.n - oldAccumulated;
             } else {
                 lambda = math.max(lambda, 0);
             }
@@ -147,9 +179,9 @@ public class CollisionSystem : SystemBase {
 
         private void ClampLambda_t(ref float lambda_t, float lambda, float frictionCoefficient) {
             if (accumulateImpulses) {
-                float old_tAccumulated = lambda_tAccumulated;
-                lambda_tAccumulated = math.clamp(lambda_tAccumulated + lambda_t, -lambdaAccumulated*frictionCoefficient, lambdaAccumulated*frictionCoefficient);
-                lambda_t = lambda_tAccumulated - old_tAccumulated;
+                float old_tAccumulated = accumulatedLambdas.t;
+                accumulatedLambdas.t = math.clamp(accumulatedLambdas.t + lambda_t, -accumulatedLambdas.n*frictionCoefficient, accumulatedLambdas.n*frictionCoefficient);
+                lambda_t = accumulatedLambdas.t - old_tAccumulated;
             } else {
                 lambda_t = math.clamp(lambda_t, -lambda*frictionCoefficient, lambda*frictionCoefficient);
             }
@@ -160,12 +192,16 @@ public class CollisionSystem : SystemBase {
     private NativeList<BoxBoxConstraint> boxBoxConstraints;
     // Maps from contact id to the accumulated lambda of that contact last
     // frame. Used for warm starting.
-    private NativeHashMap<int, float> prevLambdas;
+    private struct Lambdas {
+        public float n;
+        public float t;
+    }
+    private NativeHashMap<int, Lambdas> prevLambdas;
 
     protected override void OnCreate() {
         boxEntities = new NativeList<Entity>(100, Allocator.Persistent);
         boxBoxConstraints = new NativeList<BoxBoxConstraint>(100, Allocator.Persistent);
-        prevLambdas = new NativeHashMap<int, float>(100, Allocator.Persistent);
+        prevLambdas = new NativeHashMap<int, Lambdas>(100, Allocator.Persistent);
     }
 
     protected override void OnDestroy() {
@@ -229,6 +265,12 @@ public class CollisionSystem : SystemBase {
         for (int j = 0; j < boxBoxConstraints.Length; j++) {
             var c = boxBoxConstraints[j];
 
+            if (warmStarting && prevLambdas.TryGetValue(c.id, out Lambdas lambdas)) {
+                c.accumulatedLambdas = lambdas;
+            } else {
+                c.accumulatedLambdas = new Lambdas();
+            }
+
             c.PreStep(ref boxes, dt);
 
             // TODO: Non readonly structs are EVIL
@@ -249,7 +291,7 @@ public class CollisionSystem : SystemBase {
         prevLambdas.Clear();
         foreach (var constraint in boxBoxConstraints) {
             Debug.Assert(!prevLambdas.ContainsKey(constraint.id), "Duplicate contact id");
-            prevLambdas[constraint.id] = constraint.lambdaAccumulated;
+            prevLambdas[constraint.id] = constraint.accumulatedLambdas;
         }
     }
 
