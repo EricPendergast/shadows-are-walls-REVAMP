@@ -74,10 +74,6 @@ public class CollisionSystem : SystemBase {
             }
 
             if (accumulateImpulses) {
-                //Debug.Log("Applied initial lambda_n: " + accumulatedLambdas.n);
-                //Debug.Log("Applied initial lambda_t: " + accumulatedLambdas.t);
-                //Debug.Log("b1 initial: v = " + box1.vel + " omega = " + box1.angVel);
-                //Debug.Log("b2 initial: v = " + box2.vel + " omega = " + box2.angVel);
                 // Impulse
                 float3 P_c1 = J1_n*accumulatedLambdas.n + J1_t*accumulatedLambdas.t;
                 float3 P_c2 = J2_n*accumulatedLambdas.n + J2_t*accumulatedLambdas.t;
@@ -91,8 +87,6 @@ public class CollisionSystem : SystemBase {
 
                 box2.vel += dv2.xy;
                 box2.angVel += dv2.z;
-                //Debug.Log("b1: v = " + box1.vel + " omega = " + box1.angVel);
-                //Debug.Log("b2: v = " + box2.vel + " omega = " + box2.angVel);
             }
 
             boxes[this.box1] = box1;
@@ -104,10 +98,6 @@ public class CollisionSystem : SystemBase {
             Box box2 = boxes[this.box2];
 
             float delta = -Geometry.GetOverlapOnAxis(box1.ToRect(), box2.ToRect(), normal);
-            // If not intersecting, and no impulse has been applied yet, do nothing
-            //if (delta > 0) {
-            //    return;
-            //}
 
             float lambda;
             {
@@ -127,7 +117,6 @@ public class CollisionSystem : SystemBase {
                 lambda = -m_c_n * (math.dot(J1_n, v1) + math.dot(J2_n, v2) + bias);
 
                 ClampLambda(ref lambda);
-                //Debug.Log("Applied lambda_n: " + lambda);
 
                 // Impulse
                 float3 P_c1 = J1_n*lambda;
@@ -160,8 +149,6 @@ public class CollisionSystem : SystemBase {
 
                 ClampLambda_t(ref lambda_t, lambda,  mu);
 
-                //Debug.Log("Applied lambda_t: " + lambda_t);
-
                 float3 P_t1 = J1_t*lambda_t;
                 float3 P_t2 = J2_t*lambda_t;
 
@@ -175,9 +162,6 @@ public class CollisionSystem : SystemBase {
                 box2.vel += dv2.xy;
                 box2.angVel += dv2.z;
             }
-
-            //Debug.Log("b1: v = " + box1.vel + " omega = " + box1.angVel);
-            //Debug.Log("b2: v = " + box2.vel + " omega = " + box2.angVel);
 
             // NOTE: This is not thread safe
             boxes[this.box1] = box1;
@@ -229,7 +213,6 @@ public class CollisionSystem : SystemBase {
     }
 
     protected override void OnUpdate() {
-        //Debug.LogWarning("Begin loop");
         var boxEntities = this.boxEntities;
         boxEntities.Clear();
         boxEntities.Length = boxesQuery.CalculateEntityCount();
