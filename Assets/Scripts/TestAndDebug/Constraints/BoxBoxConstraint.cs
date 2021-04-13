@@ -11,12 +11,17 @@ public struct Lambdas {
 }
 
 public struct BoxBoxConstraint {
-    public Entity box1;
-    public Entity box2;
-    public Lambdas accumulatedLambdas;
-    public float2 normal;
-    public float2 contact;
-    public ContactId id;
+    public Entity box1 {get;}
+    public Entity box2 {get;}
+    private Lambdas accumulatedLambdas;
+    public Lambdas GetAccumulatedLambdas() {
+        return accumulatedLambdas;
+    }
+    public float2 normal {get;}
+    public float2 contact {get;}
+
+    public ContactId id {get;}
+
 
     float3x3 M1_inv;
     float3x3 M2_inv;
@@ -33,7 +38,28 @@ public struct BoxBoxConstraint {
 
     float m_c_t;
 
-    public void PreStep(ref ComponentDataFromEntity<Box> boxes, float dt) {
+    public BoxBoxConstraint(Entity box1, Entity box2, float2 normal, Geometry.Contact contact) {
+        this.box1 = box1;
+        this.box2 = box2;
+        this.normal = normal;
+        this.contact = contact.point;
+        id = contact.id;
+
+        accumulatedLambdas = new Lambdas();
+
+        M1_inv = 0;
+        M2_inv = 0;
+        J1_n = 0;
+        J2_n = 0;
+        m_c_n = 0;
+        J1_t = 0;
+        J2_t = 0;
+        m_c_t = 0;
+    }
+
+    public void PreStep(ref ComponentDataFromEntity<Box> boxes, float dt, Lambdas prevLambdas) {
+        accumulatedLambdas = prevLambdas;
+
         Box box1 = boxes[this.box1];
         Box box2 = boxes[this.box2];
 

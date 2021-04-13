@@ -65,21 +65,20 @@ public class CollisionSystem : SystemBase {
 
                 if (manifoldNullable is Geometry.Manifold manifold) {
 
-                    var constraint = 
-                        new BoxBoxConstraint{
-                            box1=box1, box2=box2, 
-                            normal=manifold.normal, 
-                            contact=manifold.contact1.point,
-                            id=manifold.contact1.id,
-                        };
-
-                    boxBoxConstraints.Add(constraint);
+                    boxBoxConstraints.Add(new BoxBoxConstraint(
+                        box1, box2,
+                        manifold.normal,
+                        manifold.contact1
+                    ));
 
 
                     if (manifold.contact2 is Geometry.Contact contact) {
-                        constraint.contact = contact.point;
-                        constraint.id = contact.id;
-                        boxBoxConstraints.Add(constraint);
+                        boxBoxConstraints.Add(new BoxBoxConstraint(
+                            box1, box2,
+                            manifold.normal,
+                            contact
+                        ));
+
                         Debug.Assert(!manifold.contact1.id.Equals(contact.id), "Duplicate contact ids within the same manifold");
                     }
                 }
@@ -91,13 +90,14 @@ public class CollisionSystem : SystemBase {
         for (int j = 0; j < boxBoxConstraints.Length; j++) {
             var c = boxBoxConstraints[j];
 
-            if (warmStarting && prevLambdas.TryGetValue(c.id, out Lambdas lambdas)) {
-                c.accumulatedLambdas = lambdas;
+            Lambdas lambdas;
+            if (warmStarting && prevLambdas.TryGetValue(c.id, out var l)) {
+                lambdas = l;
             } else {
-                c.accumulatedLambdas = new Lambdas();
+                lambdas = new Lambdas();
             }
 
-            c.PreStep(ref boxes, dt);
+            c.PreStep(ref boxes, dt, lambdas);
 
             // TODO: Non readonly structs are EVIL
             boxBoxConstraints[j] = c;
@@ -122,7 +122,7 @@ public class CollisionSystem : SystemBase {
             // giving duplicate contact ids. Having arbiters would fix this.
             // But I think its not a big deal.
             Debug.Assert(!prevLambdas.ContainsKey(constraint.id), "Duplicate contact id: " + constraint.id.ToString());
-            prevLambdas[constraint.id] = constraint.accumulatedLambdas;
+            prevLambdas[constraint.id] = constraint.GetAccumulatedLambdas();
         }
     }
 
