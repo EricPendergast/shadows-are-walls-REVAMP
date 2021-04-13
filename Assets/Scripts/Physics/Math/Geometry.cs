@@ -276,6 +276,10 @@ namespace Physics.Math {
             public bool Equals(ContactId other) {
                 return edge1.Equals(other.edge1) && edge2.Equals(other.edge2);
             }
+
+            public override string ToString() {
+                return "{edge1: " + edge1.ToString() + ", edge2: " + edge2.ToString() + "}";
+            }
         }
 
         public readonly struct EdgeId : System.IEquatable<EdgeId> {
@@ -292,6 +296,10 @@ namespace Physics.Math {
 
             public bool Equals(EdgeId other) {
                 return shapeId == other.shapeId && edgeIndex == other.edgeIndex;
+            }
+
+            public override string ToString() {
+                return "{shapeId: " + shapeId + ", edgeIndex: " + edgeIndex + "}";
             }
         }
 

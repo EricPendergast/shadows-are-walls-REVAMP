@@ -6,6 +6,8 @@ using System.Collections.Generic;
 using Physics.Math;
 using UnityEngine;
 
+using ContactId = Physics.Math.Geometry.ContactId;
+
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
 [UpdateAfter(typeof(GravitySystem))]
 public class CollisionSystem : SystemBase {
@@ -293,7 +295,12 @@ public class CollisionSystem : SystemBase {
 
         prevLambdas.Clear();
         foreach (var constraint in boxBoxConstraints) {
-            Debug.Assert(!prevLambdas.ContainsKey(constraint.id), "Duplicate contact id");
+            // TODO: This assert actually fails naturally sometimes. It's
+            // because sometimes contact ids can refer to the corner of a
+            // shape, which may be intersecting multiple other shapes, thus
+            // giving duplicate contact ids. Having arbiters would fix this.
+            // But I think its not a big deal.
+            Debug.Assert(!prevLambdas.ContainsKey(constraint.id), "Duplicate contact id: " + constraint.id.ToString());
             prevLambdas[constraint.id] = constraint.accumulatedLambdas;
         }
     }
