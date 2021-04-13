@@ -11,10 +11,12 @@ public class ContactGizmoDrawer : MonoBehaviour {
                 //Gizmos.DrawSphere((Vector2)contact.contact, .01f);
                 Gizmos.DrawRay((Vector2)contact.contact, (Vector2)contact.normal);
 
+                int id = Mathf.Abs(contact.id.GetHashCode());
+
                 Gizmos.color = new Color(
-                        (contact.id % 4591 % 256)/256.0f, 
-                        (contact.id % 5347 % 256)/265.0f,
-                        (contact.id % 3797 % 256)/265.0f);
+                        (id % 4591 % 256)/256.0f, 
+                        (id % 5347 % 256)/265.0f,
+                        (id % 3797 % 256)/265.0f);
                 Gizmos.DrawSphere((Vector2)contact.contact, .05f);
             }
         }

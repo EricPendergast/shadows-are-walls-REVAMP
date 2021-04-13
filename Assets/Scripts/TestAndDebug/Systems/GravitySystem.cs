@@ -6,7 +6,7 @@ using Unity.Mathematics;
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
 public class GravitySystem : SystemBase {
     protected override void OnUpdate() {
-        float2 gravityAccel = new float2(0, -9.8f);
+        float2 gravityAccel = new float2(0, -10f);
         float dt = Time.DeltaTime;
         Entities.
             WithNone<GravityScale>().

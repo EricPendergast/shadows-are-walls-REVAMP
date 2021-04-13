@@ -14,7 +14,7 @@ public class CollisionSystem : SystemBase {
     static bool warmStarting = true;
     static bool positionCorrection = true;
     // In the future, this will be configurable on a per object basis
-    static float globalFriction = 2f;
+    static float globalFriction = .2f;
 
     private struct BoxBoxConstraint {
         public Entity box1;
@@ -22,7 +22,7 @@ public class CollisionSystem : SystemBase {
         public Lambdas accumulatedLambdas;
         public float2 normal;
         public float2 contact;
-        public int id;
+        public ContactId id;
 
         float3x3 M1_inv;
         float3x3 M2_inv;
@@ -86,6 +86,9 @@ public class CollisionSystem : SystemBase {
                 box2.vel += dv2.xy;
                 box2.angVel += dv2.z;
             }
+
+            boxes[this.box1] = box1;
+            boxes[this.box2] = box2;
         }
 
         public void ApplyImpulse(ref ComponentDataFromEntity<Box> boxes, float dt) {
@@ -196,12 +199,12 @@ public class CollisionSystem : SystemBase {
         public float n;
         public float t;
     }
-    private NativeHashMap<int, Lambdas> prevLambdas;
+    private NativeHashMap<ContactId, Lambdas> prevLambdas;
 
     protected override void OnCreate() {
         boxEntities = new NativeList<Entity>(100, Allocator.Persistent);
         boxBoxConstraints = new NativeList<BoxBoxConstraint>(100, Allocator.Persistent);
-        prevLambdas = new NativeHashMap<int, Lambdas>(100, Allocator.Persistent);
+        prevLambdas = new NativeHashMap<ContactId, Lambdas>(100, Allocator.Persistent);
     }
 
     protected override void OnDestroy() {
@@ -254,7 +257,7 @@ public class CollisionSystem : SystemBase {
                         constraint.contact = contact.point;
                         constraint.id = contact.id;
                         boxBoxConstraints.Add(constraint);
-                        Debug.Assert(manifold.contact1.id != contact.id, "Duplicate contact ids within the same manifold");
+                        Debug.Assert(!manifold.contact1.id.Equals(contact.id), "Duplicate contact ids within the same manifold");
                     }
                 }
             }
@@ -298,7 +301,7 @@ public class CollisionSystem : SystemBase {
     public struct DebugContactInfo {
         public float2 normal;
         public float2 contact;
-        public int id;
+        public ContactId id;
     }
 
     public IEnumerable<DebugContactInfo> GetContactsForDebug() {

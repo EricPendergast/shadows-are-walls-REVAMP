@@ -3,6 +3,7 @@ using Unity.Collections;
 using UnityEngine;
 
 namespace Physics.Math {
+
     public readonly struct Rect {
         public readonly float2 pos;
         public readonly float2 width;
@@ -172,7 +173,7 @@ namespace Physics.Math {
 
         public struct Contact {
             public float2 point;
-            public int id;
+            public ContactId id;
         }
         public struct Manifold {
             public float2 normal;
@@ -229,7 +230,7 @@ namespace Physics.Math {
 
                 // Weighting the overlap so that there is a slight preference
                 // for a downward pointing normal vector.
-                overlap += .001f * math.dot(new float2(0, 1), ax);
+                overlap += .05f * math.dot(new float2(0, 1), ax);
 
                 if (overlap < minOverlap) {
                     minOverlap = overlap;
@@ -247,7 +248,37 @@ namespace Physics.Math {
             }
         }
 
-        private readonly struct EdgeId {
+        public readonly struct ContactId : System.IEquatable<ContactId> {
+            readonly public EdgeId edge1;
+            readonly public EdgeId edge2;
+
+            public ContactId(EdgeId e1, EdgeId e2) {
+                if (e1.shapeId < e2.shapeId || 
+                        (e1.shapeId == e2.shapeId && e1.edgeIndex < e2.edgeIndex)) {
+                    edge1 = e1;
+                    edge2 = e2;
+                } else {
+                    edge1 = e2;
+                    edge2 = e1;
+                }
+            }
+
+            public override int GetHashCode() {
+                int hash = 27;
+                hash = (13 * hash) + edge1.shapeId;
+                hash = (13 * hash) + edge1.edgeIndex;
+                hash = (13 * hash) + edge2.shapeId;
+                hash = (13 * hash) + edge2.edgeIndex;
+
+                return hash;
+            }
+
+            public bool Equals(ContactId other) {
+                return edge1.Equals(other.edge1) && edge2.Equals(other.edge2);
+            }
+        }
+
+        public readonly struct EdgeId : System.IEquatable<EdgeId> {
             readonly public int shapeId;
             readonly public int edgeIndex;
             public EdgeId(int si, int ei) {
@@ -258,15 +289,14 @@ namespace Physics.Math {
             public EdgeId WithIndexOffset(int offset) {
                 return new EdgeId(shapeId, ((edgeIndex + offset)%4 + 4)%4);
             }
+
+            public bool Equals(EdgeId other) {
+                return shapeId == other.shapeId && edgeIndex == other.edgeIndex;
+            }
         }
 
-
-        private static int GetContactId(EdgeId e1, EdgeId e2) {
-            if (e1.shapeId < e2.shapeId || (e1.shapeId == e2.shapeId && e1.edgeIndex < e2.edgeIndex)) {
-                return new int4(e1.shapeId, e1.edgeIndex, e2.shapeId, e2.edgeIndex).GetHashCode();
-            } else {
-                return new int4(e2.shapeId, e2.edgeIndex, e1.shapeId, e1.edgeIndex).GetHashCode();
-            }
+        private static ContactId GetContactId(EdgeId e1, EdgeId e2) {
+            return new ContactId(e1, e2);
         }
 
         private static void ComputeContacts(in Rect r1, in Rect r2, float2 normal, out Contact? contact1, out Contact? contact2, float skin) {
@@ -334,23 +364,11 @@ namespace Physics.Math {
             float2 e1Vec = math.normalize(e1.p2 - e1.p1);
             float2 e2Vec = math.normalize(e2.p2 - e2.p1);
 
-            // The more perpendicular edge is the reference edge
-            if (math.abs(math.dot(e1Vec, normal)) <= math.abs(math.dot(e2Vec, normal))) {
-                reference = e1;
-                incident = e2;
+            reference = e1;
+            incident = e2;
 
-                referenceId = new EdgeId(r1.id, e1Idx);
-                incidentId = new EdgeId(r2.id, e2Idx);
-            } else {
-                reference = e2;
-                incident = e1;
-
-                referenceId = new EdgeId(r2.id, e2Idx);
-                incidentId = new EdgeId(r1.id, e1Idx);
-                // Invert the normal so it points out of r2, because it is now
-                // the owner of the reference edge
-                normal *= -1;
-            }
+            referenceId = new EdgeId(r1.id, e1Idx);
+            incidentId = new EdgeId(r2.id, e2Idx);
         }
 
         // Clips 'seg' so that no point on 'seg' lies further along 'normal' than 'maxDist'
