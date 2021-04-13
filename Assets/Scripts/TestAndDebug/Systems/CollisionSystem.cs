@@ -109,7 +109,7 @@ public class CollisionSystem : SystemBase {
                 float3 v2 = new float3(box2.vel, box2.angVel);
 
 
-                float beta = positionCorrection ? .2f : 0;
+                float beta = positionCorrection ? .1f : 0;
                 float delta_slop = -.01f;
 
                 float bias = 0;
