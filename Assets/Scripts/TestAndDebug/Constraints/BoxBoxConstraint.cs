@@ -22,21 +22,15 @@ public struct BoxBoxConstraint {
 
     public ContactId id {get;}
 
-
-    float3x3 M1_inv;
-    float3x3 M2_inv;
-
-    // Ideally, we would have a float6 J, but the library only goes up
-    // to float4, so J is split into 2 pieces.
-    float3 J1_n;
-    float3 J2_n;
-
-    float m_c_n;
+    float3 M1_inv;
+    float3 M2_inv;
 
     float3 J1_t;
     float3 J2_t;
 
     float m_c_t;
+
+    PenetrationConstraint pc;
 
     public BoxBoxConstraint(Entity box1, Entity box2, float2 normal, Geometry.Contact contact) {
         this.box1 = box1;
@@ -49,12 +43,11 @@ public struct BoxBoxConstraint {
 
         M1_inv = 0;
         M2_inv = 0;
-        J1_n = 0;
-        J2_n = 0;
-        m_c_n = 0;
         J1_t = 0;
         J2_t = 0;
         m_c_t = 0;
+
+        pc = new PenetrationConstraint();
     }
 
     public void PreStep(ref ComponentDataFromEntity<Box> boxes, float dt, Lambdas prevLambdas) {
@@ -63,22 +56,24 @@ public struct BoxBoxConstraint {
         Box box1 = boxes[this.box1];
         Box box2 = boxes[this.box2];
 
-        M1_inv = new float3x3(
-                1/box1.mass, 0, 0,
-                0, 1/box1.mass, 0,
-                0, 0, 1/box1.inertia
-                );
-        M2_inv = new float3x3(
-                1/box2.mass, 0, 0,
-                0, 1/box2.mass, 0,
-                0, 0, 1/box2.inertia
-                );
+        M1_inv = new float3(1/box1.mass, 1/box1.mass, 1/box1.inertia);
+        M2_inv = new float3(1/box2.mass, 1/box2.mass, 1/box2.inertia);
 
         { // Normal precomputation
-            J1_n = new float3(-normal, -Lin.Cross(contact-box1.pos, normal));
-            J2_n = new float3(normal, Lin.Cross(contact-box2.pos, normal));
+            float3 J1_n = new float3(-normal, -Lin.Cross(contact-box1.pos, normal));
+            float3 J2_n = new float3(normal, Lin.Cross(contact-box2.pos, normal));
 
-            m_c_n = 1 / (math.dot(math.mul(J1_n, M1_inv), J1_n) + math.dot(math.mul(J2_n, M2_inv), J2_n));
+            float delta = -Geometry.GetOverlapOnAxis(box1.ToRect(), box2.ToRect(), normal);
+            float beta = CollisionSystem.positionCorrection ? .1f : 0;
+            float delta_slop = -.01f;
+
+            float bias = 0;
+
+            if (delta < delta_slop) {
+                bias = (beta/dt) * (delta - delta_slop);
+            }
+
+            pc = new PenetrationConstraint(J1_n, J2_n, M1_inv, M2_inv, bias);
         }
 
 
@@ -88,16 +83,16 @@ public struct BoxBoxConstraint {
             J1_t = new float3(tangent, Lin.Cross(contact-box1.pos, tangent));
             J2_t = new float3(-tangent, -Lin.Cross(contact-box2.pos, tangent));
 
-            m_c_t = 1 / (math.dot(math.mul(J1_t, M1_inv), J1_t) + math.dot(math.mul(J2_t, M2_inv), J2_t));
+            m_c_t = 1 / (math.dot(J1_t * M1_inv, J1_t) + math.dot(J2_t * M2_inv, J2_t));
         }
 
         if (CollisionSystem.accumulateImpulses) {
-            // Impulse
-            float3 P_c1 = J1_n*accum.n + J1_t*accum.t;
-            float3 P_c2 = J2_n*accum.n + J2_t*accum.t;
+            (float3 P1_n, float3 P2_n) = pc.GetImpulse(accum.n);
+            float3 P1_t = J1_t*accum.t;
+            float3 P2_t = J2_t*accum.t;
 
-            ApplyImpulse(P_c1, ref box1);
-            ApplyImpulse(P_c2, ref box2);
+            ApplyImpulse(P1_n + P1_t, ref box1);
+            ApplyImpulse(P2_n + P2_t, ref box2);
         }
 
         boxes[this.box1] = box1;
@@ -108,33 +103,17 @@ public struct BoxBoxConstraint {
         Box box1 = boxes[this.box1];
         Box box2 = boxes[this.box2];
 
-        float delta = -Geometry.GetOverlapOnAxis(box1.ToRect(), box2.ToRect(), normal);
 
         float lambda;
         {
             float3 v1 = new float3(box1.vel, box1.angVel);
             float3 v2 = new float3(box2.vel, box2.angVel);
 
+            lambda = pc.GetLambda(v1, v2, ref accum.n);
+            (float3 P_n1, float3 P_n2) = pc.GetImpulse(lambda);
 
-            float beta = CollisionSystem.positionCorrection ? .1f : 0;
-            float delta_slop = -.01f;
-
-            float bias = 0;
-
-            if (delta < delta_slop) {
-                bias = (beta/dt) * (delta - delta_slop);
-            }
-
-            lambda = -m_c_n * (math.dot(J1_n, v1) + math.dot(J2_n, v2) + bias);
-
-            ClampLambda(ref lambda, ref accum.n);
-
-            // Impulse
-            float3 P_c1 = J1_n*lambda;
-            float3 P_c2 = J2_n*lambda;
-
-            ApplyImpulse(P_c1, ref box1);
-            ApplyImpulse(P_c2, ref box2);
+            ApplyImpulse(P_n1, ref box1);
+            ApplyImpulse(P_n2, ref box2);
         }
 
         ////////////////////////////////
