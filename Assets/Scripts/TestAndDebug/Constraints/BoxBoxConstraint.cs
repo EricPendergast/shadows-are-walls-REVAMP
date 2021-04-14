@@ -13,9 +13,9 @@ public struct Lambdas {
 public struct BoxBoxConstraint {
     public Entity box1 {get;}
     public Entity box2 {get;}
-    private Lambdas accumulatedLambdas;
+    private Lambdas accum;
     public Lambdas GetAccumulatedLambdas() {
-        return accumulatedLambdas;
+        return accum;
     }
     public float2 normal {get;}
     public float2 contact {get;}
@@ -45,7 +45,7 @@ public struct BoxBoxConstraint {
         this.contact = contact.point;
         id = contact.id;
 
-        accumulatedLambdas = new Lambdas();
+        accum = new Lambdas();
 
         M1_inv = 0;
         M2_inv = 0;
@@ -58,7 +58,7 @@ public struct BoxBoxConstraint {
     }
 
     public void PreStep(ref ComponentDataFromEntity<Box> boxes, float dt, Lambdas prevLambdas) {
-        accumulatedLambdas = prevLambdas;
+        accum = prevLambdas;
 
         Box box1 = boxes[this.box1];
         Box box2 = boxes[this.box2];
@@ -93,18 +93,11 @@ public struct BoxBoxConstraint {
 
         if (CollisionSystem.accumulateImpulses) {
             // Impulse
-            float3 P_c1 = J1_n*accumulatedLambdas.n + J1_t*accumulatedLambdas.t;
-            float3 P_c2 = J2_n*accumulatedLambdas.n + J2_t*accumulatedLambdas.t;
+            float3 P_c1 = J1_n*accum.n + J1_t*accum.t;
+            float3 P_c2 = J2_n*accum.n + J2_t*accum.t;
 
-            // Delta velocity
-            float3 dv1 = math.mul(M1_inv, P_c1);
-            float3 dv2 = math.mul(M2_inv, P_c2);
-
-            box1.vel += dv1.xy;
-            box1.angVel += dv1.z;
-
-            box2.vel += dv2.xy;
-            box2.angVel += dv2.z;
+            ApplyImpulse(P_c1, ref box1);
+            ApplyImpulse(P_c2, ref box2);
         }
 
         boxes[this.box1] = box1;
@@ -134,22 +127,14 @@ public struct BoxBoxConstraint {
 
             lambda = -m_c_n * (math.dot(J1_n, v1) + math.dot(J2_n, v2) + bias);
 
-            ClampLambda(ref lambda);
+            ClampLambda(ref lambda, ref accum.n);
 
             // Impulse
             float3 P_c1 = J1_n*lambda;
             float3 P_c2 = J2_n*lambda;
 
-            // Delta velocity
-            float3 dv1 = math.mul(M1_inv, P_c1);
-            float3 dv2 = math.mul(M2_inv, P_c2);
-
-            box1.vel += dv1.xy;
-            box1.angVel += dv1.z;
-
-            box2.vel += dv2.xy;
-            box2.angVel += dv2.z;
-
+            ApplyImpulse(P_c1, ref box1);
+            ApplyImpulse(P_c2, ref box2);
         }
 
         ////////////////////////////////
@@ -165,20 +150,13 @@ public struct BoxBoxConstraint {
             // Frictional coefficient
             float mu = CollisionSystem.globalFriction;
 
-            ClampLambda_t(ref lambda_t, lambda,  mu);
+            ClampLambda_t(ref lambda_t, lambda,  mu, ref accum.t, ref accum.n);
 
             float3 P_t1 = J1_t*lambda_t;
             float3 P_t2 = J2_t*lambda_t;
 
-            // Delta velocity
-            float3 dv1 = math.mul(M1_inv, P_t1);
-            float3 dv2 = math.mul(M2_inv, P_t2);
-
-            box1.vel += dv1.xy;
-            box1.angVel += dv1.z;
-
-            box2.vel += dv2.xy;
-            box2.angVel += dv2.z;
+            ApplyImpulse(P_t1, ref box1);
+            ApplyImpulse(P_t2, ref box2);
         }
 
         // NOTE: This is not thread safe
@@ -186,24 +164,32 @@ public struct BoxBoxConstraint {
         boxes[this.box2] = box2;
     }
 
+    private static void ApplyImpulse(float3 impulse, ref Box box) {
+        // Delta velocity
+        float3 dv = new float3(1/box.mass, 1/box.mass, 1/box.inertia) * impulse;
 
-    private void ClampLambda(ref float lambda) {
+        box.vel += dv.xy;
+        box.angVel += dv.z;
+    }
+
+
+    private static void ClampLambda(ref float lambda, ref float accumulated) {
         if (CollisionSystem.accumulateImpulses) {
-            float oldAccumulated = accumulatedLambdas.n;
-            accumulatedLambdas.n = math.max(accumulatedLambdas.n + lambda, 0);
-            lambda = accumulatedLambdas.n - oldAccumulated;
+            float oldAccumulated = accumulated;
+            accumulated = math.max(accumulated + lambda, 0);
+            lambda = accumulated - oldAccumulated;
         } else {
             lambda = math.max(lambda, 0);
         }
     }
 
-    private void ClampLambda_t(ref float lambda_t, float lambda, float frictionCoefficient) {
+    private static void ClampLambda_t(ref float lambda_t, float lambda_n, float frictionCoefficient, ref float accum_t, ref float accum_n) {
         if (CollisionSystem.accumulateImpulses) {
-            float old_tAccumulated = accumulatedLambdas.t;
-            accumulatedLambdas.t = math.clamp(accumulatedLambdas.t + lambda_t, -accumulatedLambdas.n*frictionCoefficient, accumulatedLambdas.n*frictionCoefficient);
-            lambda_t = accumulatedLambdas.t - old_tAccumulated;
+            float old_tAccumulated = accum_t;
+            accum_t = math.clamp(accum_t + lambda_t, -accum_n*frictionCoefficient, accum_n*frictionCoefficient);
+            lambda_t = accum_t - old_tAccumulated;
         } else {
-            lambda_t = math.clamp(lambda_t, -lambda*frictionCoefficient, lambda*frictionCoefficient);
+            lambda_t = math.clamp(lambda_t, -lambda_n*frictionCoefficient, lambda_n*frictionCoefficient);
         }
     }
 }
