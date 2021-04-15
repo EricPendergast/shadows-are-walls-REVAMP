@@ -24,8 +24,8 @@ public struct BoxBoxConstraint {
 
     Float6 M_inv;
 
-    PenetrationConstraint<Float6> pc;
-    FrictionConstraint<Float6> fc;
+    PenetrationConstraint<Float6> penConstraint;
+    FrictionConstraint<Float6> fricConstraint;
 
     public BoxBoxConstraint(Entity box1, Entity box2, float2 normal, Geometry.Contact contact) {
         this.box1 = box1;
@@ -38,8 +38,8 @@ public struct BoxBoxConstraint {
 
         M_inv = default(Float6);
 
-        pc = new PenetrationConstraint<Float6>();
-        fc = new FrictionConstraint<Float6>();
+        penConstraint = new PenetrationConstraint<Float6>();
+        fricConstraint = new FrictionConstraint<Float6>();
     }
 
     public void PreStep(ref ComponentDataFromEntity<Box> boxes, float dt, Lambdas prevLambdas) {
@@ -69,7 +69,7 @@ public struct BoxBoxConstraint {
                 bias = (beta/dt) * (delta - delta_slop);
             }
 
-            pc = new PenetrationConstraint<Float6>(J_n, M_inv, bias);
+            penConstraint = new PenetrationConstraint<Float6>(J_n, M_inv, bias);
         }
 
 
@@ -80,12 +80,12 @@ public struct BoxBoxConstraint {
                 new float3(tangent, Lin.Cross(contact-box1.pos, tangent)), 
                 new float3(-tangent, -Lin.Cross(contact-box2.pos, tangent)));
 
-            fc = new FrictionConstraint<Float6>(J_t, M_inv, CollisionSystem.globalFriction);
+            fricConstraint = new FrictionConstraint<Float6>(J_t, M_inv, CollisionSystem.globalFriction);
         }
 
         if (CollisionSystem.accumulateImpulses) {
-            Float6 P_n = pc.GetImpulse(accum.n);
-            Float6 P_t = fc.GetImpulse(accum.t);
+            Float6 P_n = penConstraint.GetImpulse(accum.n);
+            Float6 P_t = fricConstraint.GetImpulse(accum.t);
 
             ApplyImpulse(P_n.Add(P_t), ref box1, ref box2);
         }
@@ -102,20 +102,16 @@ public struct BoxBoxConstraint {
         {
             Float6 v = GetV(ref box1, ref box2);
 
-            lambda = pc.GetLambda(v, ref accum.n);
-            Float6 P = pc.GetImpulse(lambda);
+            lambda = penConstraint.GetLambda(v, ref accum.n);
+            Float6 P = penConstraint.GetImpulse(lambda);
 
             ApplyImpulse(P, ref box1, ref box2);
         }
 
-        ////////////////////////////////
-        /////////// Friction ///////////
-        ////////////////////////////////
-
         {
             Float6 v = GetV(ref box1, ref box2);
 
-            Float6 P = fc.GetImpulse(v, lambda, ref accum.t, ref accum.n);
+            Float6 P = fricConstraint.GetImpulse(v, lambda, ref accum.t, ref accum.n);
 
             ApplyImpulse(P, ref box1, ref box2);
         }
