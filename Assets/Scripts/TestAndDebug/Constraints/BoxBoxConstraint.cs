@@ -22,11 +22,10 @@ public struct BoxBoxConstraint {
 
     public ContactId id {get;}
 
-    float3 M1_inv;
-    float3 M2_inv;
+    Float6 M_inv;
 
-    PenetrationConstraint pc;
-    FrictionConstraint fc;
+    PenetrationConstraint<Float6> pc;
+    FrictionConstraint<Float6> fc;
 
     public BoxBoxConstraint(Entity box1, Entity box2, float2 normal, Geometry.Contact contact) {
         this.box1 = box1;
@@ -37,11 +36,10 @@ public struct BoxBoxConstraint {
 
         accum = new Lambdas();
 
-        M1_inv = 0;
-        M2_inv = 0;
+        M_inv = default(Float6);
 
-        pc = new PenetrationConstraint();
-        fc = new FrictionConstraint();
+        pc = new PenetrationConstraint<Float6>();
+        fc = new FrictionConstraint<Float6>();
     }
 
     public void PreStep(ref ComponentDataFromEntity<Box> boxes, float dt, Lambdas prevLambdas) {
@@ -50,12 +48,16 @@ public struct BoxBoxConstraint {
         Box box1 = boxes[this.box1];
         Box box2 = boxes[this.box2];
 
-        M1_inv = new float3(1/box1.mass, 1/box1.mass, 1/box1.inertia);
-        M2_inv = new float3(1/box2.mass, 1/box2.mass, 1/box2.inertia);
+        M_inv = new Float6(
+            1/box1.mass, 1/box1.mass, 1/box1.inertia,
+            1/box2.mass, 1/box2.mass, 1/box2.inertia
+        );
 
         { // Normal precomputation
-            float3 J1_n = new float3(-normal, -Lin.Cross(contact-box1.pos, normal));
-            float3 J2_n = new float3(normal, Lin.Cross(contact-box2.pos, normal));
+            Float6 J_n = new Float6(
+                new float3(-normal, -Lin.Cross(contact-box1.pos, normal)), 
+                new float3(normal, Lin.Cross(contact-box2.pos, normal))
+            );
 
             float delta = -Geometry.GetOverlapOnAxis(box1.ToRect(), box2.ToRect(), normal);
             float beta = CollisionSystem.positionCorrection ? .1f : 0;
@@ -67,25 +69,25 @@ public struct BoxBoxConstraint {
                 bias = (beta/dt) * (delta - delta_slop);
             }
 
-            pc = new PenetrationConstraint(J1_n, J2_n, M1_inv, M2_inv, bias);
+            pc = new PenetrationConstraint<Float6>(J_n, M_inv, bias);
         }
 
 
         { // Tangent precomputation (friction)
             float2 tangent = Lin.Cross(normal, -1);
 
-            float3 J1_t = new float3(tangent, Lin.Cross(contact-box1.pos, tangent));
-            float3 J2_t = new float3(-tangent, -Lin.Cross(contact-box2.pos, tangent));
+            Float6 J_t = new Float6(
+                new float3(tangent, Lin.Cross(contact-box1.pos, tangent)), 
+                new float3(-tangent, -Lin.Cross(contact-box2.pos, tangent)));
 
-            fc = new FrictionConstraint(J1_t, J2_t, M1_inv, M2_inv, CollisionSystem.globalFriction);
+            fc = new FrictionConstraint<Float6>(J_t, M_inv, CollisionSystem.globalFriction);
         }
 
         if (CollisionSystem.accumulateImpulses) {
-            (float3 P1_n, float3 P2_n) = pc.GetImpulse(accum.n);
-            (float3 P1_t, float3 P2_t) = fc.GetImpulse(accum.t);
+            Float6 P_n = pc.GetImpulse(accum.n);
+            Float6 P_t = fc.GetImpulse(accum.t);
 
-            ApplyImpulse(P1_n + P1_t, ref box1);
-            ApplyImpulse(P2_n + P2_t, ref box2);
+            ApplyImpulse(P_n.Add(P_t), ref box1, ref box2);
         }
 
         boxes[this.box1] = box1;
@@ -96,17 +98,14 @@ public struct BoxBoxConstraint {
         Box box1 = boxes[this.box1];
         Box box2 = boxes[this.box2];
 
-
         float lambda;
         {
-            float3 v1 = new float3(box1.vel, box1.angVel);
-            float3 v2 = new float3(box2.vel, box2.angVel);
+            Float6 v = GetV(ref box1, ref box2);
 
-            lambda = pc.GetLambda(v1, v2, ref accum.n);
-            (float3 P_n1, float3 P_n2) = pc.GetImpulse(lambda);
+            lambda = pc.GetLambda(v, ref accum.n);
+            Float6 P = pc.GetImpulse(lambda);
 
-            ApplyImpulse(P_n1, ref box1);
-            ApplyImpulse(P_n2, ref box2);
+            ApplyImpulse(P, ref box1, ref box2);
         }
 
         ////////////////////////////////
@@ -114,13 +113,11 @@ public struct BoxBoxConstraint {
         ////////////////////////////////
 
         {
-            float3 v1 = new float3(box1.vel, box1.angVel);
-            float3 v2 = new float3(box2.vel, box2.angVel);
+            Float6 v = GetV(ref box1, ref box2);
 
-            (float3 P_t1, float3 P_t2) = fc.GetImpulse(v1, v2, lambda, ref accum.t, ref accum.n);
+            Float6 P = fc.GetImpulse(v, lambda, ref accum.t, ref accum.n);
 
-            ApplyImpulse(P_t1, ref box1);
-            ApplyImpulse(P_t2, ref box2);
+            ApplyImpulse(P, ref box1, ref box2);
         }
 
         // NOTE: This is not thread safe
@@ -128,10 +125,22 @@ public struct BoxBoxConstraint {
         boxes[this.box2] = box2;
     }
 
+    private static Float6 GetV(ref Box box1, ref Box box2) {
+        return new Float6(
+            new float3(box1.vel, box1.angVel),
+            new float3(box2.vel, box2.angVel)
+        );
+    }
+
     private static void ApplyImpulse(float3 impulse, ref Box box) {
         float3 dv = new float3(1/box.mass, 1/box.mass, 1/box.inertia) * impulse;
 
         box.vel += dv.xy;
         box.angVel += dv.z;
+    }
+
+    private static void ApplyImpulse(Float6 impulse, ref Box box1, ref Box box2) {
+        ApplyImpulse(impulse.v1, ref box1);
+        ApplyImpulse(impulse.v2, ref box2);
     }
 }
