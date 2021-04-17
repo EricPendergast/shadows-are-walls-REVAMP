@@ -20,13 +20,17 @@ public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
             new Box {
                 pos = (Vector2)transform.position,
                 rot = transform.eulerAngles.z*Mathf.Deg2Rad,
-                vel = velocity,
-                angVel = angularVelocity*Mathf.Deg2Rad,
                 mass = mass,
                 inertia = mass*(w*w + h*h)/12,
                 width = w,
                 height = h,
                 id = Random.Range(1, int.MaxValue)
+            });
+
+        dstManager.AddComponentData(entity, 
+            new Velocity {
+                vel = velocity,
+                angVel = angularVelocity*Mathf.Deg2Rad,
             });
 
         if (gravityScale != 1) {

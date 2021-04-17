@@ -43,11 +43,8 @@ public struct BoxBoxConstraint {
         fricConstraint = new FrictionConstraint<Float6>();
     }
 
-    public void PreStep(ref ComponentDataFromEntity<Box> boxes, float dt, Lambdas prevLambdas) {
+    public void PreStep(Box box1, Box box2, ref Velocity v1, ref Velocity v2, float dt, Lambdas prevLambdas) {
         accum = prevLambdas;
-
-        Box box1 = boxes[this.box1];
-        Box box2 = boxes[this.box2];
 
         M_inv = new Float6(
             1/box1.mass, 1/box1.mass, 1/box1.inertia,
@@ -88,56 +85,44 @@ public struct BoxBoxConstraint {
             Float6 P_n = penConstraint.GetImpulse(accum.n);
             Float6 P_t = fricConstraint.GetImpulse(accum.t);
 
-            ApplyImpulse(P_n.Add(P_t), ref box1, ref box2);
+            ApplyImpulse(P_n.Add(P_t), ref v1, ref v2);
         }
-
-        boxes[this.box1] = box1;
-        boxes[this.box2] = box2;
     }
 
-    public void ApplyImpulse(ref ComponentDataFromEntity<Box> boxes, float dt) {
-        Box box1 = boxes[this.box1];
-        Box box2 = boxes[this.box2];
-
+    public void ApplyImpulse(ref Velocity v1, ref Velocity v2, float dt) {
         float lambda;
         {
-            Float6 v = GetV(ref box1, ref box2);
+            Float6 v = GetV(ref v1, ref v2);
 
             lambda = penConstraint.GetLambda(v, ref accum.n);
             Float6 P = penConstraint.GetImpulse(lambda);
 
-            ApplyImpulse(P, ref box1, ref box2);
+            ApplyImpulse(P, ref v1, ref v2);
         }
 
         {
-            Float6 v = GetV(ref box1, ref box2);
+            Float6 v = GetV(ref v1, ref v2);
 
             Float6 P = fricConstraint.GetImpulse(v, lambda, ref accum.t, ref accum.n);
 
-            ApplyImpulse(P, ref box1, ref box2);
+            ApplyImpulse(P, ref v1, ref v2);
         }
-
-        // NOTE: This is not thread safe
-        boxes[this.box1] = box1;
-        boxes[this.box2] = box2;
     }
 
-    private static Float6 GetV(ref Box box1, ref Box box2) {
+    private static Float6 GetV(ref Velocity v1, ref Velocity v2) {
         return new Float6(
-            new float3(box1.vel, box1.angVel),
-            new float3(box2.vel, box2.angVel)
+            new float3(v1.vel, v1.angVel),
+            new float3(v2.vel, v2.angVel)
         );
     }
 
-    private static void ApplyImpulse(float3 impulse, ref Box box) {
-        float3 dv = new float3(1/box.mass, 1/box.mass, 1/box.inertia) * impulse;
+    private void ApplyImpulse(Float6 impulse, ref Velocity v1, ref Velocity v2) {
+        impulse = impulse.Mult(M_inv);
 
-        box.vel += dv.xy;
-        box.angVel += dv.z;
-    }
+        v1.vel += impulse.v1.xy;
+        v1.angVel += impulse.v1.z;
 
-    private static void ApplyImpulse(Float6 impulse, ref Box box1, ref Box box2) {
-        ApplyImpulse(impulse.v1, ref box1);
-        ApplyImpulse(impulse.v2, ref box2);
+        v2.vel += impulse.v2.xy;
+        v2.angVel += impulse.v2.z;
     }
 }

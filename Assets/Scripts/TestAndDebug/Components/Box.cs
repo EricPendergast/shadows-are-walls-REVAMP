@@ -8,9 +8,6 @@ public struct Box : IComponentData {
     public float2 pos;
     public float rot;
 
-    public float2 vel;
-    public float angVel;
-
     public float mass;
     public float inertia;
 

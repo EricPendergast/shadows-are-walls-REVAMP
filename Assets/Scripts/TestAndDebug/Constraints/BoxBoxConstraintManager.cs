@@ -21,6 +21,9 @@ public class BoxBoxConstraintManager : BoxBoxConstraintManagerGeneric<BoxBoxCons
     public ComponentDataFromEntity<Box> boxes {
         set => helper.boxes = value;
     }
+    public ComponentDataFromEntity<Velocity> boxVels {
+        set => helper.boxVels = value;
+    }
     public BoxBoxConstraintManager() : base(default(BoxBoxConstraintHelper)) {
 
     }
@@ -28,6 +31,7 @@ public class BoxBoxConstraintManager : BoxBoxConstraintManagerGeneric<BoxBoxCons
 
 public struct BoxBoxConstraintHelper : ConstraintManagerHelper {
     public ComponentDataFromEntity<Box> boxes;
+    public ComponentDataFromEntity<Velocity> boxVels;
 
     public Geometry.Manifold? GetManifold(Entity box1, Entity box2) {
         return Geometry.GetIntersectData(
@@ -45,11 +49,23 @@ public struct BoxBoxConstraintHelper : ConstraintManagerHelper {
     }
 
     public void ApplyImpulse(ref BoxBoxConstraint constraint, float dt) {
-        constraint.ApplyImpulse(ref boxes, dt);
+        var v1 = boxVels[constraint.box1];
+        var v2 = boxVels[constraint.box2];
+
+        constraint.ApplyImpulse(ref v1, ref v2, dt);
+
+        boxVels[constraint.box1] = v1;
+        boxVels[constraint.box2] = v2;
     }
 
     public void PreStep(ref BoxBoxConstraint constraint, float dt, Lambdas lambdas) {
-        constraint.PreStep(ref boxes, dt, lambdas);
+        var v1 = boxVels[constraint.box1];
+        var v2 = boxVels[constraint.box2];
+
+        constraint.PreStep(boxes[constraint.box1], boxes[constraint.box2], ref v1, ref v2, dt, lambdas);
+
+        boxVels[constraint.box1] = v1;
+        boxVels[constraint.box2] = v2;
     }
 }
 

@@ -35,8 +35,9 @@ public class CollisionSystem : SystemBase {
         var boxEntities = this.boxEntities;
         StoreBoxEntitiesInto(boxEntities);
 
-        var boxes = GetComponentDataFromEntity<Box>(false);
-        boxBoxCM.boxes = boxes;
+        boxBoxCM.boxes = GetComponentDataFromEntity<Box>(false);
+
+        boxBoxCM.boxVels = GetComponentDataFromEntity<Velocity>(false);
 
         boxBoxCM.FindConstraints(boxEntities);
 

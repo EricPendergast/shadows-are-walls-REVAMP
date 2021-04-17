@@ -10,13 +10,13 @@ public class GravitySystem : SystemBase {
         float dt = Time.DeltaTime;
         Entities.
             WithNone<GravityScale>().
-            ForEach((ref Box box) => {
-                box.vel += dt*gravityAccel;
+            ForEach((ref Velocity vel) => {
+               vel.vel += dt*gravityAccel;
         }).Run();
 
         Entities.
-            ForEach((ref Box box, in GravityScale gs) => {
-                box.vel += dt*gravityAccel*gs.gravityScale;
+            ForEach((ref Velocity vel, in GravityScale gs) => {
+                vel.vel += dt*gravityAccel*gs.gravityScale;
         }).Run();
     }
 }
