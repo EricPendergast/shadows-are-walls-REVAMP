@@ -27,12 +27,13 @@ public struct BoxBoxConstraint {
     PenetrationConstraint<Float6> penConstraint;
     FrictionConstraint<Float6> fricConstraint;
 
-    public BoxBoxConstraint(Entity box1, Entity box2, float2 normal, Geometry.Contact contact) {
+    public BoxBoxConstraint(Entity box1, Entity box2, Geometry.Manifold manifold, bool useContact1) {
         this.box1 = box1;
         this.box2 = box2;
-        this.normal = normal;
+        this.normal = manifold.normal;
+        var contact = useContact1 ? manifold.contact1 : (Geometry.Contact)manifold.contact2;
         this.contact = contact.point;
-        id = contact.id;
+        this.id = contact.id;
 
         accum = new Lambdas();
 

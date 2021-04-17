@@ -39,8 +39,8 @@ public struct BoxBoxConstraintHelper : ConstraintManagerHelper {
     public BoxBoxConstraint GetConstraint(Entity box1, Entity box2, Geometry.Manifold manifold, bool useContact1) {
         return new BoxBoxConstraint(
             box1, box2,
-            manifold.normal,
-            useContact1 ? manifold.contact1 : (Geometry.Contact)manifold.contact2
+            manifold,
+            useContact1
         );
     }
 
@@ -93,18 +93,21 @@ public abstract class BoxBoxConstraintManagerGeneric<H>
         }
     }
 
+    private Lambdas GetLambdas(Geometry.ContactId id) {
+        Lambdas lambdas;
+        if (CollisionSystem.warmStarting && prevLambdas.TryGetValue(id, out var l)) {
+            lambdas = l;
+        } else {
+            lambdas = new Lambdas();
+        }
+        return lambdas;
+    }
+
     public void PreSteps(float dt) {
         for (int j = 0; j < boxBoxConstraints.Length; j++) {
             var c = boxBoxConstraints[j];
 
-            Lambdas lambdas;
-            if (CollisionSystem.warmStarting && prevLambdas.TryGetValue(c.id, out var l)) {
-                lambdas = l;
-            } else {
-                lambdas = new Lambdas();
-            }
-
-            helper.PreStep(ref c, dt, lambdas);
+            helper.PreStep(ref c, dt, GetLambdas(c.id));
 
             // TODO: Non readonly structs are EVIL
             boxBoxConstraints[j] = c;
