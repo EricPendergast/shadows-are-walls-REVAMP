@@ -9,17 +9,34 @@ using Physics.Math;
 
 using ContactId = Physics.Math.Geometry.ContactId;
 
-public class BoxBoxConstraintManager : BoxBoxConstraintManagerGeneric {
+
+public interface ConstraintManagerHelper {
+     Geometry.Manifold? GetManifold(Entity box1, Entity box2);
+     BoxBoxConstraint GetConstraint(Entity box1, Entity box2, Geometry.Manifold manifold, bool useContact1);
+     void ApplyImpulse(ref BoxBoxConstraint constraint, float dt);
+     void PreStep(ref BoxBoxConstraint constraint, float dt, Lambdas lambdas);
+}
+
+public class BoxBoxConstraintManager : BoxBoxConstraintManagerGeneric<BoxBoxConstraintHelper> {
+    public ComponentDataFromEntity<Box> boxes {
+        set => helper.boxes = value;
+    }
+    public BoxBoxConstraintManager() : base(default(BoxBoxConstraintHelper)) {
+
+    }
+}
+
+public struct BoxBoxConstraintHelper : ConstraintManagerHelper {
     public ComponentDataFromEntity<Box> boxes;
 
-    protected override Geometry.Manifold? GetManifold(Entity box1, Entity box2) {
+    public Geometry.Manifold? GetManifold(Entity box1, Entity box2) {
         return Geometry.GetIntersectData(
             boxes[box1].ToRect(),
             boxes[box2].ToRect()
         );
     }
 
-    protected override BoxBoxConstraint GetConstraint(Entity box1, Entity box2, Geometry.Manifold manifold, bool useContact1) {
+    public BoxBoxConstraint GetConstraint(Entity box1, Entity box2, Geometry.Manifold manifold, bool useContact1) {
         return new BoxBoxConstraint(
             box1, box2,
             manifold.normal,
@@ -27,24 +44,28 @@ public class BoxBoxConstraintManager : BoxBoxConstraintManagerGeneric {
         );
     }
 
-    protected override void ApplyImpulse(ref BoxBoxConstraint constraint, float dt) {
+    public void ApplyImpulse(ref BoxBoxConstraint constraint, float dt) {
         constraint.ApplyImpulse(ref boxes, dt);
     }
 
-    protected override void PreStep(ref BoxBoxConstraint constraint, float dt, Lambdas lambdas) {
+    public void PreStep(ref BoxBoxConstraint constraint, float dt, Lambdas lambdas) {
         constraint.PreStep(ref boxes, dt, lambdas);
     }
 }
 
-public abstract class BoxBoxConstraintManagerGeneric {
+public abstract class BoxBoxConstraintManagerGeneric<H> 
+        where H : struct, ConstraintManagerHelper {
     private NativeList<BoxBoxConstraint> boxBoxConstraints;
     // Maps from contact id to the accumulated lambda of that contact last
     // frame. Used for warm starting.
     private NativeHashMap<ContactId, Lambdas> prevLambdas;
 
-    public BoxBoxConstraintManagerGeneric() {
+    protected H helper;
+
+    public BoxBoxConstraintManagerGeneric(H helper) {
         prevLambdas = new NativeHashMap<ContactId, Lambdas>(100, Allocator.Persistent);
         boxBoxConstraints = new NativeList<BoxBoxConstraint>(100, Allocator.Persistent);
+        this.helper = helper;
     }
 
     public void FindConstraints(NativeList<Entity> boxEntities) {
@@ -56,26 +77,21 @@ public abstract class BoxBoxConstraintManagerGeneric {
                 Entity box1 = boxEntities[i];
                 Entity box2 = boxEntities[j];
 
-                var manifoldNullable = GetManifold(box1, box2);
+                var manifoldNullable = helper.GetManifold(box1, box2);
 
                 if (manifoldNullable is Geometry.Manifold manifold) {
 
-                    boxBoxConstraints.Add(GetConstraint(box1, box2, manifold, true));
+                    boxBoxConstraints.Add(helper.GetConstraint(box1, box2, manifold, true));
 
                     if (manifold.contact2 is Geometry.Contact contact) {
 
-                        boxBoxConstraints.Add(GetConstraint(box1, box2, manifold, false));
+                        boxBoxConstraints.Add(helper.GetConstraint(box1, box2, manifold, false));
                         Debug.Assert(!manifold.contact1.id.Equals(contact.id), "Duplicate contact ids within the same manifold");
                     }
                 }
             }
         }
     }
-
-    protected abstract Geometry.Manifold? GetManifold(Entity box1, Entity box2);
-    protected abstract BoxBoxConstraint GetConstraint(Entity box1, Entity box2, Geometry.Manifold manifold, bool useContact1);
-    protected abstract void ApplyImpulse(ref BoxBoxConstraint constraint, float dt);
-    protected abstract void PreStep(ref BoxBoxConstraint constraint, float dt, Lambdas lambdas);
 
     public void PreSteps(float dt) {
         for (int j = 0; j < boxBoxConstraints.Length; j++) {
@@ -88,7 +104,7 @@ public abstract class BoxBoxConstraintManagerGeneric {
                 lambdas = new Lambdas();
             }
 
-            PreStep(ref c, dt, lambdas);
+            helper.PreStep(ref c, dt, lambdas);
 
             // TODO: Non readonly structs are EVIL
             boxBoxConstraints[j] = c;
@@ -100,7 +116,7 @@ public abstract class BoxBoxConstraintManagerGeneric {
         for (int j = 0; j < boxBoxConstraints.Length; j++) {
             var c = boxBoxConstraints[j];
 
-            ApplyImpulse(ref c, dt);
+            helper.ApplyImpulse(ref c, dt);
 
             // TODO: Non readonly structs are EVIL
             boxBoxConstraints[j] = c;
