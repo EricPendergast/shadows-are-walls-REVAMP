@@ -9,18 +9,45 @@ using Physics.Math;
 
 using ContactId = Physics.Math.Geometry.ContactId;
 
-public class BoxBoxConstraintManager {
+public class BoxBoxConstraintManager : BoxBoxConstraintManagerGeneric {
+    public ComponentDataFromEntity<Box> boxes;
+
+    protected override Geometry.Manifold? GetManifold(Entity box1, Entity box2) {
+        return Geometry.GetIntersectData(
+            boxes[box1].ToRect(),
+            boxes[box2].ToRect()
+        );
+    }
+
+    protected override BoxBoxConstraint GetConstraint(Entity box1, Entity box2, Geometry.Manifold manifold, bool useContact1) {
+        return new BoxBoxConstraint(
+            box1, box2,
+            manifold.normal,
+            useContact1 ? manifold.contact1 : (Geometry.Contact)manifold.contact2
+        );
+    }
+
+    protected override void ApplyImpulse(ref BoxBoxConstraint constraint, float dt) {
+        constraint.ApplyImpulse(ref boxes, dt);
+    }
+
+    protected override void PreStep(ref BoxBoxConstraint constraint, float dt, Lambdas lambdas) {
+        constraint.PreStep(ref boxes, dt, lambdas);
+    }
+}
+
+public abstract class BoxBoxConstraintManagerGeneric {
     private NativeList<BoxBoxConstraint> boxBoxConstraints;
     // Maps from contact id to the accumulated lambda of that contact last
     // frame. Used for warm starting.
     private NativeHashMap<ContactId, Lambdas> prevLambdas;
 
-    public BoxBoxConstraintManager() {
+    public BoxBoxConstraintManagerGeneric() {
         prevLambdas = new NativeHashMap<ContactId, Lambdas>(100, Allocator.Persistent);
         boxBoxConstraints = new NativeList<BoxBoxConstraint>(100, Allocator.Persistent);
     }
 
-    public void FindConstraints(ref ComponentDataFromEntity<Box> boxes, NativeList<Entity> boxEntities) {
+    public void FindConstraints(NativeList<Entity> boxEntities) {
 
         boxBoxConstraints.Clear();
 
@@ -29,27 +56,15 @@ public class BoxBoxConstraintManager {
                 Entity box1 = boxEntities[i];
                 Entity box2 = boxEntities[j];
 
-                var manifoldNullable = Geometry.GetIntersectData(
-                    boxes[box1].ToRect(),
-                    boxes[box2].ToRect()
-                );
+                var manifoldNullable = GetManifold(box1, box2);
 
                 if (manifoldNullable is Geometry.Manifold manifold) {
 
-                    boxBoxConstraints.Add(new BoxBoxConstraint(
-                        box1, box2,
-                        manifold.normal,
-                        manifold.contact1
-                    ));
-
+                    boxBoxConstraints.Add(GetConstraint(box1, box2, manifold, true));
 
                     if (manifold.contact2 is Geometry.Contact contact) {
-                        boxBoxConstraints.Add(new BoxBoxConstraint(
-                            box1, box2,
-                            manifold.normal,
-                            contact
-                        ));
 
+                        boxBoxConstraints.Add(GetConstraint(box1, box2, manifold, false));
                         Debug.Assert(!manifold.contact1.id.Equals(contact.id), "Duplicate contact ids within the same manifold");
                     }
                 }
@@ -57,7 +72,12 @@ public class BoxBoxConstraintManager {
         }
     }
 
-    public void PreStep(ref ComponentDataFromEntity<Box> boxes, float dt) {
+    protected abstract Geometry.Manifold? GetManifold(Entity box1, Entity box2);
+    protected abstract BoxBoxConstraint GetConstraint(Entity box1, Entity box2, Geometry.Manifold manifold, bool useContact1);
+    protected abstract void ApplyImpulse(ref BoxBoxConstraint constraint, float dt);
+    protected abstract void PreStep(ref BoxBoxConstraint constraint, float dt, Lambdas lambdas);
+
+    public void PreSteps(float dt) {
         for (int j = 0; j < boxBoxConstraints.Length; j++) {
             var c = boxBoxConstraints[j];
 
@@ -68,26 +88,26 @@ public class BoxBoxConstraintManager {
                 lambdas = new Lambdas();
             }
 
-            c.PreStep(ref boxes, dt, lambdas);
+            PreStep(ref c, dt, lambdas);
 
             // TODO: Non readonly structs are EVIL
             boxBoxConstraints[j] = c;
         }
     }
 
-    public void ApplyImpulse(ref ComponentDataFromEntity<Box> boxes, float dt) {
+    public void ApplyImpulses(float dt) {
 
         for (int j = 0; j < boxBoxConstraints.Length; j++) {
             var c = boxBoxConstraints[j];
 
-            c.ApplyImpulse(ref boxes, dt);
+            ApplyImpulse(ref c, dt);
 
             // TODO: Non readonly structs are EVIL
             boxBoxConstraints[j] = c;
         }
     }
 
-    public void StoreLambdas() {
+    public void PostSteps() {
         prevLambdas.Clear();
         foreach (var constraint in boxBoxConstraints) {
             // TODO: This assert actually fails naturally sometimes. It's

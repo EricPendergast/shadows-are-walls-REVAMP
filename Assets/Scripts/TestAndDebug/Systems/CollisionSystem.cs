@@ -36,18 +36,19 @@ public class CollisionSystem : SystemBase {
         StoreBoxEntitiesInto(boxEntities);
 
         var boxes = GetComponentDataFromEntity<Box>(false);
+        boxBoxCM.boxes = boxes;
 
-        boxBoxCM.FindConstraints(ref boxes, boxEntities);
+        boxBoxCM.FindConstraints(boxEntities);
 
         float dt = Time.DeltaTime;
 
-        boxBoxCM.PreStep(ref boxes, dt);
+        boxBoxCM.PreSteps(dt);
 
         for (int i = 0; i < 10; i++) {
-            boxBoxCM.ApplyImpulse(ref boxes, dt);
+            boxBoxCM.ApplyImpulses(dt);
         }
 
-        boxBoxCM.StoreLambdas();
+        boxBoxCM.PostSteps();
     }
 
     private void StoreBoxEntitiesInto(NativeList<Entity> storeInto) {
