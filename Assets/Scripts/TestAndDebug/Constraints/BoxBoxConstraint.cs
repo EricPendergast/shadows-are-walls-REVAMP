@@ -10,7 +10,7 @@ public struct Lambdas {
     public float t;
 }
 
-public struct BoxBoxConstraint {
+public struct BoxBoxConstraint : Constraint {
     public Entity box1 {get;}
     public Entity box2 {get;}
     private Lambdas accum;

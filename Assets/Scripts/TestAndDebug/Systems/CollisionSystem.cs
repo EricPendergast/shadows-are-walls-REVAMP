@@ -7,6 +7,7 @@ using Physics.Math;
 using UnityEngine;
 
 using ContactId = Physics.Math.Geometry.ContactId;
+using BoxBoxConstraintManager = ConstraintManager<BoxBoxConstraintHelper, BoxBoxConstraint>;
 
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
 [UpdateAfter(typeof(GravitySystem))]
@@ -28,16 +29,16 @@ public class CollisionSystem : SystemBase {
 
     protected override void OnDestroy() {
         boxEntities.Dispose();
-        boxBoxCM.Destroy();
+        boxBoxCM.Dispose();
     }
 
     protected override void OnUpdate() {
         var boxEntities = this.boxEntities;
         StoreBoxEntitiesInto(boxEntities);
 
-        boxBoxCM.boxes = GetComponentDataFromEntity<Box>(false);
-
-        boxBoxCM.boxVels = GetComponentDataFromEntity<Velocity>(false);
+        boxBoxCM.helper.boxes = GetComponentDataFromEntity<Box>(false);
+        boxBoxCM.helper.boxVels = GetComponentDataFromEntity<Velocity>(false);
+        boxBoxCM.helper.boxEntities = boxEntities;
 
         boxBoxCM.FindConstraints(boxEntities);
 
