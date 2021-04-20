@@ -15,8 +15,8 @@ public struct Lambdas {
 // jacobian, should work for normal rigidbodies (like box, circle,
 // etc). May or may not work for crazier rigidbodies.
 public struct StandardConstraint : IConstraint {
-    public Entity box1 {get;}
-    public Entity box2 {get;}
+    public Entity e1 {get;}
+    public Entity e2 {get;}
     private Lambdas accum;
     public Lambdas GetAccumulatedLambdas() {
         return accum;
@@ -32,9 +32,9 @@ public struct StandardConstraint : IConstraint {
     PenetrationConstraint<Float6> penConstraint;
     FrictionConstraint<Float6> fricConstraint;
 
-    public StandardConstraint(Entity box1, Entity box2, Geometry.Manifold manifold, bool useContact1) {
-        this.box1 = box1;
-        this.box2 = box2;
+    public StandardConstraint(Entity e1, Entity e2, Geometry.Manifold manifold, bool useContact1) {
+        this.e1 = e1;
+        this.e2 = e2;
         this.normal = manifold.normal;
         var contact = useContact1 ? manifold.contact1 : (Geometry.Contact)manifold.contact2;
         this.contact = contact.point;
@@ -49,17 +49,17 @@ public struct StandardConstraint : IConstraint {
         fricConstraint = new FrictionConstraint<Float6>();
     }
 
-    public void PreStep(Box box1, Box box2, ref Velocity v1, ref Velocity v2, float dt, Lambdas prevLambdas) {
+    public void PreStep(Box e1, Box e2, ref Velocity v1, ref Velocity v2, float dt, Lambdas prevLambdas) {
         accum = prevLambdas;
         M_inv = new Float6(
-            1/box1.mass, 1/box1.mass, 1/box1.inertia,
-            1/box2.mass, 1/box2.mass, 1/box2.inertia
+            1/e1.mass, 1/e1.mass, 1/e1.inertia,
+            1/e2.mass, 1/e2.mass, 1/e2.inertia
         );
 
         { // Normal precomputation
             Float6 J_n = new Float6(
-                new float3(-normal, -Lin.Cross(contact-box1.pos, normal)), 
-                new float3(normal, Lin.Cross(contact-box2.pos, normal))
+                new float3(-normal, -Lin.Cross(contact-e1.pos, normal)), 
+                new float3(normal, Lin.Cross(contact-e2.pos, normal))
             );
 
             float delta = -overlap;
@@ -80,8 +80,8 @@ public struct StandardConstraint : IConstraint {
             float2 tangent = Lin.Cross(normal, -1);
 
             Float6 J_t = new Float6(
-                new float3(tangent, Lin.Cross(contact-box1.pos, tangent)), 
-                new float3(-tangent, -Lin.Cross(contact-box2.pos, tangent)));
+                new float3(tangent, Lin.Cross(contact-e1.pos, tangent)), 
+                new float3(-tangent, -Lin.Cross(contact-e2.pos, tangent)));
 
             fricConstraint = new FrictionConstraint<Float6>(J_t, M_inv, CollisionSystem.globalFriction);
         }

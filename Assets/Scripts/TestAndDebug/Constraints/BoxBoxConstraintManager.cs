@@ -43,23 +43,23 @@ public struct BoxBoxConstraintHelper : ConstraintManagerHelper<StandardConstrain
     }
 
     public void ApplyImpulse(ref StandardConstraint constraint, float dt) {
-        var v1 = boxVels[constraint.box1];
-        var v2 = boxVels[constraint.box2];
+        var v1 = boxVels[constraint.e1];
+        var v2 = boxVels[constraint.e2];
 
         constraint.ApplyImpulse(ref v1, ref v2, dt);
 
-        boxVels[constraint.box1] = v1;
-        boxVels[constraint.box2] = v2;
+        boxVels[constraint.e1] = v1;
+        boxVels[constraint.e2] = v2;
     }
 
     public void PreStep(ref StandardConstraint constraint, float dt, Lambdas lambdas) {
-        var v1 = boxVels[constraint.box1];
-        var v2 = boxVels[constraint.box2];
+        var v1 = boxVels[constraint.e1];
+        var v2 = boxVels[constraint.e2];
 
-        constraint.PreStep(boxes[constraint.box1], boxes[constraint.box2], ref v1, ref v2, dt, lambdas);
+        constraint.PreStep(boxes[constraint.e1], boxes[constraint.e2], ref v1, ref v2, dt, lambdas);
 
-        boxVels[constraint.box1] = v1;
-        boxVels[constraint.box2] = v2;
+        boxVels[constraint.e1] = v1;
+        boxVels[constraint.e2] = v2;
     }
 
     public void FillWithConstraints(NativeList<StandardConstraint> constraints) {

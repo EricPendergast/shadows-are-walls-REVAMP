@@ -48,23 +48,23 @@ public struct BoxLightEdgeConstraintHelper : ConstraintManagerHelper<StandardCon
     }
 
     public void ApplyImpulse(ref StandardConstraint constraint, float dt) {
-        var v1 = vels[constraint.box1];
-        var v2 = vels[constraint.box2];
+        var v1 = vels[constraint.e1];
+        var v2 = vels[constraint.e2];
 
         constraint.ApplyImpulse(ref v1, ref v2, dt);
 
-        vels[constraint.box1] = v1;
-        vels[constraint.box2] = v2;
+        vels[constraint.e1] = v1;
+        vels[constraint.e2] = v2;
     }
 
     public void PreStep(ref StandardConstraint constraint, float dt, Lambdas lambdas) {
-        var v1 = vels[constraint.box1];
-        var v2 = vels[constraint.box2];
+        var v1 = vels[constraint.e1];
+        var v2 = vels[constraint.e2];
 
-        constraint.PreStep(boxes[constraint.box1], lightEdges[constraint.box2], ref v1, ref v2, dt, lambdas);
+        constraint.PreStep(boxes[constraint.e1], lightEdges[constraint.e2], ref v1, ref v2, dt, lambdas);
 
-        vels[constraint.box1] = v1;
-        vels[constraint.box2] = v2;
+        vels[constraint.e1] = v1;
+        vels[constraint.e2] = v2;
     }
 
     public void FillWithConstraints(NativeList<StandardConstraint> constraints) {
