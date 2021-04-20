@@ -7,12 +7,14 @@ using Physics.Math;
 using UnityEngine;
 
 using ContactId = Physics.Math.Geometry.ContactId;
-using BoxBoxConstraintManager = ConstraintManager<BoxBoxConstraintHelper, BoxBoxConstraint>;
+using BoxBoxConstraintManager = ConstraintManager<BoxBoxConstraintHelper, StandardConstraint>;
+using BoxLightEdgeConstraintManager = ConstraintManager<BoxLightEdgeConstraintHelper, StandardConstraint>;
 
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
 [UpdateAfter(typeof(GravitySystem))]
 public class CollisionSystem : SystemBase {
     EntityQuery boxesQuery;
+    EntityQuery lightEdgesQuery;
     public static bool accumulateImpulses = true;
     public static bool warmStarting = true;
     public static bool positionCorrection = true;
@@ -20,37 +22,66 @@ public class CollisionSystem : SystemBase {
     public static float globalFriction = .2f;
 
     private NativeList<Entity> boxEntities;
+    private NativeList<Entity> lightEdgeEntities;
+
     private BoxBoxConstraintManager boxBoxCM;
+    private BoxLightEdgeConstraintManager boxLightEdgeCM;
 
     protected override void OnCreate() {
         boxEntities = new NativeList<Entity>(100, Allocator.Persistent);
+        lightEdgeEntities = new NativeList<Entity>(100, Allocator.Persistent);
+
         boxBoxCM = new BoxBoxConstraintManager();
+        boxLightEdgeCM = new BoxLightEdgeConstraintManager();
     }
 
     protected override void OnDestroy() {
         boxEntities.Dispose();
+        lightEdgeEntities.Dispose();
+
         boxBoxCM.Dispose();
+        boxLightEdgeCM.Dispose();
     }
 
     protected override void OnUpdate() {
         var boxEntities = this.boxEntities;
         StoreBoxEntitiesInto(boxEntities);
 
-        boxBoxCM.helper.boxes = GetComponentDataFromEntity<Box>(false);
-        boxBoxCM.helper.boxVels = GetComponentDataFromEntity<Velocity>(false);
+        var lightEdgeEntities = this.lightEdgeEntities;
+        StoreLightEdgeEntitiesInto(lightEdgeEntities);
+
+        var boxes = GetComponentDataFromEntity<Box>(false);
+        var lightEdges = GetComponentDataFromEntity<LightEdge>(false);
+        var velocities = GetComponentDataFromEntity<Velocity>(false);
+
+        // TODO: Put this in an update function
+        boxBoxCM.helper.boxes = boxes;
+        boxBoxCM.helper.boxVels = velocities;
         boxBoxCM.helper.boxEntities = boxEntities;
 
-        boxBoxCM.FindConstraints(boxEntities);
+        boxLightEdgeCM.helper.Update(
+            boxes: boxes,
+            lightEdges: lightEdges,
+            vels: velocities,
+            boxEntities: boxEntities,
+            lightEdgeEntities: lightEdgeEntities
+        );
+
+        boxBoxCM.FindConstraints();
+        boxLightEdgeCM.FindConstraints();
 
         float dt = Time.DeltaTime;
 
         boxBoxCM.PreSteps(dt);
+        boxLightEdgeCM.PreSteps(dt);
 
         for (int i = 0; i < 10; i++) {
             boxBoxCM.ApplyImpulses(dt);
+            boxLightEdgeCM.ApplyImpulses(dt);
         }
 
         boxBoxCM.PostSteps();
+        boxLightEdgeCM.PostSteps();
     }
 
     private void StoreBoxEntitiesInto(NativeList<Entity> storeInto) {
@@ -66,6 +97,19 @@ public class CollisionSystem : SystemBase {
             }).Run();
     }
 
+    private void StoreLightEdgeEntitiesInto(NativeList<Entity> storeInto) {
+        storeInto.Clear();
+        storeInto.Length = lightEdgesQuery.CalculateEntityCount();
+    
+        Entities
+            .WithName("StoreLightEdges")
+            .WithAll<LightEdge>()
+            .WithStoreEntityQueryInField(ref lightEdgesQuery)
+            .ForEach((int entityInQueryIndex, ref Entity e) => {
+                storeInto[entityInQueryIndex] = e;
+            }).Run();
+    }
+
     public struct DebugContactInfo {
         public float2 normal;
         public float2 contact;
@@ -74,6 +118,9 @@ public class CollisionSystem : SystemBase {
 
     public IEnumerable<DebugContactInfo> GetContactsForDebug() {
         foreach (var item in boxBoxCM.GetContactsForDebug()) {
+            yield return item;
+        }
+        foreach (var item in boxLightEdgeCM.GetContactsForDebug()) {
             yield return item;
         }
     }
