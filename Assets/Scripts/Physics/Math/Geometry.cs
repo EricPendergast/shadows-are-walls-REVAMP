@@ -177,7 +177,8 @@ namespace Physics.Math {
         }
         public struct Manifold {
             public float2 normal;
-            //float penetration;
+            // This is negative if they aren't touching
+            public float overlap;
             public Contact contact1;
             public Contact? contact2;
         }
@@ -199,7 +200,8 @@ namespace Physics.Math {
         
             // Says how far r1 must move along the best axis before it touches
             // r2 at a single point.
-            float minOverlap = math.INFINITY;
+            float minOverlapWeighted = math.INFINITY;
+            float minOverlap= math.INFINITY;
             float2 bestAxis = float2.zero;
             
             for (int i = 0; i < axes.Length; i++) {
@@ -230,9 +232,10 @@ namespace Physics.Math {
 
                 // Weighting the overlap so that there is a slight preference
                 // for a downward pointing normal vector.
-                overlap += .05f * math.dot(new float2(0, 1), ax);
+                var overlapWeighted = overlap + .05f * math.dot(new float2(0, 1), ax);
 
-                if (overlap < minOverlap) {
+                if (overlapWeighted < minOverlapWeighted) {
+                    minOverlapWeighted = overlapWeighted;
                     minOverlap = overlap;
                     bestAxis = ax;
                 }
@@ -243,7 +246,7 @@ namespace Physics.Math {
             if (contact1 == null) {
                 return null;
             } else {
-                Manifold manifold = new Manifold{normal = bestAxis, contact1 = (Contact)contact1, contact2 = contact2};
+                Manifold manifold = new Manifold{normal = bestAxis, contact1 = (Contact)contact1, contact2 = contact2, overlap=minOverlap};
                 return manifold;
             }
         }

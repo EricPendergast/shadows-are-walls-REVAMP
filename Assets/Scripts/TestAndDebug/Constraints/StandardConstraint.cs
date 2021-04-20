@@ -23,6 +23,7 @@ public struct StandardConstraint : IConstraint {
     }
     public float2 normal {get;}
     public float2 contact {get;}
+    public float overlap;
 
     public ContactId id {get;}
 
@@ -37,6 +38,7 @@ public struct StandardConstraint : IConstraint {
         this.normal = manifold.normal;
         var contact = useContact1 ? manifold.contact1 : (Geometry.Contact)manifold.contact2;
         this.contact = contact.point;
+        this.overlap = manifold.overlap;
         this.id = contact.id;
 
         accum = new Lambdas();
@@ -60,7 +62,7 @@ public struct StandardConstraint : IConstraint {
                 new float3(normal, Lin.Cross(contact-box2.pos, normal))
             );
 
-            float delta = -Geometry.GetOverlapOnAxis(box1.ToRect(), box2.ToRect(), normal);
+            float delta = -overlap;
             float beta = CollisionSystem.positionCorrection ? .1f : 0;
             float delta_slop = -.01f;
 
@@ -105,8 +107,7 @@ public struct StandardConstraint : IConstraint {
                 new float3(0, 0, Lin.Cross(contact-le.pos, normal))
             );
 
-            // TODO: Overlap should be stored in the manifold, not calculated here
-            float delta = -Geometry.GetOverlapOnAxis(box.ToRect(), le.ToRect(), normal);
+            float delta = -overlap;
             float beta = CollisionSystem.positionCorrection ? .1f : 0;
             float delta_slop = -.01f;
 
