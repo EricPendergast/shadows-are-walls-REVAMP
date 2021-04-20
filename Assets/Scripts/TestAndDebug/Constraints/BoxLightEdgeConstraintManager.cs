@@ -7,7 +7,9 @@ using UnityEngine;
 
 using Physics.Math;
 
-using ContactId = Physics.Math.Geometry.ContactId;
+// This is what the box-lightEdge constraint manager class looks like
+//      using BoxLightEdgeConstraintManager = 
+//          ConstraintManager<BoxLightEdgeConstraintHelper, StandardConstraint>;
 
 public struct BoxLightEdgeConstraintHelper : ConstraintManagerHelper<StandardConstraint> {
     private ComponentDataFromEntity<Box> boxes;
