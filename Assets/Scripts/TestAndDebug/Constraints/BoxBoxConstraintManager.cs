@@ -12,9 +12,20 @@ using Physics.Math;
 //          ConstraintManager<BoxBoxConstraintHelper, StandardConstraint>;
 
 public struct BoxBoxConstraintHelper : ConstraintManagerHelper<StandardConstraint> {
-    public ComponentDataFromEntity<Box> boxes;
-    public ComponentDataFromEntity<Velocity> boxVels;
-    public NativeList<Entity> boxEntities;
+    private ComponentDataFromEntity<Box> boxes;
+    private ComponentDataFromEntity<Velocity> boxVels;
+    private NativeList<Entity> boxEntities;
+
+    public void Update(
+        ComponentDataFromEntity<Box> boxes,
+        ComponentDataFromEntity<Velocity> boxVels,
+        NativeList<Entity> boxEntities) {
+
+        this.boxes = boxes;
+        this.boxVels = boxVels;
+        this.boxEntities = boxEntities;
+    }
+
 
     private Geometry.Manifold? GetManifold(Entity box1, Entity box2) {
         return Geometry.GetIntersectData(

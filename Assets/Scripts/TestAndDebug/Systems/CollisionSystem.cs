@@ -54,10 +54,11 @@ public class CollisionSystem : SystemBase {
         var lightEdges = GetComponentDataFromEntity<LightEdge>(false);
         var velocities = GetComponentDataFromEntity<Velocity>(false);
 
-        // TODO: Put this in an update function
-        boxBoxCM.helper.boxes = boxes;
-        boxBoxCM.helper.boxVels = velocities;
-        boxBoxCM.helper.boxEntities = boxEntities;
+        boxBoxCM.helper.Update(
+            boxes: boxes,
+            boxVels: velocities,
+            boxEntities: boxEntities
+        );
 
         boxLightEdgeCM.helper.Update(
             boxes: boxes,
