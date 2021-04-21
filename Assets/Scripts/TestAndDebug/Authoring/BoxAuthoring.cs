@@ -2,6 +2,12 @@ using Unity.Entities;
 using UnityEngine;
 
 public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
+    public enum BoxType {
+        HitShadowsObject,
+        TransparentObject
+    }
+    public BoxType boxType;
+
     public Vector2 velocity;
     public float angularVelocity;
 
@@ -39,6 +45,9 @@ public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
             );
         }
 
+        if (boxType == BoxType.HitShadowsObject) {
+            dstManager.AddComponentData(entity, new HitShadowsObject());
+        }
     }
 }
 

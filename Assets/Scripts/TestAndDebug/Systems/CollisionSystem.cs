@@ -14,41 +14,35 @@ using BoxLightEdgeConstraintManager = ConstraintManager<BoxLightEdgeConstraintHe
 [UpdateAfter(typeof(GravitySystem))]
 public class CollisionSystem : SystemBase {
     EntityQuery boxesQuery;
+    EntityQuery hitShadBoxesQuery;
     EntityQuery lightEdgesQuery;
     public static bool accumulateImpulses = true;
     public static bool warmStarting = true;
     public static bool positionCorrection = true;
     // In the future, this will be configurable on a per object basis
-    public static float globalFriction = .2f;
-
-    private NativeList<Entity> boxEntities;
-    private NativeList<Entity> lightEdgeEntities;
+    public static float globalFriction = .5f;
 
     private BoxBoxConstraintManager boxBoxCM;
     private BoxLightEdgeConstraintManager boxLightEdgeCM;
 
     protected override void OnCreate() {
-        boxEntities = new NativeList<Entity>(0, Allocator.Persistent);
-        lightEdgeEntities = new NativeList<Entity>(0, Allocator.Persistent);
+        boxesQuery = GetEntityQuery(typeof(Box));
+        hitShadBoxesQuery = GetEntityQuery(typeof(Box), typeof(HitShadowsObject));
+        lightEdgesQuery = GetEntityQuery(typeof(LightEdge));
 
         boxBoxCM = new BoxBoxConstraintManager();
         boxLightEdgeCM = new BoxLightEdgeConstraintManager();
     }
 
     protected override void OnDestroy() {
-        boxEntities.Dispose();
-        lightEdgeEntities.Dispose();
-
         boxBoxCM.Dispose();
         boxLightEdgeCM.Dispose();
     }
 
     protected override void OnUpdate() {
-        var boxEntities = this.boxEntities;
-        StoreBoxEntitiesInto(boxEntities);
-
-        var lightEdgeEntities = this.lightEdgeEntities;
-        StoreLightEdgeEntitiesInto(lightEdgeEntities);
+        NativeArray<Entity> boxEntities = boxesQuery.ToEntityArray(Allocator.TempJob);
+        NativeArray<Entity> hitShadBoxEntities = hitShadBoxesQuery.ToEntityArray(Allocator.TempJob);
+        NativeArray<Entity> lightEdgeEntities = lightEdgesQuery.ToEntityArray(Allocator.TempJob);
 
         var boxes = GetComponentDataFromEntity<Box>(false);
         var lightEdges = GetComponentDataFromEntity<LightEdge>(false);
@@ -66,7 +60,7 @@ public class CollisionSystem : SystemBase {
             lightEdges: lightEdges,
             vels: velocities,
             lightSources: lightSources,
-            boxEntities: boxEntities,
+            hitShadBoxEntities: hitShadBoxEntities,
             lightEdgeEntities: lightEdgeEntities
         );
 
@@ -85,19 +79,11 @@ public class CollisionSystem : SystemBase {
 
         boxBoxCM.PostSteps();
         boxLightEdgeCM.PostSteps();
-    }
 
-    private void StoreBoxEntitiesInto(NativeList<Entity> storeInto) {
-        storeInto.Clear();
-        storeInto.Length = boxesQuery.CalculateEntityCount();
 
-        Entities
-            .WithName("StoreBoxes")
-            .WithAll<Box>()
-            .WithStoreEntityQueryInField(ref boxesQuery)
-            .ForEach((int entityInQueryIndex, ref Entity e) => {
-                storeInto[entityInQueryIndex] = e;
-            }).Run();
+        boxEntities.Dispose();
+        hitShadBoxEntities.Dispose();
+        lightEdgeEntities.Dispose();
     }
 
     private void StoreLightEdgeEntitiesInto(NativeList<Entity> storeInto) {

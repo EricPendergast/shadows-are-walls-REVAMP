@@ -16,22 +16,22 @@ public struct BoxLightEdgeConstraintHelper : ConstraintManagerHelper<StandardCon
     private ComponentDataFromEntity<LightEdge> lightEdges;
     private ComponentDataFromEntity<Velocity> vels;
     private ComponentDataFromEntity<LightSource> lightSources;
-    private NativeList<Entity> boxEntities;
-    private NativeList<Entity> lightEdgeEntities;
+    private NativeArray<Entity> hitShadBoxEntities;
+    private NativeArray<Entity> lightEdgeEntities;
 
     public void Update(
         ComponentDataFromEntity<Box> boxes,
         ComponentDataFromEntity<LightEdge> lightEdges,
         ComponentDataFromEntity<Velocity> vels,
         ComponentDataFromEntity<LightSource> lightSources,
-        NativeList<Entity> boxEntities,
-        NativeList<Entity> lightEdgeEntities) {
+        NativeArray<Entity> hitShadBoxEntities,
+        NativeArray<Entity> lightEdgeEntities) {
 
         this.boxes = boxes;
         this.lightEdges = lightEdges;
         this.vels = vels;
         this.lightSources = lightSources;
-        this.boxEntities = boxEntities;
+        this.hitShadBoxEntities = hitShadBoxEntities;
         this.lightEdgeEntities = lightEdgeEntities;
     }
 
@@ -76,9 +76,9 @@ public struct BoxLightEdgeConstraintHelper : ConstraintManagerHelper<StandardCon
     }
 
     public void FillWithConstraints(NativeList<StandardConstraint> constraints) {
-        for (int i = 0; i < boxEntities.Length; i++ ) {
+        for (int i = 0; i < hitShadBoxEntities.Length; i++ ) {
             for (int j = 0; j < lightEdgeEntities.Length; j++ ) {
-                Entity box = boxEntities[i];
+                Entity box = hitShadBoxEntities[i];
                 Entity lightEdge = lightEdgeEntities[j];
 
                 // Light edges are used to calculate the manifold, but the

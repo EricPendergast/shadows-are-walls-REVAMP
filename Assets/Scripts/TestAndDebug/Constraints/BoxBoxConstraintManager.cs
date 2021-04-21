@@ -14,12 +14,12 @@ using Physics.Math;
 public struct BoxBoxConstraintHelper : ConstraintManagerHelper<StandardConstraint> {
     private ComponentDataFromEntity<Box> boxes;
     private ComponentDataFromEntity<Velocity> boxVels;
-    private NativeList<Entity> boxEntities;
+    private NativeArray<Entity> boxEntities;
 
     public void Update(
         ComponentDataFromEntity<Box> boxes,
         ComponentDataFromEntity<Velocity> boxVels,
-        NativeList<Entity> boxEntities) {
+        NativeArray<Entity> boxEntities) {
 
         this.boxes = boxes;
         this.boxVels = boxVels;
