@@ -31,7 +31,7 @@ public class ConstraintManager<H, C>
     public H helper;
 
     public ConstraintManager() {
-        constraints = new NativeList<C>(100, Allocator.Persistent);
+        constraints = new NativeList<C>(0, Allocator.Persistent);
         helper = default(H);
         warmStart = new WarmStartManager();
     }
@@ -86,7 +86,7 @@ public class ConstraintManager<H, C>
         private NativeHashMap<ContactId, Lambdas> prevLambdas;
 
         public WarmStartManager() {
-            prevLambdas = new NativeHashMap<ContactId, Lambdas>(100, Allocator.Persistent);
+            prevLambdas = new NativeHashMap<ContactId, Lambdas>(0, Allocator.Persistent);
         }
 
         public Lambdas GetLambdas(Geometry.ContactId id) {

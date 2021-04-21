@@ -15,6 +15,7 @@ public struct BoxLightEdgeConstraintHelper : ConstraintManagerHelper<StandardCon
     private ComponentDataFromEntity<Box> boxes;
     private ComponentDataFromEntity<LightEdge> lightEdges;
     private ComponentDataFromEntity<Velocity> vels;
+    private ComponentDataFromEntity<LightSource> lightSources;
     private NativeList<Entity> boxEntities;
     private NativeList<Entity> lightEdgeEntities;
 
@@ -22,26 +23,33 @@ public struct BoxLightEdgeConstraintHelper : ConstraintManagerHelper<StandardCon
         ComponentDataFromEntity<Box> boxes,
         ComponentDataFromEntity<LightEdge> lightEdges,
         ComponentDataFromEntity<Velocity> vels,
+        ComponentDataFromEntity<LightSource> lightSources,
         NativeList<Entity> boxEntities,
         NativeList<Entity> lightEdgeEntities) {
 
         this.boxes = boxes;
         this.lightEdges = lightEdges;
         this.vels = vels;
+        this.lightSources = lightSources;
         this.boxEntities = boxEntities;
         this.lightEdgeEntities = lightEdgeEntities;
     }
 
-    private Geometry.Manifold? GetManifold(Entity box, Entity lightEdge) {
+    private Geometry.Manifold? GetManifold(Entity boxEntity, Entity lightEdgeEntity, out Entity lightSourceOut) {
+        LightEdge le = lightEdges[lightEdgeEntity];
+        LightSource lightSource = lightSources[le.lightSource];
+
+        lightSourceOut = le.lightSource;
+
         return Geometry.GetIntersectData(
-            boxes[box].ToRect(),
-            lightEdges[lightEdge].ToRect()
+            boxes[boxEntity].ToRect(),
+            le.ToRect(ref lightSource)
         );
     }
 
-    private StandardConstraint GetConstraint(Entity box, Entity lightEdge, Geometry.Manifold manifold, bool useContact1) {
+    private StandardConstraint GetConstraint(Entity box, Entity lightSource, Geometry.Manifold manifold, bool useContact1) {
         return new StandardConstraint(
-            box, lightEdge,
+            box, lightSource,
             manifold,
             useContact1
         );
@@ -61,7 +69,7 @@ public struct BoxLightEdgeConstraintHelper : ConstraintManagerHelper<StandardCon
         var v1 = vels[constraint.e1];
         var v2 = vels[constraint.e2];
 
-        constraint.PreStep(boxes[constraint.e1], lightEdges[constraint.e2], ref v1, ref v2, dt, lambdas);
+        constraint.PreStep(boxes[constraint.e1], lightSources[constraint.e2], ref v1, ref v2, dt, lambdas);
 
         vels[constraint.e1] = v1;
         vels[constraint.e2] = v2;
@@ -73,15 +81,17 @@ public struct BoxLightEdgeConstraintHelper : ConstraintManagerHelper<StandardCon
                 Entity box = boxEntities[i];
                 Entity lightEdge = lightEdgeEntities[j];
 
-                var manifoldNullable = GetManifold(box, lightEdge);
+                // Light edges are used to calculate the manifold, but the
+                // light source is used during collision resolution
+                var manifoldNullable = GetManifold(box, lightEdge, out Entity lightSource);
 
                 if (manifoldNullable is Geometry.Manifold manifold) {
 
-                    constraints.Add(GetConstraint(box, lightEdge, manifold, true));
+                    constraints.Add(GetConstraint(box, lightSource, manifold, true));
 
                     if (manifold.contact2 is Geometry.Contact contact) {
 
-                        constraints.Add(GetConstraint(box, lightEdge, manifold, false));
+                        constraints.Add(GetConstraint(box, lightSource, manifold, false));
                         Debug.Assert(!manifold.contact1.id.Equals(contact.id), "Duplicate contact ids within the same manifold");
                     }
                 }

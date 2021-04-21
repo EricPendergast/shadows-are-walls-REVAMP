@@ -12,9 +12,9 @@ public class VelocityIntegrationSystem : SystemBase {
             box.pos += dt*vel.vel;
             box.rot += dt*vel.angVel;
         }).Run();
-        Entities.ForEach((ref LightEdge le, in Velocity vel) => {
-            le.pos += dt*vel.vel;
-            le.rot += dt*vel.angVel;
+        Entities.ForEach((ref LightSource ls, in Velocity vel) => {
+            ls.pos += dt*vel.vel;
+            ls.rot += dt*vel.angVel;
         }).Run();
     }
 }

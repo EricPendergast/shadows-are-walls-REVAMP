@@ -28,8 +28,8 @@ public class CollisionSystem : SystemBase {
     private BoxLightEdgeConstraintManager boxLightEdgeCM;
 
     protected override void OnCreate() {
-        boxEntities = new NativeList<Entity>(100, Allocator.Persistent);
-        lightEdgeEntities = new NativeList<Entity>(100, Allocator.Persistent);
+        boxEntities = new NativeList<Entity>(0, Allocator.Persistent);
+        lightEdgeEntities = new NativeList<Entity>(0, Allocator.Persistent);
 
         boxBoxCM = new BoxBoxConstraintManager();
         boxLightEdgeCM = new BoxLightEdgeConstraintManager();
@@ -53,6 +53,7 @@ public class CollisionSystem : SystemBase {
         var boxes = GetComponentDataFromEntity<Box>(false);
         var lightEdges = GetComponentDataFromEntity<LightEdge>(false);
         var velocities = GetComponentDataFromEntity<Velocity>(false);
+        var lightSources = GetComponentDataFromEntity<LightSource>(false);
 
         boxBoxCM.helper.Update(
             boxes: boxes,
@@ -64,6 +65,7 @@ public class CollisionSystem : SystemBase {
             boxes: boxes,
             lightEdges: lightEdges,
             vels: velocities,
+            lightSources: lightSources,
             boxEntities: boxEntities,
             lightEdgeEntities: lightEdgeEntities
         );

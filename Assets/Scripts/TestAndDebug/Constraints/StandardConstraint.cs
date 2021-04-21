@@ -94,7 +94,7 @@ public struct StandardConstraint : IConstraint {
         }
     }
 
-    public void PreStep(Box box, LightEdge le, ref Velocity v1, ref Velocity v2, float dt, Lambdas prevLambdas) {
+    public void PreStep(Box box, LightSource le, ref Velocity v1, ref Velocity v2, float dt, Lambdas prevLambdas) {
         accum = prevLambdas;
         M_inv = new Float6(
             1/box.mass, 1/box.mass, 1/box.inertia,
