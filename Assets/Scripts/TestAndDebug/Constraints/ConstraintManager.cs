@@ -10,7 +10,7 @@ using Physics.Math;
 using ContactId = Physics.Math.Geometry.ContactId;
 
 public interface IConstraint {
-    public ContactId id {get;}
+    public int id {get;}
     public float2 normal {get;}
     public float2 contact {get;}
     public Lambdas GetAccumulatedLambdas();
@@ -83,13 +83,13 @@ public class ConstraintManager<H, C>
     public class WarmStartManager {
         // Maps from contact id to the accumulated lambda of that contact last
         // frame. Used for warm starting.
-        private NativeHashMap<ContactId, Lambdas> prevLambdas;
+        private NativeHashMap<int, Lambdas> prevLambdas;
 
         public WarmStartManager() {
-            prevLambdas = new NativeHashMap<ContactId, Lambdas>(0, Allocator.Persistent);
+            prevLambdas = new NativeHashMap<int, Lambdas>(0, Allocator.Persistent);
         }
 
-        public Lambdas GetLambdas(Geometry.ContactId id) {
+        public Lambdas GetLambdas(int id) {
             Lambdas lambdas;
             if (CollisionSystem.warmStarting && prevLambdas.TryGetValue(id, out var l)) {
                 lambdas = l;

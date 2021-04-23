@@ -25,7 +25,8 @@ public struct StandardConstraint : IConstraint {
     public float2 contact {get;}
     public float overlap;
 
-    public ContactId id {get;}
+
+    public int id {get;}
 
     Float6 M_inv;
 
@@ -39,7 +40,7 @@ public struct StandardConstraint : IConstraint {
         { 
             var contact = useContact1 ? manifold.contact1 : (Geometry.Contact)manifold.contact2;
             this.contact = contact.point;
-            this.id = contact.id;
+            this.id = contact.id.GetHashCode();
         }
         this.overlap = manifold.overlap;
 
@@ -88,7 +89,7 @@ public struct StandardConstraint : IConstraint {
         { 
             var contact = useContact1 ? manifold.contact1 : (Geometry.Contact)manifold.contact2;
             this.contact = contact.point;
-            this.id = contact.id;
+            this.id = contact.id.GetHashCode();
         }
         this.overlap = manifold.overlap;
 

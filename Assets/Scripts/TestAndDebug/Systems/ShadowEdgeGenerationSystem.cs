@@ -35,7 +35,6 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         var shadowEdges = this.shadowEdges;
         shadowEdges.Clear();
         var lightSources = lightSourceQuery.ToComponentDataArray<LightSource>(Allocator.TempJob);
-        // TODO: Proper contact id generation
 
         foreach (var l in lightSources) {
             float2 lightPos = l.pos;
@@ -43,19 +42,18 @@ public class ShadowEdgeGenerationSystem : SystemBase {
                 .WithAll<OpaqueObject>()
                 .ForEach((in Box box, in Entity entity) => {
                     Geometry.CalculateShadowGeometry(box.ToRect(), lightPos, .05f, out var sg1, out var sg2);
-                    Debug.Log("Added shadow edge");
                     shadowEdges.Add(new ShadowEdge {
                         contact1 = sg1.contact1,
                         contact2 = sg1.contact2,
                         opaque = entity,
-                        collider = Rect.FromLineSegment(sg1.contact1, sg1.contact1 + math.normalize(sg1.contact1 - lightPos)*20, 123456),
+                        collider = Rect.FromLineSegment(sg1.contact1, sg1.contact1 + math.normalize(sg1.contact1 - lightPos)*20, sg1.id),
                         lightSource = lightPos
                     });
                     shadowEdges.Add(new ShadowEdge {
                         contact1 = sg2.contact1,
                         contact2 = sg2.contact2,
                         opaque = entity,
-                        collider = Rect.FromLineSegment(sg2.contact1, sg2.contact1 + math.normalize(sg2.contact1 - lightPos)*20, 123456),
+                        collider = Rect.FromLineSegment(sg2.contact1, sg2.contact1 + math.normalize(sg2.contact1 - lightPos)*20, sg2.id),
                         lightSource = lightPos
                     });
                 }

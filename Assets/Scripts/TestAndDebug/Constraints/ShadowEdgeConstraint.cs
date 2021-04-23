@@ -22,20 +22,20 @@ public struct ShadowEdgeConstraint : IConstraint {
     public float2 contact2 {get;}
     public float overlap;
 
-    public ContactId id {get;}
+    public int id {get;}
 
     Float6 M_inv;
 
     PenetrationConstraint<Float6> penConstraint;
 
-    public ShadowEdgeConstraint(Entity e1, Entity e2, Box box1, Box box2, float2 shadowOrigin, float2 lightOrigin, Geometry.Manifold manifold, bool useContact1, float dt) {
+    public ShadowEdgeConstraint(Entity e1, Entity e2, Box box1, Box box2, float2 shadowOrigin, float2 lightOrigin, Geometry.Manifold manifold, bool useContact1, float dt, int contactIdScrambler) {
         this.e1 = e1;
         this.e2 = e2;
         this.normal = manifold.normal;
         { 
             var contact = useContact1 ? manifold.contact1 : (Geometry.Contact)manifold.contact2;
             this.contact1 = contact.point;
-            this.id = contact.id;
+            this.id = new int2(contact.id.GetHashCode(), contactIdScrambler).GetHashCode();
         }
         this.contact2 = shadowOrigin;
         this.overlap = manifold.overlap;

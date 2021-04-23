@@ -107,7 +107,7 @@ public class CollisionSystem : SystemBase {
     public struct DebugContactInfo {
         public float2 normal;
         public float2 contact;
-        public ContactId id;
+        public int id;
     }
 
     public IEnumerable<DebugContactInfo> GetContactsForDebug() {

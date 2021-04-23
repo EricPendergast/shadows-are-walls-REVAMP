@@ -36,7 +36,6 @@ public struct ShadowEdgeConstraintHelper : ConstraintManagerHelper<ShadowEdgeCon
     }
 
     private void AddConstraints(ref NativeList<ShadowEdgeConstraint> constraints, Entity box, ShadowEdge shadowEdge, Manifold manifold, bool useContact1) {
-
         constraints.Add(new ShadowEdgeConstraint(
             e1: box, 
             e2: shadowEdge.opaque,
@@ -46,7 +45,8 @@ public struct ShadowEdgeConstraintHelper : ConstraintManagerHelper<ShadowEdgeCon
             lightOrigin: shadowEdge.lightSource,
             manifold: manifold,
             useContact1: useContact1,
-            dt: dt
+            dt: dt,
+            contactIdScrambler: 1
         ));
 
         if (shadowEdge.contact2 is float2 shadowOrigin) {
@@ -59,7 +59,8 @@ public struct ShadowEdgeConstraintHelper : ConstraintManagerHelper<ShadowEdgeCon
                 lightOrigin: shadowEdge.lightSource,
                 manifold: manifold,
                 useContact1: useContact1,
-                dt: dt
+                dt: dt,
+                contactIdScrambler: 2
             ));
         }
     }

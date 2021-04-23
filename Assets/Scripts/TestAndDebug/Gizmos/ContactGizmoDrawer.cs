@@ -7,7 +7,7 @@ public class ContactGizmoDrawer : MonoBehaviour {
         if (Application.isPlaying) {
             var world = World.DefaultGameObjectInjectionWorld;
 
-            var set = new HashSet<Physics.Math.Geometry.ContactId>();
+            var set = new HashSet<int>();
 
 
             foreach (var contact in world.GetOrCreateSystem<CollisionSystem>().GetContactsForDebug()) {

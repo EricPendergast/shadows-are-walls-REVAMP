@@ -8,6 +8,7 @@ namespace Physics.Math {
         public struct ShadowGeometry {
             public float2 contact1;
             public float2? contact2;
+            public int id;
         }
 
         public static void CalculateShadowGeometry(Rect rect, float2 lightSource, float slop, out ShadowGeometry sg1, out ShadowGeometry sg2) {
@@ -44,6 +45,15 @@ namespace Physics.Math {
                 }
             }
 
+            // Ensure they always have the same relative rotation. Improves
+            // coherence of contact ids.
+            if (Lin.Cross(cornersN[l1], cornersN[l2]) < 0) {
+                var tmp = l1;
+                l1 = l2;
+                l2 = tmp;
+            }
+
+
             // Finding the other 2 corners
             int o1 = 0;
             int o2 = 0;
@@ -70,14 +80,16 @@ namespace Physics.Math {
 
             sg1 = new ShadowGeometry{
                 contact1 = corners[l1] + lightSource,
-                contact2 = reject1 < slop ? corners[o1] + lightSource : (float2?)null
+                contact2 = reject1 < slop ? corners[o1] + lightSource : (float2?)null,
+                id = new float2(rect.id, 1).GetHashCode()
             };
 
             float reject2 = math.abs(Lin.Cross(cornersN[l2], corners[o2]));
 
             sg2 = new ShadowGeometry{
                 contact1 = corners[l2] + lightSource,
-                contact2 = reject2 < slop ? corners[o2] + lightSource : (float2?)null
+                contact2 = reject2 < slop ? corners[o2] + lightSource : (float2?)null,
+                id = new float2(rect.id, 2).GetHashCode()
             };
         }
     }
