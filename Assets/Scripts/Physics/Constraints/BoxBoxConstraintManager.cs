@@ -37,14 +37,21 @@ public struct BoxBoxConstraintHelper : ConstraintManagerHelper<StandardConstrain
         );
     }
 
-    private StandardConstraint GetConstraint(Entity box1, Entity box2, Geometry.Manifold manifold, bool useContact1) {
-        return new StandardConstraint(
+    private void AddConstraint(ref NativeList<StandardConstraint> constraints, Entity e1, Entity e2, Geometry.Manifold manifold, bool useContact1) {
+        Box box1 = boxes[e1];
+        Box box2 = boxes[e2];
+
+        if (box1.mass == math.INFINITY && box2.mass == math.INFINITY) {
+            return;
+        }
+
+        constraints.Add(new StandardConstraint(
+            e1, e2,
             box1, box2,
-            boxes[box1], boxes[box2], 
             manifold,
             useContact1,
             dt
-        );
+        ));
     }
 
     public void ApplyImpulse(ref StandardConstraint constraint, float dt) {
@@ -77,11 +84,12 @@ public struct BoxBoxConstraintHelper : ConstraintManagerHelper<StandardConstrain
 
                 if (manifoldNullable is Geometry.Manifold manifold) {
 
-                    constraints.Add(GetConstraint(box1, box2, manifold, true));
+
+                    AddConstraint(ref constraints, box1, box2, manifold, true);
 
                     if (manifold.contact2 is Geometry.Contact contact) {
 
-                        constraints.Add(GetConstraint(box1, box2, manifold, false));
+                        AddConstraint(ref constraints, box1, box2, manifold, false);
                         Debug.Assert(!manifold.contact1.id.Equals(contact.id), "Duplicate contact ids within the same manifold");
                     }
                 }
