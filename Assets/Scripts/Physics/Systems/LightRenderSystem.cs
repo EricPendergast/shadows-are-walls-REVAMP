@@ -26,7 +26,7 @@ public class LightRenderSystem : SystemBase {
                 LightSource source = lightSources[lightEdge.lightSource];
                 var rect = lightEdge.ToRect(ref source);
 
-                vertices.Add(lightEdge.lightSource, math.mul(quaternion.Euler(0, 0, lightEdge.rot), new float3(20, 0, 0)).xy);
+                vertices.Add(lightEdge.lightSource, math.mul(quaternion.Euler(0, 0, lightEdge.rot), new float3(200, 0, 0)).xy);
             }).Run();
 
 
@@ -43,7 +43,7 @@ public class LightRenderSystem : SystemBase {
 
                 verts.Add(Vector2.zero);
                 foreach (float2 vertex in It.Iterate(vertices, entity)) {
-                    verts.Add((Vector2)vertex);
+                    verts.Add(new Vector3(vertex.x, vertex.y, 1));
                 }
                 
                 for (int i = 1; i+1 < verts.Count; i++ ) {
