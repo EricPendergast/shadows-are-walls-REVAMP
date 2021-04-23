@@ -9,7 +9,12 @@ public class ShadowEdgesGizmoDrawer : MonoBehaviour {
 
             foreach (var shadowEdge in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetShadowEdgesForDebug()) {
                 Gizmos.color = Color.red;
-                Gizmos.DrawLine((Vector2)shadowEdge.contact1, (Vector2)shadowEdge.lightSource);
+
+                Gizmos.DrawLine((Vector2)shadowEdge.collider.c1, (Vector2)shadowEdge.collider.c2);
+                Gizmos.DrawLine((Vector2)shadowEdge.collider.c2, (Vector2)shadowEdge.collider.c3);
+                Gizmos.DrawLine((Vector2)shadowEdge.collider.c3, (Vector2)shadowEdge.collider.c4);
+                Gizmos.DrawLine((Vector2)shadowEdge.collider.c4, (Vector2)shadowEdge.collider.c1);
+
                 Gizmos.DrawSphere((Vector2)shadowEdge.contact1, .05f);
                 if (shadowEdge.contact2 != null) {
                     Gizmos.color = Color.green;

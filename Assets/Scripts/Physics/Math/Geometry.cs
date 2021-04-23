@@ -34,6 +34,12 @@ namespace Physics.Math {
             return new Rect(p, right, up, id);
         }
 
+        public static Rect FromLineSegment(float2 p1, float2 p2, int id) {
+            float2 right = (p2 - p1)/2;
+            float2 up = Lin.Cross(math.normalize(right), -1)*.001f;
+            return new Rect(p1 + right, right, up, id);
+        }
+
         //public bool Contains(float2 point) {
         //    return  math.abs(math.dot(point - pos, width)) < math.lengthsq(width) &&
         //            math.abs(math.dot(point - pos, height)) < math.lengthsq(height);

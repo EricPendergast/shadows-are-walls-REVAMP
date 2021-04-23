@@ -9,6 +9,7 @@ using UnityEngine;
 using ContactId = Physics.Math.Geometry.ContactId;
 using BoxBoxConstraintManager = ConstraintManager<BoxBoxConstraintHelper, StandardConstraint>;
 using BoxLightEdgeConstraintManager = ConstraintManager<BoxLightEdgeConstraintHelper, StandardConstraint>;
+using ShadowEdgeConstraintManager = ConstraintManager<ShadowEdgeConstraintHelper, ShadowEdgeConstraint>;
 
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
 [UpdateAfter(typeof(ShadowEdgeGenerationSystem))]
@@ -24,6 +25,7 @@ public class CollisionSystem : SystemBase {
 
     private BoxBoxConstraintManager boxBoxCM;
     private BoxLightEdgeConstraintManager boxLightEdgeCM;
+    private ShadowEdgeConstraintManager shadowEdgeCM;
 
     protected override void OnCreate() {
         boxesQuery = GetEntityQuery(typeof(Box));
@@ -32,11 +34,13 @@ public class CollisionSystem : SystemBase {
 
         boxBoxCM = new BoxBoxConstraintManager();
         boxLightEdgeCM = new BoxLightEdgeConstraintManager();
+        shadowEdgeCM = new ShadowEdgeConstraintManager();
     }
 
     protected override void OnDestroy() {
         boxBoxCM.Dispose();
         boxLightEdgeCM.Dispose();
+        shadowEdgeCM.Dispose();
     }
 
     protected override void OnUpdate() {
@@ -68,38 +72,36 @@ public class CollisionSystem : SystemBase {
             dt: dt
         );
 
+        shadowEdgeCM.helper.Update(
+            vels: velocities,
+            boxes: boxes,
+            shadowEdges: World.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetShadowEdges(),
+            hitShadBoxEntities: hitShadBoxEntities,
+            dt: dt
+        );
+
         boxBoxCM.FindConstraints();
         boxLightEdgeCM.FindConstraints();
-
+        shadowEdgeCM.FindConstraints();
 
         boxBoxCM.PreSteps(dt);
         boxLightEdgeCM.PreSteps(dt);
+        shadowEdgeCM.PreSteps(dt);
 
         for (int i = 0; i < 10; i++) {
             boxBoxCM.ApplyImpulses(dt);
             boxLightEdgeCM.ApplyImpulses(dt);
+            shadowEdgeCM.ApplyImpulses(dt);
         }
 
         boxBoxCM.PostSteps();
         boxLightEdgeCM.PostSteps();
+        shadowEdgeCM.PostSteps();
 
 
         boxEntities.Dispose();
         hitShadBoxEntities.Dispose();
         lightEdgeEntities.Dispose();
-    }
-
-    private void StoreLightEdgeEntitiesInto(NativeList<Entity> storeInto) {
-        storeInto.Clear();
-        storeInto.Length = lightEdgesQuery.CalculateEntityCount();
-    
-        Entities
-            .WithName("StoreLightEdges")
-            .WithAll<LightEdge>()
-            .WithStoreEntityQueryInField(ref lightEdgesQuery)
-            .ForEach((int entityInQueryIndex, ref Entity e) => {
-                storeInto[entityInQueryIndex] = e;
-            }).Run();
     }
 
     public struct DebugContactInfo {
@@ -113,6 +115,9 @@ public class CollisionSystem : SystemBase {
             yield return item;
         }
         foreach (var item in boxLightEdgeCM.GetContactsForDebug()) {
+            yield return item;
+        }
+        foreach (var item in shadowEdgeCM.GetContactsForDebug()) {
             yield return item;
         }
     }
