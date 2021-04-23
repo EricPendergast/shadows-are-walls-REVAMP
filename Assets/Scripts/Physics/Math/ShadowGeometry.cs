@@ -12,9 +12,8 @@ namespace Physics.Math {
         }
 
         public static void CalculateShadowGeometry(Rect rect, float2 lightSource, float slop, out ShadowGeometry sg1, out ShadowGeometry sg2) {
-            // TODO: rect.Contains is not implemented
             if (rect.Contains(lightSource)) {
-                // TODO: Do something special
+                Debug.Log("TODO: Opaque object contains light source. Behavior will not be correct.");
             }
 
             FixedList64<float2> corners = new FixedList32<float2>();

@@ -40,10 +40,6 @@ namespace Physics.Math {
             return new Rect(p1 + right, right, up, id);
         }
 
-        //public bool Contains(float2 point) {
-        //    return  math.abs(math.dot(point - pos, width)) < math.lengthsq(width) &&
-        //            math.abs(math.dot(point - pos, height)) < math.lengthsq(height);
-        //}
 
         // Returns the edge with counter clockwise winding
         public LineSegment FurthestEdge(float2 normal, out int edgeIdx) {
@@ -92,9 +88,10 @@ namespace Physics.Math {
         }
 
         public bool Contains(float2 point) {
-            // TODO: Implement this
-            return false;
+            return  math.abs(math.dot(point - pos, width)) < math.lengthsq(width) &&
+                    math.abs(math.dot(point - pos, height)) < math.lengthsq(height);
         }
+
         //public float2 Penetration(float2 point) {
         //    point = point - pos;
         //    float xDir = math.dot(point, width) < 0 ? -1 : 1;
