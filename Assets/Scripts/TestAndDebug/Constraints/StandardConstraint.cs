@@ -143,12 +143,10 @@ public struct StandardConstraint : IConstraint {
     }
 
     public void ApplyImpulse(ref Velocity v1, ref Velocity v2, float dt) {
-        float lambda;
         {
             Float6 v = GetV(ref v1, ref v2);
 
-            lambda = penConstraint.GetLambda(v, ref accum.n);
-            Float6 P = penConstraint.GetImpulse(lambda);
+            Float6 P = fricConstraint.GetImpulse(v, ref accum.t, ref accum.n);
 
             ApplyImpulse(P, ref v1, ref v2);
         }
@@ -156,10 +154,11 @@ public struct StandardConstraint : IConstraint {
         {
             Float6 v = GetV(ref v1, ref v2);
 
-            Float6 P = fricConstraint.GetImpulse(v, lambda, ref accum.t, ref accum.n);
+            Float6 P = penConstraint.GetImpulse(v, ref accum.n);
 
             ApplyImpulse(P, ref v1, ref v2);
         }
+
     }
 
     private static Float6 GetV(ref Velocity v1, ref Velocity v2) {

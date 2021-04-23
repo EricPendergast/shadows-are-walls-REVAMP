@@ -63,21 +63,20 @@ public readonly struct FrictionConstraint<T> where T : FloatX<T> {
         return J.Mult(lambda);
     }
     
-    public T GetImpulse(T v, float lambda_n, ref float accum_t, ref float accum_n) {
+    public T GetImpulse(T v, ref float accum_t, ref float accum_n) {
         float lambda_t = -m_c * (J.Dot(v));
 
-        ClampLambda(ref lambda_t, lambda_n, ref accum_t, ref accum_n);
+        ClampLambda(ref lambda_t, ref accum_t, ref accum_n);
 
         return J.Mult(lambda_t);
     }
     
-    private void ClampLambda(ref float lambda_t, float lambda_n, ref float accum_t, ref float accum_n) {
-        if (CollisionSystem.accumulateImpulses) {
-            float old_tAccumulated = accum_t;
-            accum_t = math.clamp(accum_t + lambda_t, -accum_n*frictionCoeff, accum_n*frictionCoeff);
-            lambda_t = accum_t - old_tAccumulated;
-        } else {
-            lambda_t = math.clamp(lambda_t, -lambda_n*frictionCoeff, lambda_n*frictionCoeff);
-        }
+    private void ClampLambda(ref float lambda_t, ref float accum_t, ref float accum_n) {
+        float old_tAccumulated = accum_t;
+        accum_t = math.clamp(accum_t + lambda_t, -accum_n*frictionCoeff, accum_n*frictionCoeff);
+        lambda_t = accum_t - old_tAccumulated;
+
+        // This is what we would do if we didn't use accumulation:
+        // lambda_t = math.clamp(lambda_t, -lambda_n*frictionCoeff, lambda_n*frictionCoeff);
     }
 }

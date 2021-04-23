@@ -3,10 +3,6 @@ using Unity.Collections;
 using Unity.Mathematics;
 using System.Collections.Generic;
 
-using Physics.Math;
-using UnityEngine;
-
-using ContactId = Physics.Math.Geometry.ContactId;
 using BoxBoxConstraintManager = ConstraintManager<BoxBoxConstraintHelper, StandardConstraint>;
 using BoxLightEdgeConstraintManager = ConstraintManager<BoxLightEdgeConstraintHelper, StandardConstraint>;
 using ShadowEdgeConstraintManager = ConstraintManager<ShadowEdgeConstraintHelper, ShadowEdgeConstraint>;
@@ -17,6 +13,7 @@ public class CollisionSystem : SystemBase {
     EntityQuery boxesQuery;
     EntityQuery hitShadBoxesQuery;
     EntityQuery lightEdgesQuery;
+    // Warning: Friction no longer works when accumulateImpulses is false
     public static bool accumulateImpulses = true;
     public static bool warmStarting = true;
     public static bool positionCorrection = true;
