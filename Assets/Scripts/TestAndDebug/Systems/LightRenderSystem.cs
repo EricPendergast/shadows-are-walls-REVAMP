@@ -32,7 +32,7 @@ public class LightRenderSystem : SystemBase {
 
         Entities
             .WithStructuralChanges()
-            .ForEach((in LightSource light, in Entity entity) => {
+            .ForEach((ref RenderBounds bounds, in LightSource light, in Entity entity) => {
 
                 RenderMesh renderMesh = EntityManager.GetSharedComponentData<RenderMesh>(entity);
 
@@ -54,6 +54,9 @@ public class LightRenderSystem : SystemBase {
 
                 renderMesh.mesh.vertices = verts.ToArray();
                 renderMesh.mesh.triangles = triangles.ToArray();
+
+                renderMesh.mesh.RecalculateBounds();
+                bounds.Value = renderMesh.mesh.bounds.ToAABB();
 
             }).Run();
 

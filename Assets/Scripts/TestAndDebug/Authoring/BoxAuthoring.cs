@@ -4,7 +4,8 @@ using UnityEngine;
 public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
     public enum BoxType {
         HitShadowsObject,
-        TransparentObject
+        TransparentObject,
+        OpaqueObject
     }
     public BoxType boxType;
 
@@ -47,6 +48,10 @@ public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
 
         if (boxType == BoxType.HitShadowsObject) {
             dstManager.AddComponentData(entity, new HitShadowsObject());
+        }
+
+        if (boxType == BoxType.OpaqueObject) {
+            dstManager.AddComponentData(entity, new OpaqueObject());
         }
     }
 }

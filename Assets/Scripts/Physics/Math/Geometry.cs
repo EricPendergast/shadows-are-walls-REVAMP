@@ -85,6 +85,10 @@ namespace Physics.Math {
             }
         }
 
+        public bool Contains(float2 point) {
+            // TODO: Implement this
+            return false;
+        }
         //public float2 Penetration(float2 point) {
         //    point = point - pos;
         //    float xDir = math.dot(point, width) < 0 ? -1 : 1;
@@ -169,7 +173,7 @@ namespace Physics.Math {
             return x >= x1 && x >= x2;
         }
     }
-    public static class Geometry {
+    public static partial class Geometry {
 
         public struct Contact {
             public float2 point;

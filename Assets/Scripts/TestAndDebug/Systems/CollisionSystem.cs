@@ -11,7 +11,7 @@ using BoxBoxConstraintManager = ConstraintManager<BoxBoxConstraintHelper, Standa
 using BoxLightEdgeConstraintManager = ConstraintManager<BoxLightEdgeConstraintHelper, StandardConstraint>;
 
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
-[UpdateAfter(typeof(GravitySystem))]
+[UpdateAfter(typeof(ShadowEdgeGenerationSystem))]
 public class CollisionSystem : SystemBase {
     EntityQuery boxesQuery;
     EntityQuery hitShadBoxesQuery;
