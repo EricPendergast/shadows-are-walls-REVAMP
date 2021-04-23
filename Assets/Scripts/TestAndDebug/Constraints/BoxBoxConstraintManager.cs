@@ -15,15 +15,18 @@ public struct BoxBoxConstraintHelper : ConstraintManagerHelper<StandardConstrain
     private ComponentDataFromEntity<Box> boxes;
     private ComponentDataFromEntity<Velocity> boxVels;
     private NativeArray<Entity> boxEntities;
+    private float dt;
 
     public void Update(
         ComponentDataFromEntity<Box> boxes,
         ComponentDataFromEntity<Velocity> boxVels,
-        NativeArray<Entity> boxEntities) {
+        NativeArray<Entity> boxEntities,
+        float dt) {
 
         this.boxes = boxes;
         this.boxVels = boxVels;
         this.boxEntities = boxEntities;
+        this.dt = dt;
     }
 
 
@@ -37,8 +40,10 @@ public struct BoxBoxConstraintHelper : ConstraintManagerHelper<StandardConstrain
     private StandardConstraint GetConstraint(Entity box1, Entity box2, Geometry.Manifold manifold, bool useContact1) {
         return new StandardConstraint(
             box1, box2,
+            boxes[box1], boxes[box2], 
             manifold,
-            useContact1
+            useContact1,
+            dt
         );
     }
 
@@ -56,7 +61,7 @@ public struct BoxBoxConstraintHelper : ConstraintManagerHelper<StandardConstrain
         var v1 = boxVels[constraint.e1];
         var v2 = boxVels[constraint.e2];
 
-        constraint.PreStep(boxes[constraint.e1], boxes[constraint.e2], ref v1, ref v2, dt, lambdas);
+        constraint.PreStep(ref v1, ref v2, dt, lambdas);
 
         boxVels[constraint.e1] = v1;
         boxVels[constraint.e2] = v2;

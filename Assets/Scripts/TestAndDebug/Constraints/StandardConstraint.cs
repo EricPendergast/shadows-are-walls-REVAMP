@@ -32,34 +32,28 @@ public struct StandardConstraint : IConstraint {
     PenetrationConstraint<Float6> penConstraint;
     FrictionConstraint<Float6> fricConstraint;
 
-    public StandardConstraint(Entity e1, Entity e2, Geometry.Manifold manifold, bool useContact1) {
+    public StandardConstraint(Entity e1, Entity e2, Box b1, Box b2, Geometry.Manifold manifold, bool useContact1, float dt) {
         this.e1 = e1;
         this.e2 = e2;
         this.normal = manifold.normal;
-        var contact = useContact1 ? manifold.contact1 : (Geometry.Contact)manifold.contact2;
-        this.contact = contact.point;
+        { 
+            var contact = useContact1 ? manifold.contact1 : (Geometry.Contact)manifold.contact2;
+            this.contact = contact.point;
+            this.id = contact.id;
+        }
         this.overlap = manifold.overlap;
-        this.id = contact.id;
 
         accum = new Lambdas();
 
-        M_inv = default(Float6);
-
-        penConstraint = new PenetrationConstraint<Float6>();
-        fricConstraint = new FrictionConstraint<Float6>();
-    }
-
-    public void PreStep(Box e1, Box e2, ref Velocity v1, ref Velocity v2, float dt, Lambdas prevLambdas) {
-        accum = prevLambdas;
         M_inv = new Float6(
-            1/e1.mass, 1/e1.mass, 1/e1.inertia,
-            1/e2.mass, 1/e2.mass, 1/e2.inertia
+            1/b1.mass, 1/b1.mass, 1/b1.inertia,
+            1/b2.mass, 1/b2.mass, 1/b2.inertia
         );
 
         { // Normal precomputation
             Float6 J_n = new Float6(
-                new float3(-normal, -Lin.Cross(contact-e1.pos, normal)), 
-                new float3(normal, Lin.Cross(contact-e2.pos, normal))
+                new float3(-normal, -Lin.Cross(contact-b1.pos, normal)), 
+                new float3(normal, Lin.Cross(contact-b2.pos, normal))
             );
 
             float delta = -overlap;
@@ -80,22 +74,26 @@ public struct StandardConstraint : IConstraint {
             float2 tangent = Lin.Cross(normal, -1);
 
             Float6 J_t = new Float6(
-                new float3(tangent, Lin.Cross(contact-e1.pos, tangent)), 
-                new float3(-tangent, -Lin.Cross(contact-e2.pos, tangent)));
+                new float3(tangent, Lin.Cross(contact-b1.pos, tangent)), 
+                new float3(-tangent, -Lin.Cross(contact-b2.pos, tangent)));
 
             fricConstraint = new FrictionConstraint<Float6>(J_t, M_inv, CollisionSystem.globalFriction);
         }
-
-        if (CollisionSystem.accumulateImpulses) {
-            Float6 P_n = penConstraint.GetImpulse(accum.n);
-            Float6 P_t = fricConstraint.GetImpulse(accum.t);
-
-            ApplyImpulse(P_n.Add(P_t), ref v1, ref v2);
-        }
     }
 
-    public void PreStep(Box box, LightSource le, ref Velocity v1, ref Velocity v2, float dt, Lambdas prevLambdas) {
-        accum = prevLambdas;
+    public StandardConstraint(Entity e1, Entity e2, Box box, LightSource le, Geometry.Manifold manifold, bool useContact1, float dt) {
+        this.e1 = e1;
+        this.e2 = e2;
+        this.normal = manifold.normal;
+        { 
+            var contact = useContact1 ? manifold.contact1 : (Geometry.Contact)manifold.contact2;
+            this.contact = contact.point;
+            this.id = contact.id;
+        }
+        this.overlap = manifold.overlap;
+
+        accum = new Lambdas();
+
         M_inv = new Float6(
             1/box.mass, 1/box.mass, 1/box.inertia,
             0, 0, 1/le.inertia
@@ -130,6 +128,10 @@ public struct StandardConstraint : IConstraint {
 
             fricConstraint = new FrictionConstraint<Float6>(J_t, M_inv, CollisionSystem.globalFriction);
         }
+    }
+
+    public void PreStep(ref Velocity v1, ref Velocity v2, float dt, Lambdas prevLambdas) {
+        accum = prevLambdas;
 
         if (CollisionSystem.accumulateImpulses) {
             Float6 P_n = penConstraint.GetImpulse(accum.n);

@@ -18,6 +18,7 @@ public struct BoxLightEdgeConstraintHelper : ConstraintManagerHelper<StandardCon
     private ComponentDataFromEntity<LightSource> lightSources;
     private NativeArray<Entity> hitShadBoxEntities;
     private NativeArray<Entity> lightEdgeEntities;
+    private float dt;
 
     public void Update(
         ComponentDataFromEntity<Box> boxes,
@@ -25,7 +26,8 @@ public struct BoxLightEdgeConstraintHelper : ConstraintManagerHelper<StandardCon
         ComponentDataFromEntity<Velocity> vels,
         ComponentDataFromEntity<LightSource> lightSources,
         NativeArray<Entity> hitShadBoxEntities,
-        NativeArray<Entity> lightEdgeEntities) {
+        NativeArray<Entity> lightEdgeEntities,
+        float dt) {
 
         this.boxes = boxes;
         this.lightEdges = lightEdges;
@@ -33,6 +35,7 @@ public struct BoxLightEdgeConstraintHelper : ConstraintManagerHelper<StandardCon
         this.lightSources = lightSources;
         this.hitShadBoxEntities = hitShadBoxEntities;
         this.lightEdgeEntities = lightEdgeEntities;
+        this.dt = dt;
     }
 
     private Geometry.Manifold? GetManifold(Entity boxEntity, Entity lightEdgeEntity, out Entity lightSourceOut) {
@@ -50,8 +53,10 @@ public struct BoxLightEdgeConstraintHelper : ConstraintManagerHelper<StandardCon
     private StandardConstraint GetConstraint(Entity box, Entity lightSource, Geometry.Manifold manifold, bool useContact1) {
         return new StandardConstraint(
             box, lightSource,
+            boxes[box], lightSources[lightSource],
             manifold,
-            useContact1
+            useContact1,
+            dt
         );
     }
 
@@ -69,7 +74,7 @@ public struct BoxLightEdgeConstraintHelper : ConstraintManagerHelper<StandardCon
         var v1 = vels[constraint.e1];
         var v2 = vels[constraint.e2];
 
-        constraint.PreStep(boxes[constraint.e1], lightSources[constraint.e2], ref v1, ref v2, dt, lambdas);
+        constraint.PreStep(ref v1, ref v2, dt, lambdas);
 
         vels[constraint.e1] = v1;
         vels[constraint.e2] = v2;

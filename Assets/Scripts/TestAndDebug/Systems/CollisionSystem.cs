@@ -49,10 +49,13 @@ public class CollisionSystem : SystemBase {
         var velocities = GetComponentDataFromEntity<Velocity>(false);
         var lightSources = GetComponentDataFromEntity<LightSource>(false);
 
+        float dt = Time.DeltaTime;
+
         boxBoxCM.helper.Update(
             boxes: boxes,
             boxVels: velocities,
-            boxEntities: boxEntities
+            boxEntities: boxEntities,
+            dt: dt
         );
 
         boxLightEdgeCM.helper.Update(
@@ -61,13 +64,13 @@ public class CollisionSystem : SystemBase {
             vels: velocities,
             lightSources: lightSources,
             hitShadBoxEntities: hitShadBoxEntities,
-            lightEdgeEntities: lightEdgeEntities
+            lightEdgeEntities: lightEdgeEntities,
+            dt: dt
         );
 
         boxBoxCM.FindConstraints();
         boxLightEdgeCM.FindConstraints();
 
-        float dt = Time.DeltaTime;
 
         boxBoxCM.PreSteps(dt);
         boxLightEdgeCM.PreSteps(dt);
