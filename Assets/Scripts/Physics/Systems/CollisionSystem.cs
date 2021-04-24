@@ -12,7 +12,7 @@ using ShadowEdgeConstraintManager = ConstraintManager<ShadowEdgeConstraintHelper
 public class CollisionSystem : SystemBase {
     EntityQuery boxesQuery;
     EntityQuery hitShadBoxesQuery;
-    EntityQuery lightEdgesQuery;
+    EntityQuery lightSourcesQuery;
     // Warning: Friction no longer works when accumulateImpulses is false
     public static bool accumulateImpulses = true;
     public static bool warmStarting = true;
@@ -27,7 +27,7 @@ public class CollisionSystem : SystemBase {
     protected override void OnCreate() {
         boxesQuery = GetEntityQuery(typeof(Box));
         hitShadBoxesQuery = GetEntityQuery(typeof(Box), typeof(HitShadowsObject));
-        lightEdgesQuery = GetEntityQuery(typeof(LightEdge));
+        lightSourcesQuery = GetEntityQuery(typeof(LightSource));
 
         boxBoxCM = new BoxBoxConstraintManager();
         boxLightEdgeCM = new BoxLightEdgeConstraintManager();
@@ -43,10 +43,9 @@ public class CollisionSystem : SystemBase {
     protected override void OnUpdate() {
         NativeArray<Entity> boxEntities = boxesQuery.ToEntityArray(Allocator.TempJob);
         NativeArray<Entity> hitShadBoxEntities = hitShadBoxesQuery.ToEntityArray(Allocator.TempJob);
-        NativeArray<Entity> lightEdgeEntities = lightEdgesQuery.ToEntityArray(Allocator.TempJob);
+        NativeArray<Entity> lightSourceEntities = lightSourcesQuery.ToEntityArray(Allocator.TempJob);
 
         var boxes = GetComponentDataFromEntity<Box>(false);
-        var lightEdges = GetComponentDataFromEntity<LightEdge>(false);
         var velocities = GetComponentDataFromEntity<Velocity>(false);
         var lightSources = GetComponentDataFromEntity<LightSource>(false);
 
@@ -61,11 +60,10 @@ public class CollisionSystem : SystemBase {
 
         boxLightEdgeCM.helper.Update(
             boxes: boxes,
-            lightEdges: lightEdges,
             vels: velocities,
             lightSources: lightSources,
             hitShadBoxEntities: hitShadBoxEntities,
-            lightEdgeEntities: lightEdgeEntities,
+            lightSourceEntities: lightSourceEntities,
             dt: dt
         );
 
@@ -98,7 +96,7 @@ public class CollisionSystem : SystemBase {
 
         boxEntities.Dispose();
         hitShadBoxEntities.Dispose();
-        lightEdgeEntities.Dispose();
+        lightSourceEntities.Dispose();
     }
 
     public struct DebugContactInfo {

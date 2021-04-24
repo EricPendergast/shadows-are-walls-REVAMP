@@ -13,41 +13,46 @@ using Physics.Math;
 
 public struct BoxLightEdgeConstraintHelper : ConstraintManagerHelper<StandardConstraint> {
     private ComponentDataFromEntity<Box> boxes;
-    private ComponentDataFromEntity<LightEdge> lightEdges;
     private ComponentDataFromEntity<Velocity> vels;
     private ComponentDataFromEntity<LightSource> lightSources;
     private NativeArray<Entity> hitShadBoxEntities;
-    private NativeArray<Entity> lightEdgeEntities;
+    private NativeArray<Entity> lightSourceEntities;
     private float dt;
 
     public void Update(
         ComponentDataFromEntity<Box> boxes,
-        ComponentDataFromEntity<LightEdge> lightEdges,
         ComponentDataFromEntity<Velocity> vels,
         ComponentDataFromEntity<LightSource> lightSources,
         NativeArray<Entity> hitShadBoxEntities,
-        NativeArray<Entity> lightEdgeEntities,
+        NativeArray<Entity> lightSourceEntities,
         float dt) {
 
         this.boxes = boxes;
-        this.lightEdges = lightEdges;
         this.vels = vels;
         this.lightSources = lightSources;
         this.hitShadBoxEntities = hitShadBoxEntities;
-        this.lightEdgeEntities = lightEdgeEntities;
+        this.lightSourceEntities = lightSourceEntities;
         this.dt = dt;
     }
 
-    private Geometry.Manifold? GetManifold(Entity boxEntity, Entity lightEdgeEntity, out Entity lightSourceOut) {
-        LightEdge le = lightEdges[lightEdgeEntity];
-        LightSource lightSource = lightSources[le.lightSource];
-
-        lightSourceOut = le.lightSource;
-
-        return Geometry.GetIntersectData(
+    private void AddConstraints(ref NativeList<StandardConstraint> constraints, Entity boxEntity, Entity lightSourceEntity, bool lightEdgeFlag) {
+        var manifoldNullable = Geometry.GetIntersectData(
             boxes[boxEntity].ToRect(),
-            le.ToRect(ref lightSource)
+            lightEdgeFlag ? 
+                lightSources[lightSourceEntity].GetMinEdgeRect() : 
+                lightSources[lightSourceEntity].GetMaxEdgeRect()
         );
+
+        if (manifoldNullable is Geometry.Manifold manifold) {
+
+            constraints.Add(GetConstraint(boxEntity, lightSourceEntity, manifold, true));
+
+            if (manifold.contact2 is Geometry.Contact contact) {
+
+                constraints.Add(GetConstraint(boxEntity, lightSourceEntity, manifold, false));
+                Debug.Assert(!manifold.contact1.id.Equals(contact.id), "Duplicate contact ids within the same manifold");
+            }
+        }
     }
 
     private StandardConstraint GetConstraint(Entity box, Entity lightSource, Geometry.Manifold manifold, bool useContact1) {
@@ -82,24 +87,12 @@ public struct BoxLightEdgeConstraintHelper : ConstraintManagerHelper<StandardCon
 
     public void FillWithConstraints(NativeList<StandardConstraint> constraints) {
         for (int i = 0; i < hitShadBoxEntities.Length; i++ ) {
-            for (int j = 0; j < lightEdgeEntities.Length; j++ ) {
+            for (int j = 0; j < lightSourceEntities.Length; j++ ) {
                 Entity box = hitShadBoxEntities[i];
-                Entity lightEdge = lightEdgeEntities[j];
+                Entity lightSource = lightSourceEntities[j];
 
-                // Light edges are used to calculate the manifold, but the
-                // light source is used during collision resolution
-                var manifoldNullable = GetManifold(box, lightEdge, out Entity lightSource);
-
-                if (manifoldNullable is Geometry.Manifold manifold) {
-
-                    constraints.Add(GetConstraint(box, lightSource, manifold, true));
-
-                    if (manifold.contact2 is Geometry.Contact contact) {
-
-                        constraints.Add(GetConstraint(box, lightSource, manifold, false));
-                        Debug.Assert(!manifold.contact1.id.Equals(contact.id), "Duplicate contact ids within the same manifold");
-                    }
-                }
+                AddConstraints(ref constraints, box, lightSource, true);
+                AddConstraints(ref constraints, box, lightSource, false);
             }
         }
     }

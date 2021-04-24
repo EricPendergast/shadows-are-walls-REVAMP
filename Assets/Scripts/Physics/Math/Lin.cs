@@ -19,5 +19,9 @@ namespace Physics.Math {
         public static float2 Reject(float2 a, float2 b) {
             return a - math.project(a, b);
         }
+
+        public static float2 Rotate(float2 vec, float angle) {
+            return math.mul(float2x2.Rotate(angle), vec);
+        }
     }
 }

@@ -5,6 +5,7 @@ using Unity.Transforms;
 using Unity.Mathematics;
 using Unity.Rendering;
 using UnityEngine;
+using Physics.Math;
 
 using Utilities;
 // Syncs the physics state with the rendering state.
@@ -21,12 +22,14 @@ public class LightRenderSystem : SystemBase {
 
         var vertices = new NativeMultiHashMap<Entity, float2>(0, Allocator.TempJob);
 
-        Entities
-            .ForEach((in LightEdge lightEdge) => {
-                LightSource source = lightSources[lightEdge.lightSource];
-                var rect = lightEdge.ToRect(ref source);
+        // TODO: The way I'm doing this doesn't make much sense, because of
+        // refactoring elsewhere and not wanting to change too much here. But
+        // it may make more sense when I make future changes.
 
-                vertices.Add(lightEdge.lightSource, math.mul(quaternion.Euler(0, 0, lightEdge.rot), new float3(200, 0, 0)).xy);
+        Entities
+            .ForEach((in LightSource lightSource, in Entity entity) => {
+                vertices.Add(entity, Lin.Rotate(lightSource.GetMaxEdgeNorm()*200, -lightSource.rot));
+                vertices.Add(entity, Lin.Rotate(lightSource.GetMinEdgeNorm()*200, -lightSource.rot));
             }).Run();
 
 
