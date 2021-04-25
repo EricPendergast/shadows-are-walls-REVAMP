@@ -2,6 +2,7 @@ using Unity.Entities;
 using Unity.Collections;
 using Unity.Mathematics;
 using System.Collections.Generic;
+using System.Collections;
 
 using Physics.Math;
 using UnityEngine;
@@ -38,9 +39,10 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         Clear(lightManagers);
 
         var lightSources = lightSourceQuery.ToComponentDataArray<LightSource>(Allocator.TempJob);
+        var boxes = GetComponentDataFromEntity<Box>(true);
 
         foreach (var lightSource in lightSources) {
-            lightManagers.Add(new LightManager(in lightSource));
+            lightManagers.Add(new LightManager(in lightSource, boxes));
         }
         
         Entities
@@ -81,48 +83,153 @@ public class ShadowEdgeGenerationSystem : SystemBase {
 
 public class LightManager {
     private LightSource source;
+    private float2 lightEdge1;
+    private float2 lightEdge2;
     public NativeList<ShadowEdge> shadowEdges {get;}
+    private NativeList<ProtoEdge> protoEdges;
+    private NativeList<Entity> workingSet;
+    private NativeHashMap<Entity, ShadowData> shadowData;
+    private ComponentDataFromEntity<Box> boxes;
 
-    private struct ShadowEdgeData {
-        float2 contact1;
-        float2? contact2;
-        int id;
-    }
-    private struct ProtoEdge {
-        float angle;
-        Entity opaque;
+    private struct ShadowData {
+        public Geometry.ShadowGeometry sg1;
+        public Geometry.ShadowGeometry sg2;
     }
 
-    public LightManager(in LightSource source) {
+    private struct ProtoEdge : System.IComparable<ProtoEdge> {
+        public float angle;
+        public Entity opaque;
+
+        public int CompareTo(ProtoEdge p) {
+            return angle.CompareTo(p.angle);
+        }
+    }
+
+    public LightManager(in LightSource source, ComponentDataFromEntity<Box> boxes) {
         this.source = source;
+        lightEdge1 = source.GetMinEdgeNorm();
+        lightEdge2 = source.GetMaxEdgeNorm();
+        Debug.Assert(Lin.Cross(lightEdge1, lightEdge2) > 0);
+
+
         shadowEdges = new NativeList<ShadowEdge>(Allocator.TempJob);
+        protoEdges = new NativeList<ProtoEdge>(Allocator.TempJob);
+        workingSet = new NativeList<Entity>(Allocator.TempJob);
+        shadowData = new NativeHashMap<Entity, ShadowData>(0, Allocator.TempJob);
+        this.boxes = boxes;
     }
 
     public void Dispose() {
         shadowEdges.Dispose();
+        protoEdges.Dispose();
+        workingSet.Dispose();
+        shadowData.Dispose();
     }
 
     public void Add(in Box box, in Entity entity) {
-        // TODO: For the purposes of calculation, we could use a smaller struct.
         float2 lightPos = source.pos;
         Geometry.CalculateShadowGeometry(box.ToRect(), lightPos, .05f, out var sg1, out var sg2);
-        shadowEdges.Add(new ShadowEdge {
-            contact1 = sg1.contact1,
-            contact2 = sg1.contact2,
-            opaque = entity,
-            collider = Rect.FromLineSegment(sg1.contact1, sg1.contact1 + math.normalize(sg1.contact1 - lightPos)*20, sg1.id),
-            lightSource = lightPos
-        });
-        shadowEdges.Add(new ShadowEdge {
-            contact1 = sg2.contact1,
-            contact2 = sg2.contact2,
-            opaque = entity,
-            collider = Rect.FromLineSegment(sg2.contact1, sg2.contact1 + math.normalize(sg2.contact1 - lightPos)*20, sg2.id),
-            lightSource = lightPos
-        });
+
+        (float a1, float a2) = Angles(sg1.contact1, sg2.contact1);
+        if (!math.isnan(a1)) {
+            protoEdges.Add(new ProtoEdge{angle=a1, opaque=entity});
+            protoEdges.Add(new ProtoEdge{angle=a2, opaque=entity});
+            shadowData[entity] = new ShadowData{sg1 = sg1, sg2 = sg2};
+        }
     }
 
     public void Compute() {
-        
+        protoEdges.Sort();
+        workingSet.Clear();
+
+        foreach (var protoEdge in protoEdges) {
+            var scannedEdge = new Geometry.ShadowGeometry();
+
+            bool addToWorking = true;
+            {// Scanning
+                var shadowDatum = shadowData[protoEdge.opaque];
+                for (int i = 0; i < workingSet.Length; i++) {
+                    if (workingSet[i] == protoEdge.opaque) {
+                        workingSet.RemoveAtSwapBack(i);
+                        addToWorking = false;
+                        scannedEdge = shadowDatum.sg2;
+                        break;
+                    }
+                }
+                if (addToWorking) {
+                    scannedEdge = shadowDatum.sg1;
+                }
+            }
+
+            if (math.isfinite(protoEdge.angle)) {// Subtraction of working set from scannedEdge
+                float scannedEdgeLength = 100;
+                foreach (Entity entityToSubtract in workingSet) {
+                    Box boxToSubtract = boxes[entityToSubtract];
+                    Geometry.ShadowSubtract(
+                        lightOrigin: source.pos,
+                        shadowOrigin: scannedEdge.contact1,
+                        shadowLength: ref scannedEdgeLength,
+                        toSubtract: boxToSubtract
+                    );
+                }
+
+                shadowEdges.Add(new ShadowEdge {
+                    contact1 = scannedEdge.contact1,
+                    contact2 = scannedEdge.contact2,
+                    opaque = protoEdge.opaque,
+                    collider = Rect.FromLineSegment(scannedEdge.contact1, scannedEdge.contact1 + math.normalize(scannedEdge.contact1 - source.pos)*scannedEdgeLength, scannedEdge.id),
+                    lightSource = source.pos
+                });
+            }
+
+            // This is here so that the owner of scannedEdge is not in the
+            // working set during the subtraction calculations
+            if (addToWorking) {
+                workingSet.Add(protoEdge.opaque);
+            }
+        }
+    }
+
+    private float Angle(float2 point) {
+        // The region the light shines on is the set of all points that are "in
+        // front" of both lightEdge1 and lightEdge2
+        float2 n = math.normalize(point - source.pos);
+        // c1 > 0 iff n is in front of lightEdge1
+        float c1 = Lin.Cross(lightEdge1, n);
+        // c2 < 0 iff n is in front of lightEdge2
+        float c2 = Lin.Cross(lightEdge2, n);
+        if (c1 < 0 && c2 > 0) {
+            return math.NAN;
+        }
+        if (c1 < 0) {
+            return -math.INFINITY;
+        }
+        if (c2 > 0) {
+            return math.INFINITY;
+        }
+        return 1 - math.dot(lightEdge1, n);
+    }
+
+    private (float, float) Angles(float2 p1, float2 p2) {
+        float a1 = Angle(p1);
+        float a2 = Angle(p2);
+        if (a1 == math.NAN) {
+            if (math.isfinite(a2)) {
+                return (-math.INFINITY, a2);
+            } else {
+                return (math.NAN, math.NAN);
+            }
+        }
+        if (a2 == math.NAN) {
+            if (math.isfinite(a1)) {
+                return (a1, math.INFINITY);
+            } else {
+                return (math.NAN, math.NAN);
+            }
+        }
+        if (a1 >= a2) {
+            return (math.NAN, math.NAN);
+        }
+        return (a1, a2);
     }
 }

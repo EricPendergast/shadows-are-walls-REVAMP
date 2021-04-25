@@ -10,6 +10,7 @@ namespace Physics.Math {
         public readonly float2 height;
         public readonly int id;
 
+        // Counterclockwise winding. Things depend on this exact ordering.
         public float2 c1 => pos + width + height;
         public float2 c2 => pos - width + height;
         public float2 c3 => pos - width - height;
@@ -61,7 +62,7 @@ namespace Physics.Math {
             }
         }
 
-        private int FurthestVertex(float2 normal) {
+        public int FurthestVertex(float2 normal) {
             int furthest = 0;
             float max = math.dot(GetVertex(furthest), normal);
             for (int i = 1; i < 4; i++) {

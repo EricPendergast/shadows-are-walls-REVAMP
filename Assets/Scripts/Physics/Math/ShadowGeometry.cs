@@ -91,5 +91,72 @@ namespace Physics.Math {
                 id = new float2(rect.id, 2).GetHashCode()
             };
         }
+
+        // Casts a ray with direction (lightOrigin towards shadowOrigin) from
+        // shadowOrigin for distance shadowLength, and updates shadowLength
+        // with the distance it traveled before hitting toSubtract
+        public static void ShadowSubtract(float2 lightOrigin, float2 shadowOrigin, ref float shadowLength, Box toSubtract) {
+            var rect = toSubtract.ToRect();
+            
+            float2 ray = math.normalize(shadowOrigin - lightOrigin);
+
+            // Ensure the rayNorm points from the rect center to the ray
+            float2 rayNorm = Lin.Cross(ray, -1);
+
+            int closestVertex = rect.FurthestVertex(-ray);
+
+            float centerToRayProj = math.dot(shadowOrigin - rect.pos, rayNorm);
+            if (centerToRayProj < 0) {
+                centerToRayProj *= -1;
+                rayNorm *= -1;
+            }
+
+            float2 width = rect.width;
+            // If corner has negative width term: (height-width) or (-height-width)
+            if (closestVertex == 1 || closestVertex == 2) {
+                width *= -1;
+            }
+            float widthProj = math.dot(width, rayNorm);
+            
+            float2 height = rect.height;
+            // If corner has negative height term: (-height-width) or (-height+width)
+            if (closestVertex == 2 || closestVertex == 3) {
+                height *= -1;
+            }
+            float heightProj = math.dot(height, rayNorm);
+            
+            // Derived from: widthProj + heightProj*x = centerToRayProj
+            float heightMult = (centerToRayProj - widthProj)/heightProj;
+            
+            // Derived from: heightProj + widthProj*x = centerToRayProj
+            float widthMult = (centerToRayProj - heightProj)/widthProj;
+            
+            float2 p1 = rect.pos + height + width*widthMult;
+            float2 p2 = rect.pos + width + height*heightMult;
+            
+            float2 intersection;
+            
+            if (math.abs(heightMult) <= 1 && math.abs(widthMult) <= 1) {
+                if (math.dot(p1, ray) < math.dot(p2, ray)) {
+                    intersection = p1;
+                } else {
+                    intersection = p2;
+                }
+            } else if (math.abs(widthMult) <= 1) {
+                intersection = p1;
+            } else if (math.abs(heightMult) <= 1) {
+                intersection = p2;
+            } else {
+                return;
+            }
+            
+            float intersectionDist = math.dot(intersection, ray);
+            float shadowOriginDist = math.dot(shadowOrigin, ray);
+            if (intersectionDist <= shadowOriginDist) {
+                shadowLength = 0;
+            } else {
+                shadowLength = math.min(shadowLength, intersectionDist - shadowOriginDist);
+            }
+        }
     }
 }

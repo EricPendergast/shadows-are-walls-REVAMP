@@ -2,6 +2,10 @@ using Unity.Mathematics;
 
 namespace Physics.Math {
     public static class Lin {
+        // Cross product uses the right hand rule: In the cross product
+        // functions, curl your right hand from arg 1 to arg 2, and your thumb
+        // points in the direction of the result, where towards yourself is
+        // positive.
 
         public static float2 Cross(float2 a, float s) {
             return new float2(s * a.y, -s * a.x);
