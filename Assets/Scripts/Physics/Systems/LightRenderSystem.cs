@@ -9,7 +9,9 @@ using Physics.Math;
 
 using Utilities;
 // Syncs the physics state with the rendering state.
-[UpdateInGroup(typeof(SimulationSystemGroup))]
+[UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
+[UpdateAfter(typeof(ShadowEdgeGenerationSystem))]
+[UpdateBefore(typeof(VelocityIntegrationSystem))]
 public class LightRenderSystem : SystemBase {
     protected override void OnUpdate() {
         Entities
@@ -20,18 +22,7 @@ public class LightRenderSystem : SystemBase {
 
         var lightSources = GetComponentDataFromEntity<LightSource>(false);
 
-        var vertices = new NativeMultiHashMap<Entity, float2>(0, Allocator.TempJob);
-
-        // TODO: The way I'm doing this doesn't make much sense, because of
-        // refactoring elsewhere and not wanting to change too much here. But
-        // it may make more sense when I make future changes.
-
-        Entities
-            .ForEach((in LightSource lightSource, in Entity entity) => {
-                vertices.Add(entity, Lin.Rotate(lightSource.GetMaxEdgeNorm()*200, -lightSource.rot));
-                vertices.Add(entity, Lin.Rotate(lightSource.GetMinEdgeNorm()*200, -lightSource.rot));
-            }).Run();
-
+        var shadowEdgeSystem = World.GetOrCreateSystem<ShadowEdgeGenerationSystem>();
 
         Entities
             .WithStructuralChanges()
@@ -45,11 +36,26 @@ public class LightRenderSystem : SystemBase {
                 List<int> triangles = new List<int>();
 
                 verts.Add(Vector2.zero);
-                foreach (float2 vertex in It.Iterate(vertices, entity)) {
-                    verts.Add(new Vector3(vertex.x, vertex.y, 1));
+                // TODO: This is going to be the end of the min light edge
+                verts.Add(Vector2.zero);
+                foreach (var edge in shadowEdgeSystem.GetShadowEdges(entity)) {
+                    float2 p1;
+                    float2 p2;
+                    if (edge.leading) {
+                        p1 = edge.CalculateEndPoint();
+                        p2 = edge.contact1;
+                    } else {
+                        p1 = edge.contact1;
+                        p2 = edge.CalculateEndPoint();
+                    }
+
+                    verts.Add((Vector2)light.GlobalToLocal(p1));
+                    verts.Add((Vector2)light.GlobalToLocal(p2));
                 }
+                // TODO: This is going to be the end of the max light edge
+                verts.Add(Vector2.zero);
                 
-                for (int i = 1; i+1 < verts.Count; i++ ) {
+                for (int i = 1; i+1 < verts.Count; i+=2) {
                     triangles.Add(0);
                     triangles.Add(i);
                     triangles.Add(i+1);
@@ -61,8 +67,7 @@ public class LightRenderSystem : SystemBase {
                 renderMesh.mesh.RecalculateBounds();
                 bounds.Value = renderMesh.mesh.bounds.ToAABB();
 
-            }).Run();
-
-        vertices.Dispose();
+            }
+        ).Run();
     }
 }

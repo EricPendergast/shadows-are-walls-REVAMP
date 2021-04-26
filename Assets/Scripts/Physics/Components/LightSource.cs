@@ -27,4 +27,8 @@ public struct LightSource : IComponentData {
     public Rect GetMaxEdgeRect() {
         return Rect.FromLineSegment(pos, pos + GetMaxEdgeNorm()*20, maxEdgeId);
     }
+
+    public float2 GlobalToLocal(float2 point) {
+        return Lin.Rotate(point - pos, -rot);
+    }
 }

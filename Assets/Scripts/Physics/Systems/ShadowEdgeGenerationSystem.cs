@@ -20,15 +20,24 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         public float2 contact1;
         public float2? contact2;
         public Entity opaque;
+        // TODO: It may make sense to join these into the same term
+        public float length;
+        public bool leading;
+        // TODO: It may be worth it to remove this field, since it is
+        // technically redundant. Would have to write a special collision
+        // function if we do this.
         public Rect collider;
         public float2 lightSource;
+        public float2 CalculateEndPoint() {
+            return contact1 + math.normalize(contact1 - lightSource)*length;
+        }
     }
 
-    List<LightManager> lightManagers;
+    Dictionary<Entity, LightManager> lightManagers;
 
     protected override void OnCreate() {
         lightSourceQuery = GetEntityQuery(typeof(LightSource));
-        lightManagers = new List<LightManager>();
+        lightManagers = new Dictionary<Entity, LightManager>();
     }
 
     protected override void OnDestroy() {
@@ -39,41 +48,50 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         Clear(lightManagers);
 
         var lightSources = lightSourceQuery.ToComponentDataArray<LightSource>(Allocator.TempJob);
+        var lightSourceEntities = lightSourceQuery.ToEntityArray(Allocator.TempJob);
         var boxes = GetComponentDataFromEntity<Box>(true);
 
-        foreach (var lightSource in lightSources) {
-            lightManagers.Add(new LightManager(in lightSource, boxes));
+        for (int i = 0; i < lightSources.Length; i++) {
+            lightManagers[lightSourceEntities[i]] = new LightManager(lightSources[i], boxes);
         }
-        
+
         Entities
             .WithAll<OpaqueObject>()
             .WithoutBurst()
             .ForEach((in Box box, in Entity entity) => {
-                foreach (var l in lightManagers) {
+                foreach (var l in lightManagers.Values) {
                     l.Add(in box, in entity);
                 }
             }).Run();
         
-        foreach (var lightManager in lightManagers) {
+        foreach (var lightManager in lightManagers.Values) {
             lightManager.Compute();
         }
         
         lightSources.Dispose();
+        lightSourceEntities.Dispose();
     }
 
     public IEnumerable<ShadowEdge> GetShadowEdgesForDebug() {
-        foreach (var edge in lightManagers[0].shadowEdges) {
+        foreach (var edge in GetShadowEdges()) {
             yield return edge;
         }
     }
 
-    public NativeList<ShadowEdge> GetShadowEdges() {
-        // TODO: For now, there is only one light manager
-        return lightManagers[0].shadowEdges;
+    public NativeList<ShadowEdge> GetShadowEdges(Entity shadowSource) {
+        return lightManagers[shadowSource].shadowEdges;
     }
 
-    private void Clear(List<LightManager> lightManagers) {
-        foreach (var lightManager in lightManagers) {
+    public NativeList<ShadowEdge> GetShadowEdges() {
+        // TODO: For now, there is only one light manager
+        foreach (var lightManager in lightManagers.Values) {
+            return lightManager.shadowEdges;
+        }
+        throw new System.Exception();
+    }
+
+    private void Clear(Dictionary<Entity, LightManager> lightManagers) {
+        foreach (var lightManager in lightManagers.Values) {
             lightManager.Dispose();
         }
         lightManagers.Clear();
@@ -173,13 +191,17 @@ public class LightManager {
                     );
                 }
 
-                shadowEdges.Add(new ShadowEdge {
-                    contact1 = scannedEdge.contact1,
-                    contact2 = scannedEdge.contact2,
-                    opaque = protoEdge.opaque,
-                    collider = Rect.FromLineSegment(scannedEdge.contact1, scannedEdge.contact1 + math.normalize(scannedEdge.contact1 - source.pos)*scannedEdgeLength, scannedEdge.id),
-                    lightSource = source.pos
-                });
+                if (scannedEdgeLength > 0) {
+                    shadowEdges.Add(new ShadowEdge {
+                        contact1 = scannedEdge.contact1,
+                        contact2 = scannedEdge.contact2,
+                        opaque = protoEdge.opaque,
+                        collider = Rect.FromLineSegment(scannedEdge.contact1, scannedEdge.contact1 + math.normalize(scannedEdge.contact1 - source.pos)*scannedEdgeLength, scannedEdge.id),
+                        length = scannedEdgeLength,
+                        leading = addToWorking,
+                        lightSource = source.pos
+                    });
+                }
             }
 
             // This is here so that the owner of scannedEdge is not in the
