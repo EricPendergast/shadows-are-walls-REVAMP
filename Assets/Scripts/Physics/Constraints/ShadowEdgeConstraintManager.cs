@@ -31,7 +31,11 @@ public struct ShadowEdgeConstraintHelper : ConstraintManagerHelper<ShadowEdgeCon
         this.dt = dt;
     }
 
-    private void AddConstraints(ref NativeList<ShadowEdgeConstraint> constraints, Entity box, ShadowEdge shadowEdge, Manifold manifold, bool useContact1) {
+    private void AddConstraints(ref NativeList<ShadowEdgeConstraint> constraints, ShadowEdgeManifold seManifold, bool useContact1) {
+        var box = seManifold.box;
+        var shadowEdge = seManifold.shadowEdge;
+        var manifold = seManifold.manifold;
+
         constraints.Add(new ShadowEdgeConstraint(
             e1: box, 
             e2: shadowEdge.opaque,
@@ -84,11 +88,11 @@ public struct ShadowEdgeConstraintHelper : ConstraintManagerHelper<ShadowEdgeCon
     public void FillWithConstraints(NativeList<ShadowEdgeConstraint> constraints) {
         foreach (ShadowEdgeManifold seManifold in shadowEdgeManifolds) {
             Geometry.Manifold manifold = seManifold.manifold;
-            AddConstraints(ref constraints, seManifold.box, seManifold.shadowEdge, manifold, true);
+            AddConstraints(ref constraints, seManifold, true);
 
             if (manifold.contact2 is Geometry.Contact contact) {
 
-                AddConstraints(ref constraints, seManifold.box, seManifold.shadowEdge, manifold, false);
+                AddConstraints(ref constraints, seManifold, false);
 
                 Debug.Assert(!manifold.contact1.id.Equals(contact.id), "Duplicate contact ids within the same manifold");
             }

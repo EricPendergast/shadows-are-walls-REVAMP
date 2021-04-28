@@ -7,9 +7,12 @@ using System.Collections;
 using Physics.Math;
 using UnityEngine;
 
+using Utilities;
+
 using Rect = Physics.Math.Rect;
 
 using ShadowEdge = ShadowEdgeGenerationSystem.ShadowEdge;
+using ShadowEdgeManifold = ShadowEdgeGenerationSystem.ShadowEdgeManifold;
 
 // Current plans for this class:
 // Generate all manifolds representing contact between a shadow edge and a box, or a light edge and a box.
@@ -50,7 +53,14 @@ using ShadowEdge = ShadowEdgeGenerationSystem.ShadowEdge;
 [UpdateAfter(typeof(GravitySystem))]
 public class ShadowEdgeGenerationSystem : SystemBase {
     private EntityQuery lightSourceQuery;
+    private EntityQuery opaqueBoxesQuery;
+    private EntityQuery shadHitBoxesQuery;
 
+    // TODO: All that is needed here by the constraint manager is:
+    //  contact1
+    //  contact2
+    //  opaque
+    //  lightSource
     public struct ShadowEdge {
         public float2 contact1;
         public float2? contact2;
@@ -75,73 +85,127 @@ public class ShadowEdgeGenerationSystem : SystemBase {
     }
 
     Dictionary<Entity, LightManager> lightManagers;
-    NativeList<ShadowEdgeManifold> shadowEdgeManifolds;
+    NativeList<ShadowEdgeManifold> finalShadowEdgeManifolds;
+    //TODO: Initialize
+    NativeMultiHashMap<Entity, ShadowEdgeManifold> boxManifolds;
 
     protected override void OnCreate() {
         lightSourceQuery = GetEntityQuery(typeof(LightSource));
+        opaqueBoxesQuery = GetEntityQuery(typeof(Box), typeof(OpaqueObject));
+        shadHitBoxesQuery = GetEntityQuery(typeof(Box), typeof(HitShadowsObject));
         lightManagers = new Dictionary<Entity, LightManager>();
-        shadowEdgeManifolds = new NativeList<ShadowEdgeManifold>(Allocator.Persistent);
+        finalShadowEdgeManifolds = new NativeList<ShadowEdgeManifold>(Allocator.Persistent);
+        boxManifolds = new NativeMultiHashMap<Entity, ShadowEdgeManifold>(0, Allocator.Persistent);
     }
 
     protected override void OnDestroy() {
         Clear(lightManagers);
-        shadowEdgeManifolds.Dispose();
+        finalShadowEdgeManifolds.Dispose();
+        boxManifolds.Dispose();
     }
 
     protected override void OnUpdate() {
-        Clear(lightManagers);
 
         var lightSources = lightSourceQuery.ToComponentDataArray<LightSource>(Allocator.TempJob);
         var lightSourceEntities = lightSourceQuery.ToEntityArray(Allocator.TempJob);
+
+        var opaqueBoxes = opaqueBoxesQuery.ToComponentDataArray<Box>(Allocator.TempJob);
+        var opaqueBoxEntities = opaqueBoxesQuery.ToEntityArray(Allocator.TempJob);
+
+        var shadHitBoxes = shadHitBoxesQuery.ToComponentDataArray<Box>(Allocator.TempJob);
+        var shadHitBoxEntities = shadHitBoxesQuery.ToEntityArray(Allocator.TempJob);
+
         var boxes = GetComponentDataFromEntity<Box>(true);
 
+        // Step 1: Initialization
+        // Can be optimized
+        Clear(lightManagers);
         for (int i = 0; i < lightSources.Length; i++) {
             lightManagers[lightSourceEntities[i]] = new LightManager(lightSources[i], boxes);
         }
 
-        Entities
-            .WithAll<OpaqueObject>()
-            .WithoutBurst()
-            .ForEach((in Box box, in Entity entity) => {
-                foreach (var l in lightManagers.Values) {
-                    l.Add(in box, in entity);
+
+        boxManifolds.Clear();
+        // Step 2: Computing initial contact manifolds
+        foreach (var lm in lightManagers.Values) {
+            // Compute the sorted shadow list
+            // 2.a, 2.b
+            lm.Precompute(opaqueBoxes, opaqueBoxEntities);
+            // 2.c
+            lm.ComputeInitialManifolds(shadHitBoxes, shadHitBoxEntities, ref boxManifolds);
+        }
+
+        var (boxesWithManifolds, length) = boxManifolds.GetUniqueKeyArray(Allocator.TempJob);
+        // Step 3: Computing shadow corners
+        // can optimize with IJobNativeMultiHashMapMergedSharedKeyIndices
+        // TODO: Implement functions called here
+        //for (int i = 0; i < length; i++) {
+        //    Entity box = boxesWithManifolds[i];
+        //    var manIt = It.Iterate(boxManifolds, box);
+        //    while (manIt.MoveNext()) {
+        //        var m1 = manIt.Current;
+        //        var manIt2 = manIt;
+        //        while (manIt2.MoveNext()) {
+        //            var m2 = manIt2.Current;
+        //            if (m1.Intersect(m2) is ShadowCornerManifold scm) {
+        //                shadowCornerManifolds.Add(scm);
+        //            }
+        //        }
+        //    }
+        //}
+
+        boxesWithManifolds.Dispose();
+
+        // Step 4: Removing illuminated manifolds
+        var illuminatedPoints = new NativeHashSet<float2>(0, Allocator.TempJob);
+
+        // TODO: Implement functions called here
+        //foreach (var lm in lightManagers.Values) {
+        //    lm.MarkIlluminated(shadowCornerManifolds, illuminatedPoints);
+        //    lm.MarkIlluminated(boxManifolds, illuminatedPoints);
+        //}
+
+        // Step 5: Store all non illuminated manifolds
+
+        finalShadowEdgeManifolds.Clear();
+        foreach (var kv in boxManifolds) {
+            var seManifold = kv.Value;
+
+            float2 c1 = seManifold.manifold.contact1.point;
+            float2? c2Nullable = seManifold.manifold.contact2?.point;
+
+            // Removing illuminated contact points
+            if (illuminatedPoints.Contains(c1)) {
+                if (c2Nullable is float2 c2 && !illuminatedPoints.Contains(c2)) {
+                    seManifold.manifold.contact1 = (Geometry.Contact)seManifold.manifold.contact2;
+                    seManifold.manifold.contact2 = null;
+                } else {
+                    continue;
                 }
-            }).Run();
-        
-        foreach (var lightManager in lightManagers.Values) {
-            lightManager.Compute();
+            } else {
+                if (c2Nullable is float2 c2 && illuminatedPoints.Contains((float2)c2)) {
+                    seManifold.manifold.contact2 = null;
+                }
+            }
+
+            finalShadowEdgeManifolds.Add(seManifold);
         }
 
-        /////////////////
-        /// Temporary ///
-        /////////////////
-        // computing all the shadow edge manifolds. This algorithm is brute force
+        // TODO: When implementing shadow corner collisions
+        //finalShadowCornerManifolds.Clear();
+        //foreach (var scManifold in shadowCornerManifolds) {
+        //    if (!illuminatedPoints.Contains(scManifold.point)) {
+        //        finalShadowCornerManifolds.Add(scManifold);
+        //    }
+        //}
 
-        shadowEdgeManifolds.Clear();
-
-        foreach (var lightManager in lightManagers.Values) {
-            Entities
-                .WithAll<HitShadowsObject>()
-                .WithoutBurst()
-                .ForEach((in Box box, in Entity entity) => {
-                    foreach (ShadowEdge edge in lightManager.shadowEdges) {
-                        var manifoldNullable = Geometry.GetIntersectData(box.ToRect(), edge.collider);
-                        if (manifoldNullable is Geometry.Manifold manifold) {
-                            shadowEdgeManifolds.Add(new ShadowEdgeManifold{
-                                box = entity,
-                                manifold = manifold,
-                                shadowEdge = edge
-                            });
-                        }
-                    }
-                }).Run();
-        }
-
-        /////////////////
-        /////////////////
-        /////////////////
+        illuminatedPoints.Dispose();
         lightSources.Dispose();
         lightSourceEntities.Dispose();
+        opaqueBoxes.Dispose();
+        opaqueBoxEntities.Dispose();
+        shadHitBoxes.Dispose();
+        shadHitBoxEntities.Dispose();
     }
 
     public IEnumerable<ShadowEdge> GetShadowEdgesForDebug() {
@@ -157,7 +221,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
     }
 
     public NativeList<ShadowEdgeManifold> GetShadowEdgeManifolds() {
-        return shadowEdgeManifolds;
+        return finalShadowEdgeManifolds;
     }
 
     private void Clear(Dictionary<Entity, LightManager> lightManagers) {
@@ -179,6 +243,13 @@ public class LightManager {
     private NativeList<Entity> workingSet;
     private NativeHashMap<Entity, ShadowData> shadowData;
     private ComponentDataFromEntity<Box> boxes;
+
+    private struct MyShadowEdge {
+        public float angle;
+        public float start;
+        public float end;
+        public Entity boxEntity;
+    }
 
     private struct ShadowData {
         public Geometry.ShadowGeometry sg1;
@@ -215,7 +286,34 @@ public class LightManager {
         shadowData.Dispose();
     }
 
-    public void Add(in Box box, in Entity entity) {
+    public void Precompute(NativeArray<Box> opaqueBoxes, NativeArray<Entity> opaqueBoxEntities) {
+        Debug.Assert(opaqueBoxes.Length == opaqueBoxEntities.Length);
+        for (int i = 0; i < opaqueBoxes.Length; i++) {
+            // TODO: Implement this better
+            Add(opaqueBoxes[i], opaqueBoxEntities[i]);
+        }
+        Compute();
+    }
+
+    public void ComputeInitialManifolds(NativeArray<Box> shadHitBoxes, NativeArray<Entity> shadHitBoxEntities, ref NativeMultiHashMap<Entity, ShadowEdgeManifold> shadowEdgeManifolds) {
+        Debug.Assert(shadHitBoxes.Length == shadHitBoxEntities.Length);
+        for (int i = 0; i < shadHitBoxes.Length; i++) {
+            var shBox = shadHitBoxes[i];
+            var shEntity = shadHitBoxEntities[i];
+            foreach (ShadowEdge edge in shadowEdges) {
+                var manifoldNullable = Geometry.GetIntersectData(shBox.ToRect(), edge.collider);
+                if (manifoldNullable is Geometry.Manifold manifold) {
+                    shadowEdgeManifolds.Add(shEntity, new ShadowEdgeManifold{
+                        box = shEntity,
+                        manifold = manifold,
+                        shadowEdge = edge
+                    });
+                }
+            }
+        }
+    }
+
+    private void Add(in Box box, in Entity entity) {
         float2 lightPos = source.pos;
         Geometry.CalculateShadowGeometry(box.ToRect(), lightPos, .05f, out var sg1, out var sg2);
 
@@ -227,7 +325,7 @@ public class LightManager {
         }
     }
 
-    public void Compute() {
+    private void Compute() {
         protoEdges.Sort();
         workingSet.Clear();
 
