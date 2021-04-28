@@ -11,6 +11,41 @@ using Rect = Physics.Math.Rect;
 
 using ShadowEdge = ShadowEdgeGenerationSystem.ShadowEdge;
 
+// Current plans for this class:
+// Generate all manifolds representing contact between a shadow edge and a box, or a light edge and a box.
+// These manifolds will be used to generate constraints elsewhere.
+//
+// Inputs to algorithm:
+// - List of opaque boxes
+// - List of light sources
+// - List of shadowhitting boxes
+//
+// Global data structures:
+// - box_to_manifold: multi map from shadowHit boxes to shadow edge manifolds involving them
+// - initial_shadow_corner_manifolds: NativeList of shadow corner manifolds
+// Steps of algorithm:
+// 1. Ensure each light source has a corresponding LightManager, freshly initialized
+// 2. For each light manager
+//      2.a Take in all opaque boxes and shadowHitting boxes
+//      2.b. Generate a list of (angle, shape) sorted by angle, where an entry
+//          (a, s) means "'s' occupies the angular space starting at 'a', and
+//          ending at the angle of the next entry"
+//      2.c. Use the generated list to calculate manifolds for each shadowEdge, shadowHittingObj pair
+//          Put these manifolds in box_to_manifold
+//
+//  3. For each box with manifolds m1, m2 ... mn
+//      3.a. For each pair of manifolds mi, mj
+//          3.a.a. If mi and mj intersect to create a shadow corner intersecting their box,
+//              add the shadow corner to initial_shadow_corner_manifolds
+//
+//  4. For each light manager
+//      4.a Mark any manifold (in box_to_manifold and
+//      initial_shadow_corner_manifolds) illuminated by this light manager as
+//      trash
+//
+//  5. Return all non-trash manifolds
+//
+
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
 [UpdateAfter(typeof(GravitySystem))]
 public class ShadowEdgeGenerationSystem : SystemBase {
@@ -33,15 +68,24 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         }
     }
 
+    public struct ShadowEdgeManifold {
+        public Geometry.Manifold manifold;
+        public Entity box;
+        public ShadowEdge shadowEdge;
+    }
+
     Dictionary<Entity, LightManager> lightManagers;
+    NativeList<ShadowEdgeManifold> shadowEdgeManifolds;
 
     protected override void OnCreate() {
         lightSourceQuery = GetEntityQuery(typeof(LightSource));
         lightManagers = new Dictionary<Entity, LightManager>();
+        shadowEdgeManifolds = new NativeList<ShadowEdgeManifold>(Allocator.Persistent);
     }
 
     protected override void OnDestroy() {
         Clear(lightManagers);
+        shadowEdgeManifolds.Dispose();
     }
 
     protected override void OnUpdate() {
@@ -67,14 +111,44 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         foreach (var lightManager in lightManagers.Values) {
             lightManager.Compute();
         }
-        
+
+        /////////////////
+        /// Temporary ///
+        /////////////////
+        // computing all the shadow edge manifolds. This algorithm is brute force
+
+        shadowEdgeManifolds.Clear();
+
+        foreach (var lightManager in lightManagers.Values) {
+            Entities
+                .WithAll<HitShadowsObject>()
+                .WithoutBurst()
+                .ForEach((in Box box, in Entity entity) => {
+                    foreach (ShadowEdge edge in lightManager.shadowEdges) {
+                        var manifoldNullable = Geometry.GetIntersectData(box.ToRect(), edge.collider);
+                        if (manifoldNullable is Geometry.Manifold manifold) {
+                            shadowEdgeManifolds.Add(new ShadowEdgeManifold{
+                                box = entity,
+                                manifold = manifold,
+                                shadowEdge = edge
+                            });
+                        }
+                    }
+                }).Run();
+        }
+
+        /////////////////
+        /////////////////
+        /////////////////
         lightSources.Dispose();
         lightSourceEntities.Dispose();
     }
 
     public IEnumerable<ShadowEdge> GetShadowEdgesForDebug() {
-        foreach (var edge in GetShadowEdges()) {
-            yield return edge;
+        foreach (var lightManager in lightManagers.Values) {
+            foreach (var edge in lightManager.shadowEdges) {
+                yield return edge;
+            }
         }
     }
 
@@ -82,12 +156,8 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         return lightManagers[shadowSource].shadowEdges;
     }
 
-    public NativeList<ShadowEdge> GetShadowEdges() {
-        // TODO: For now, there is only one light manager
-        foreach (var lightManager in lightManagers.Values) {
-            return lightManager.shadowEdges;
-        }
-        throw new System.Exception();
+    public NativeList<ShadowEdgeManifold> GetShadowEdgeManifolds() {
+        return shadowEdgeManifolds;
     }
 
     private void Clear(Dictionary<Entity, LightManager> lightManagers) {
@@ -99,6 +169,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
 
 }
 
+// TODO: figure out if it's worth it to make this a struct.
 public class LightManager {
     private LightSource source;
     private float2 lightEdge1;
@@ -152,7 +223,7 @@ public class LightManager {
         if (!math.isnan(a1)) {
             protoEdges.Add(new ProtoEdge{angle=a1, opaque=entity});
             protoEdges.Add(new ProtoEdge{angle=a2, opaque=entity});
-            shadowData[entity] = new ShadowData{sg1 = sg1, sg2 = sg2};
+            shadowData.TryAdd(entity, new ShadowData{sg1 = sg1, sg2 = sg2});
         }
     }
 

@@ -8,31 +8,27 @@ using UnityEngine;
 using Physics.Math;
 
 using ShadowEdge = ShadowEdgeGenerationSystem.ShadowEdge;
+using ShadowEdgeManifold = ShadowEdgeGenerationSystem.ShadowEdgeManifold;
 using Manifold = Physics.Math.Geometry.Manifold;
 
 public struct ShadowEdgeConstraintHelper : ConstraintManagerHelper<ShadowEdgeConstraint> {
     private ComponentDataFromEntity<Velocity> vels;
     private ComponentDataFromEntity<Box> boxes;
-    private NativeList<ShadowEdge> shadowEdges;
     private NativeArray<Entity> hitShadBoxEntities;
+    private NativeArray<ShadowEdgeManifold> shadowEdgeManifolds;
     private float dt;
 
     public void Update(
             ComponentDataFromEntity<Velocity> vels,
             ComponentDataFromEntity<Box> boxes,
-            NativeList<ShadowEdge> shadowEdges,
             NativeArray<Entity> hitShadBoxEntities,
+            NativeArray<ShadowEdgeManifold> shadowEdgeManifolds,
             float dt) {
         this.vels = vels;
         this.boxes = boxes;
-        this.shadowEdges = shadowEdges;
         this.hitShadBoxEntities = hitShadBoxEntities;
+        this.shadowEdgeManifolds = shadowEdgeManifolds;
         this.dt = dt;
-    }
-
-
-    private Manifold? GetManifold(Entity box, ShadowEdge shadowEdge) {
-        return Geometry.GetIntersectData(boxes[box].ToRect(), shadowEdge.collider);
     }
 
     private void AddConstraints(ref NativeList<ShadowEdgeConstraint> constraints, Entity box, ShadowEdge shadowEdge, Manifold manifold, bool useContact1) {
@@ -86,24 +82,15 @@ public struct ShadowEdgeConstraintHelper : ConstraintManagerHelper<ShadowEdgeCon
     }
 
     public void FillWithConstraints(NativeList<ShadowEdgeConstraint> constraints) {
-        for (int i = 0; i < hitShadBoxEntities.Length; i++ ) {
-            for (int j = 0; j < shadowEdges.Length; j++ ) {
-                Entity box = hitShadBoxEntities[i];
-                ShadowEdge shadowEdge = shadowEdges[j];
+        foreach (ShadowEdgeManifold seManifold in shadowEdgeManifolds) {
+            Geometry.Manifold manifold = seManifold.manifold;
+            AddConstraints(ref constraints, seManifold.box, seManifold.shadowEdge, manifold, true);
 
-                var manifoldNullable = GetManifold(box, shadowEdge);
+            if (manifold.contact2 is Geometry.Contact contact) {
 
-                if (manifoldNullable is Geometry.Manifold manifold) {
+                AddConstraints(ref constraints, seManifold.box, seManifold.shadowEdge, manifold, false);
 
-                    AddConstraints(ref constraints, box, shadowEdge, manifold, true);
-
-                    if (manifold.contact2 is Geometry.Contact contact) {
-
-                        AddConstraints(ref constraints, box, shadowEdge, manifold, false);
-
-                        Debug.Assert(!manifold.contact1.id.Equals(contact.id), "Duplicate contact ids within the same manifold");
-                    }
-                }
+                Debug.Assert(!manifold.contact1.id.Equals(contact.id), "Duplicate contact ids within the same manifold");
             }
         }
     }

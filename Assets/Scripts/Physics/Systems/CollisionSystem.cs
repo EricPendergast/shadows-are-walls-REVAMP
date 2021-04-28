@@ -70,7 +70,7 @@ public class CollisionSystem : SystemBase {
         shadowEdgeCM.helper.Update(
             vels: velocities,
             boxes: boxes,
-            shadowEdges: World.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetShadowEdges(),
+            shadowEdgeManifolds: World.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetShadowEdgeManifolds(),
             hitShadBoxEntities: hitShadBoxEntities,
             dt: dt
         );
