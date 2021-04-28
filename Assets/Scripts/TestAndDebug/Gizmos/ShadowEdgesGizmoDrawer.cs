@@ -8,18 +8,23 @@ public class ShadowEdgesGizmoDrawer : MonoBehaviour {
         if (Application.isPlaying) {
             var world = World.DefaultGameObjectInjectionWorld;
 
+            var ids = new HashSet<int>();
+
             foreach (var shadowEdge in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetShadowEdgesForDebug()) {
-                int id = math.abs(shadowEdge.collider.id);
+                int id = shadowEdge.id;
+                if (ids.Contains(id)) {
+                    Debug.LogError("Duplicate shadow edges with id: " + id);
+                }
+                ids.Add(id);
+
+                id = math.abs(id);
 
                 Gizmos.color = new Color(
                         (id % 4591 % 256)/256.0f, 
                         (id % 5347 % 256)/265.0f,
                         (id % 3797 % 256)/265.0f);
 
-                Gizmos.DrawLine((Vector2)shadowEdge.collider.c1, (Vector2)shadowEdge.collider.c2);
-                Gizmos.DrawLine((Vector2)shadowEdge.collider.c2, (Vector2)shadowEdge.collider.c3);
-                Gizmos.DrawLine((Vector2)shadowEdge.collider.c3, (Vector2)shadowEdge.collider.c4);
-                Gizmos.DrawLine((Vector2)shadowEdge.collider.c4, (Vector2)shadowEdge.collider.c1);
+                Gizmos.DrawLine((Vector2)shadowEdge.contact1, (Vector2)(shadowEdge.contact1 + math.normalize(shadowEdge.contact1 - shadowEdge.lightSource)*shadowEdge.length));
 
                 Gizmos.DrawSphere((Vector2)shadowEdge.contact1, .05f);
                 if (shadowEdge.contact2 != null) {

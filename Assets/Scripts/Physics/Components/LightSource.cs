@@ -10,6 +10,7 @@ public struct LightSource : IComponentData {
     public float inertia;
     public float aperture;
 
+    public int id;
     public int minEdgeId;
     public int maxEdgeId;
 

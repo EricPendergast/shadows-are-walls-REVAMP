@@ -24,6 +24,7 @@ public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
                 aperture = aperture * Mathf.Deg2Rad,
                 maxEdgeId = Random.Range(1, int.MaxValue),
                 minEdgeId = Random.Range(1, int.MaxValue),
+                id = Random.Range(1, int.MaxValue),
             }
         );
 

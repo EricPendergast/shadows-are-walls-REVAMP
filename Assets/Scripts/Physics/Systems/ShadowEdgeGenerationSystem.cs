@@ -71,7 +71,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         // TODO: It may be worth it to remove this field, since it is
         // technically redundant. Would have to write a special collision
         // function if we do this.
-        public Rect collider;
+        public int id;
         public float2 lightSource;
         public float2 CalculateEndPoint() {
             return contact1 + math.normalize(contact1 - lightSource)*length;
@@ -301,7 +301,7 @@ public class LightManager {
             var shBox = shadHitBoxes[i];
             var shEntity = shadHitBoxEntities[i];
             foreach (ShadowEdge edge in shadowEdges) {
-                var manifoldNullable = Geometry.GetIntersectData(shBox.ToRect(), edge.collider);
+                var manifoldNullable = Geometry.GetIntersectData(shBox.ToRect(), Rect.FromLineSegment(edge.contact1, edge.contact1 + math.normalize(edge.contact1 - edge.lightSource)*edge.length, edge.id));
                 if (manifoldNullable is Geometry.Manifold manifold) {
                     shadowEdgeManifolds.Add(shEntity, new ShadowEdgeManifold{
                         box = shEntity,
@@ -365,7 +365,7 @@ public class LightManager {
                         contact1 = scannedEdge.contact1,
                         contact2 = scannedEdge.contact2,
                         opaque = protoEdge.opaque,
-                        collider = Rect.FromLineSegment(scannedEdge.contact1, scannedEdge.contact1 + math.normalize(scannedEdge.contact1 - source.pos)*scannedEdgeLength, scannedEdge.id),
+                        id = new int2(scannedEdge.id, source.id).GetHashCode(),
                         length = scannedEdgeLength,
                         leading = addToWorking,
                         lightSource = source.pos
