@@ -38,19 +38,10 @@ public class LightRenderSystem : SystemBase {
                 verts.Add(Vector2.zero);
                 // TODO: This is going to be the end of the min light edge
                 verts.Add(Vector2.zero);
-                foreach (var edge in shadowEdgeSystem.GetShadowEdges(entity)) {
-                    float2 p1;
-                    float2 p2;
-                    if (edge.leading) {
-                        p1 = edge.CalculateEndPoint();
-                        p2 = edge.contact1;
-                    } else {
-                        p1 = edge.contact1;
-                        p2 = edge.CalculateEndPoint();
-                    }
-
-                    verts.Add((Vector2)light.GlobalToLocal(p1));
-                    verts.Add((Vector2)light.GlobalToLocal(p2));
+                
+                // TODO: Vague function name. Maybe shift some work into/out of GetRenderPoints
+                foreach (var point in shadowEdgeSystem.GetRenderPoints(entity)) {
+                    verts.Add((Vector2)light.GlobalToLocal(point));
                 }
                 // TODO: This is going to be the end of the max light edge
                 verts.Add(Vector2.zero);

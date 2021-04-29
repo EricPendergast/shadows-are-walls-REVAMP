@@ -24,12 +24,12 @@ public class ShadowEdgesGizmoDrawer : MonoBehaviour {
                         (id % 5347 % 256)/265.0f,
                         (id % 3797 % 256)/265.0f);
 
-                Gizmos.DrawLine((Vector2)shadowEdge.contact1, (Vector2)(shadowEdge.contact1 + math.normalize(shadowEdge.contact1 - shadowEdge.lightSource)*shadowEdge.length));
+                Gizmos.DrawLine((Vector2)shadowEdge.mount1, (Vector2)shadowEdge.endpoint);
 
-                Gizmos.DrawSphere((Vector2)shadowEdge.contact1, .05f);
-                if (shadowEdge.contact2 != null) {
+                Gizmos.DrawSphere((Vector2)shadowEdge.mount1, .05f);
+                if (shadowEdge.mount2 != null) {
                     Gizmos.color = Color.green;
-                    Gizmos.DrawSphere((Vector2)shadowEdge.contact2, .05f);
+                    Gizmos.DrawSphere((Vector2)shadowEdge.mount2, .05f);
                 }
             }
         }

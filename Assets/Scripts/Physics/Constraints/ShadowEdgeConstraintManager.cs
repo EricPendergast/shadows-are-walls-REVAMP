@@ -7,9 +7,7 @@ using UnityEngine;
 
 using Physics.Math;
 
-using ShadowEdge = ShadowEdgeGenerationSystem.ShadowEdge;
 using ShadowEdgeManifold = ShadowEdgeGenerationSystem.ShadowEdgeManifold;
-using Manifold = Physics.Math.Geometry.Manifold;
 
 public struct ShadowEdgeConstraintHelper : ConstraintManagerHelper<ShadowEdgeConstraint> {
     private ComponentDataFromEntity<Velocity> vels;
@@ -31,33 +29,38 @@ public struct ShadowEdgeConstraintHelper : ConstraintManagerHelper<ShadowEdgeCon
         this.dt = dt;
     }
 
-    private void AddConstraints(ref NativeList<ShadowEdgeConstraint> constraints, ShadowEdgeManifold seManifold, bool useContact1) {
-        var box = seManifold.box;
-        var shadowEdge = seManifold.shadowEdge;
-        var manifold = seManifold.manifold;
+    private void AddConstraints(ref NativeList<ShadowEdgeConstraint> constraints, ShadowEdgeManifold m, bool useContact1) {
+        Debug.Assert(m.castingShapeType == LightManager.ShapeType.Box);
+
+        var standardManifold = new Physics.Math.Geometry.Manifold{
+            contact1 = m.contact1,
+            contact2 = m.contact2,
+            normal = m.normal,
+            overlap = m.overlap
+        };
 
         constraints.Add(new ShadowEdgeConstraint(
-            e1: box, 
-            e2: shadowEdge.opaque,
-            box1: boxes[box], 
-            box2: boxes[shadowEdge.opaque],
-            shadowOrigin: shadowEdge.contact1,
-            lightOrigin: shadowEdge.lightSource,
-            manifold: manifold,
+            e1: m.shadHitEntity, 
+            e2: m.castingEntity,
+            box1: boxes[m.shadHitEntity], 
+            box2: boxes[m.castingEntity],
+            shadowOrigin: m.mount1,
+            lightOrigin: m.lightSource,
+            manifold: standardManifold,
             useContact1: useContact1,
             dt: dt,
             contactIdScrambler: 1
         ));
 
-        if (shadowEdge.contact2 is float2 shadowOrigin) {
+        if (m.mount2 is float2 shadowOrigin) {
             constraints.Add(new ShadowEdgeConstraint(
-                e1: box, 
-                e2: shadowEdge.opaque,
-                box1: boxes[box], 
-                box2: boxes[shadowEdge.opaque],
+                e1: m.shadHitEntity, 
+                e2: m.castingEntity,
+                box1: boxes[m.shadHitEntity], 
+                box2: boxes[m.castingEntity],
                 shadowOrigin: shadowOrigin,
-                lightOrigin: shadowEdge.lightSource,
-                manifold: manifold,
+                lightOrigin: m.lightSource,
+                manifold: standardManifold,
                 useContact1: useContact1,
                 dt: dt,
                 contactIdScrambler: 2
@@ -87,14 +90,13 @@ public struct ShadowEdgeConstraintHelper : ConstraintManagerHelper<ShadowEdgeCon
 
     public void FillWithConstraints(NativeList<ShadowEdgeConstraint> constraints) {
         foreach (ShadowEdgeManifold seManifold in shadowEdgeManifolds) {
-            Geometry.Manifold manifold = seManifold.manifold;
             AddConstraints(ref constraints, seManifold, true);
 
-            if (manifold.contact2 is Geometry.Contact contact) {
+            if (seManifold.contact2 is Geometry.Contact contact) {
 
                 AddConstraints(ref constraints, seManifold, false);
 
-                Debug.Assert(!manifold.contact1.id.Equals(contact.id), "Duplicate contact ids within the same manifold");
+                Debug.Assert(!seManifold.contact1.id.Equals(contact.id), "Duplicate contact ids within the same manifold");
             }
         }
     }
