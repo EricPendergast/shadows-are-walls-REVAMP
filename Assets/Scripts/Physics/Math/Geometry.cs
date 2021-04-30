@@ -260,10 +260,14 @@ namespace Physics.Math {
         }
 
         public readonly struct ContactId : System.IEquatable<ContactId> {
+            // We need the shape ids because sometimes both edges are on the
+            // same shape. This occasionally leads to duplicate contact ids.
+            readonly public int shape1Id;
+            readonly public int shape2Id;
             readonly public EdgeId edge1;
             readonly public EdgeId edge2;
 
-            public ContactId(EdgeId e1, EdgeId e2) {
+            public ContactId(int shape1Id, int shape2Id, EdgeId e1, EdgeId e2) {
                 if (e1.shapeId < e2.shapeId || 
                         (e1.shapeId == e2.shapeId && e1.edgeIndex < e2.edgeIndex)) {
                     edge1 = e1;
@@ -272,16 +276,13 @@ namespace Physics.Math {
                     edge1 = e2;
                     edge2 = e1;
                 }
+
+                this.shape1Id = math.min(shape1Id, shape2Id);
+                this.shape2Id = math.max(shape1Id, shape2Id);
             }
 
             public override int GetHashCode() {
-                int hash = 27;
-                hash = (13 * hash) + edge1.shapeId;
-                hash = (13 * hash) + edge1.edgeIndex;
-                hash = (13 * hash) + edge2.shapeId;
-                hash = (13 * hash) + edge2.edgeIndex;
-
-                return hash;
+                return new int2x3(shape1Id, shape2Id, edge1.shapeId, edge1.edgeIndex, edge2.shapeId, edge2.edgeIndex).GetHashCode();
             }
 
             public bool Equals(ContactId other) {
@@ -314,9 +315,14 @@ namespace Physics.Math {
             }
         }
 
-        private static ContactId GetContactId(EdgeId e1, EdgeId e2) {
-            return new ContactId(e1, e2);
+        private static ContactId GetContactId(int shape1Id, int shape2Id, EdgeId e1, EdgeId e2) {
+            return new ContactId(shape1Id, shape2Id, e1, e2);
         }
+        // Debug/optimization note: If you want to make contact points be ints,
+        // use this version of GetContactId instead of the above function:
+        //private static int GetContactId(int shape1Id, int shape2Id, EdgeId e1, EdgeId e2) {
+        //    return new ContactId(shape1Id, shape2Id, e1, e2).GetHashCode();
+        //}
 
         private static void ComputeContacts(in Rect r1, in Rect r2, float2 normal, out Contact? contact1, out Contact? contact2, float skin) {
             contact1 = null;
@@ -351,7 +357,7 @@ namespace Physics.Math {
                     contactEdgeId = incidentId.WithIndexOffset(-1);
                 }
 
-                contact1 = new Contact{point=incident.p1, id=GetContactId(incidentId, contactEdgeId)};
+                contact1 = new Contact{point=incident.p1, id=GetContactId(r1.id, r2.id, incidentId, contactEdgeId)};
             }
 
             if (math.dot(refNorm, incident.p2) < max) {
@@ -365,7 +371,7 @@ namespace Physics.Math {
                     contactEdgeId = incidentId.WithIndexOffset(1);
                 }
 
-                contact2 = new Contact{point=incident.p2, id=GetContactId(incidentId, contactEdgeId)};
+                contact2 = new Contact{point=incident.p2, id=GetContactId(r1.id, r2.id, incidentId, contactEdgeId)};
             }
 
             if (contact1 == null) {
