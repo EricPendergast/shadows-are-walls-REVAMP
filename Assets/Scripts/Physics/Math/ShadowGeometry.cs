@@ -95,15 +95,17 @@ namespace Physics.Math {
         // Casts a ray with direction (lightOrigin towards shadowOrigin) from
         // shadowOrigin for distance shadowLength, and updates shadowLength
         // with the distance it traveled before hitting toSubtract
-        public static void ShadowSubtract(float2 lightOrigin, float2 shadowOrigin, ref float shadowLength, Box toSubtract) {
+        //public static void ShadowSubtract(float2 lightOrigin, float2 shadowOrigin, ref float shadowLength, Box toSubtract) {
+        public static void ShadowSubtract(float2 lightOrigin, float2 shadowDirection, float shadowStart, ref float shadowEnd, Box toSubtract) {
             var rect = toSubtract.ToRect();
             
-            float2 ray = math.normalize(shadowOrigin - lightOrigin);
+            //float2 ray = math.normalize(shadowOrigin - lightOrigin);
+            float2 shadowOrigin = lightOrigin + shadowDirection*shadowStart;
 
-            // Ensure the rayNorm points from the rect center to the ray
-            float2 rayNorm = Lin.Cross(ray, -1);
+            // Ensure the rayNorm points from the rect center to the shadowDirection
+            float2 rayNorm = Lin.Cross(shadowDirection, -1);
 
-            int closestVertex = rect.FurthestVertex(-ray);
+            int closestVertex = rect.FurthestVertex(-shadowDirection);
 
             float centerToRayProj = math.dot(shadowOrigin - rect.pos, rayNorm);
             if (centerToRayProj < 0) {
@@ -137,7 +139,7 @@ namespace Physics.Math {
             float2 intersection;
             
             if (math.abs(heightMult) <= 1 && math.abs(widthMult) <= 1) {
-                if (math.dot(p1, ray) < math.dot(p2, ray)) {
+                if (math.dot(p1, shadowDirection) < math.dot(p2, shadowDirection)) {
                     intersection = p1;
                 } else {
                     intersection = p2;
@@ -150,13 +152,7 @@ namespace Physics.Math {
                 return;
             }
             
-            float intersectionDist = math.dot(intersection, ray);
-            float shadowOriginDist = math.dot(shadowOrigin, ray);
-            if (intersectionDist <= shadowOriginDist) {
-                shadowLength = 0;
-            } else {
-                shadowLength = math.min(shadowLength, intersectionDist - shadowOriginDist);
-            }
+            shadowEnd = math.min(shadowEnd, math.dot(intersection - lightOrigin, shadowDirection));
         }
     }
 }

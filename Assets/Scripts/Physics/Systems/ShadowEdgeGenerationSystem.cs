@@ -228,13 +228,7 @@ public class LightManager {
     private NativeList<OpaqueSection> sortedShadows;
     private NativeList<ProtoEdge> protoEdges;
     private NativeList<Entity> workingSet;
-    private NativeHashMap<Entity, ShadowData> shadowData;
     private ComponentDataFromEntity<Box> boxes;
-
-    private struct ShadowData {
-        public Geometry.ShadowGeometry sg1;
-        public Geometry.ShadowGeometry sg2;
-    }
 
     public enum ShapeType {
         Box, Light
@@ -277,6 +271,7 @@ public class LightManager {
     private struct ProtoEdge : System.IComparable<ProtoEdge> {
         public float angle;
         public Entity opaque;
+        public Geometry.ShadowGeometry sg;
     
         public int CompareTo(ProtoEdge p) {
             return angle.CompareTo(p.angle);
@@ -294,7 +289,6 @@ public class LightManager {
         protoEdges = new NativeList<ProtoEdge>(Allocator.TempJob);
         sortedShadows = new NativeList<OpaqueSection>(Allocator.TempJob);
         workingSet = new NativeList<Entity>(Allocator.TempJob);
-        shadowData = new NativeHashMap<Entity, ShadowData>(0, Allocator.TempJob);
         this.boxes = boxes;
     }
 
@@ -302,7 +296,6 @@ public class LightManager {
         protoEdges.Dispose();
         sortedShadows.Dispose();
         workingSet.Dispose();
-        shadowData.Dispose();
     }
 
     public void Precompute(NativeArray<Box> opaqueBoxes, NativeArray<Entity> opaqueBoxEntities) {
@@ -314,10 +307,8 @@ public class LightManager {
             (float a1, float a2) = Angles(sg1.contact1, sg2.contact1);
             if (!math.isnan(a1)) {
                 Entity opaqueEntity = opaqueBoxEntities[i];
-                // TODO: I think there are some unecessary steps here. Can't I just put sg1 and sg2 into protoEdges?
-                protoEdges.Add(new ProtoEdge{angle=a1, opaque=opaqueEntity});
-                protoEdges.Add(new ProtoEdge{angle=a2, opaque=opaqueEntity});
-                shadowData.TryAdd(opaqueEntity, new ShadowData{sg1 = sg1, sg2 = sg2});
+                protoEdges.Add(new ProtoEdge{angle=a1, opaque=opaqueEntity, sg=sg1});
+                protoEdges.Add(new ProtoEdge{angle=a2, opaque=opaqueEntity, sg=sg2});
             }
         }
 
@@ -354,68 +345,73 @@ public class LightManager {
         workingSet.Clear();
 
         foreach (var protoEdge in protoEdges) {
-            var scannedEdge = new Geometry.ShadowGeometry();
 
             bool leading = true;
             {// Scanning
-                var shadowDatum = shadowData[protoEdge.opaque];
                 for (int i = 0; i < workingSet.Length; i++) {
                     if (workingSet[i] == protoEdge.opaque) {
                         workingSet.RemoveAtSwapBack(i);
                         leading = false;
-                        scannedEdge = shadowDatum.sg2;
                         break;
                     }
                 }
-                if (leading) {
-                    scannedEdge = shadowDatum.sg1;
-                }
             }
 
-            if (math.isfinite(protoEdge.angle)) {// Subtraction of working set from scannedEdge
-                float scannedEdgeLength = 100;
-                // Contains the entity of the box with the most overlap with the shadow edge
-                Entity subtracted = sourceEntity;
-                foreach (Entity entityToSubtract in workingSet) {
-                    Box boxToSubtract = boxes[entityToSubtract];
-                    float prevLength = scannedEdgeLength;
-                    Geometry.ShadowSubtract(
-                        lightOrigin: source.pos,
-                        shadowOrigin: scannedEdge.contact1,
-                        shadowLength: ref scannedEdgeLength,
-                        toSubtract: boxToSubtract
-                    );
-                    if (prevLength != scannedEdgeLength) {
-                        subtracted = entityToSubtract;
-                    }
-                }
+            AddOpaqueSection(protoEdge, leading);
 
-
-                if (scannedEdgeLength > 0) {
-                    ShapeType subtractedType = subtracted == sourceEntity ? ShapeType.Light : ShapeType.Box;
-
-                    sortedShadows.Add(new OpaqueSection {
-                        angle = protoEdge.angle,
-                        // If this is the trailing edge, then the shape
-                        // occupying the range is the one after the edge, which
-                        // is the one which subtracted the largest amount from
-                        // it.
-                        castingShape = leading ? protoEdge.opaque : subtracted,
-                        castingShapeType = leading ? ShapeType.Box : subtractedType,
-                        edgeStart = math.distance(source.pos, scannedEdge.contact1),
-                        edgeEnd = math.distance(source.pos, scannedEdge.contact1) + scannedEdgeLength,
-                        edgeOwner = protoEdge.opaque,
-                        mount1 = scannedEdge.contact1,
-                        mount2 = scannedEdge.contact2,
-                        edgeId = new int2(scannedEdge.id, source.id).GetHashCode()
-                    });
-                }
-            }
-
-            // This is here so that the owner of scannedEdge is not in the
+            // This is here so that the owner of protoEdge is not in the
             // working set during the subtraction calculations
             if (leading) {
                 workingSet.Add(protoEdge.opaque);
+            }
+        }
+    }
+
+    // Adds an OpaqueSection to sortedShadows, corresponding to protoEdge.
+    // Subtracts workingSet from the resulting shadow edge
+    private void AddOpaqueSection(ProtoEdge protoEdge, bool leading) {
+        if (math.isfinite(protoEdge.angle)) {
+            float scannedEdgeEnd = 100;
+            // Contains the entity of the box with the most overlap with the shadow edge
+            Entity subtracted = sourceEntity;
+
+            float scannedEdgeStart = math.distance(source.pos, protoEdge.sg.contact1);
+            float2 scannedEdgeDir = (protoEdge.sg.contact1 - source.pos)/scannedEdgeStart;
+
+            foreach (Entity entityToSubtract in workingSet) {
+                Box boxToSubtract = boxes[entityToSubtract];
+                float prevLength = scannedEdgeEnd;
+
+                Geometry.ShadowSubtract(
+                    lightOrigin: source.pos,
+                    shadowDirection: scannedEdgeDir,
+                    shadowStart: scannedEdgeStart,
+                    shadowEnd: ref scannedEdgeEnd,
+                    toSubtract: boxToSubtract
+                );
+                if (prevLength != scannedEdgeEnd) {
+                    subtracted = entityToSubtract;
+                }
+            }
+
+            if (scannedEdgeEnd > scannedEdgeStart) {
+                ShapeType subtractedType = subtracted == sourceEntity ? ShapeType.Light : ShapeType.Box;
+
+                sortedShadows.Add(new OpaqueSection {
+                    angle = protoEdge.angle,
+                    // If this is the trailing edge, then the shape
+                    // occupying the range is the one after the edge, which
+                    // is the one which subtracted the largest amount from
+                    // it.
+                    castingShape = leading ? protoEdge.opaque : subtracted,
+                    castingShapeType = leading ? ShapeType.Box : subtractedType,
+                    edgeStart = scannedEdgeStart,
+                    edgeEnd = scannedEdgeEnd,
+                    edgeOwner = protoEdge.opaque,
+                    mount1 = protoEdge.sg.contact1,
+                    mount2 = protoEdge.sg.contact2,
+                    edgeId = new int2(protoEdge.sg.id, source.id).GetHashCode()
+                });
             }
         }
     }
