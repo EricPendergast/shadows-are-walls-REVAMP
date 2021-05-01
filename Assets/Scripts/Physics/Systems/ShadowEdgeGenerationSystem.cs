@@ -223,6 +223,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
 public class LightManager {
     private LightSource source;
     private Entity sourceEntity;
+    // TODO: Rename these to leadingLightEdge, trailingLightEdge
     private float2 lightEdge1;
     private float2 lightEdge2;
     private NativeList<OpaqueSection> sortedShadows;
@@ -249,6 +250,7 @@ public class LightManager {
         public Entity occupyingShape;
         public ShapeType occupyingShapeType;
 
+        public float2 edgeDir;
         public float edgeStart;
         public float edgeEnd;
 
@@ -265,12 +267,13 @@ public class LightManager {
         }
 
         public float2 ShadowEndPoint(float2 lightPos) {
-            return lightPos + math.normalize(mount1 - lightPos)*edgeEnd;
+            return lightPos + edgeDir*edgeEnd;
         }
     }
 
     private struct ProtoEdge : System.IComparable<ProtoEdge> {
         public float angle;
+        // TODO: Rename to source
         public Entity opaque;
         public Geometry.ShadowGeometry sg;
     
@@ -313,6 +316,9 @@ public class LightManager {
             }
         }
 
+        protoEdges.Add(new ProtoEdge{angle=0, opaque=sourceEntity, sg=new Geometry.ShadowGeometry{contact1=source.pos, contact2=null, id=source.minEdgeId}});
+        protoEdges.Add(new ProtoEdge{angle=RawAngleOfNormal(lightEdge2), opaque=sourceEntity, sg=new Geometry.ShadowGeometry{contact1=source.pos, contact2=null, id=source.maxEdgeId}});
+
         Compute();
     }
 
@@ -322,20 +328,22 @@ public class LightManager {
             var shBox = shadHitBoxes[i];
             var shEntity = shadHitBoxEntities[i];
             foreach (OpaqueSection sect in sortedShadows) {
-                var manifoldNullable = Geometry.GetIntersectData(shBox.ToRect(), Rect.FromLineSegment(sect.mount1, sect.ShadowEndPoint(source.pos), sect.edgeId));
-                if (manifoldNullable is Geometry.Manifold manifold) {
-                    shadowEdgeManifolds.Add(shEntity, new ShadowEdgeManifold{
-                        contact1 = manifold.contact1,
-                        contact2 = manifold.contact2,
-                        mount1 = sect.mount1,
-                        mount2 = sect.mount2,
-                        shadHitEntity = shEntity,
-                        castingEntity = sect.edgeOwner,
-                        castingShapeType = sect.edgeOwnerType,
-                        overlap = manifold.overlap,
-                        lightSource = source.pos,
-                        normal = manifold.normal
-                    });
+                if (sect.edgeOwnerType == ShapeType.Box) {
+                    var manifoldNullable = Geometry.GetIntersectData(shBox.ToRect(), Rect.FromLineSegment(sect.mount1, sect.ShadowEndPoint(source.pos), sect.edgeId));
+                    if (manifoldNullable is Geometry.Manifold manifold) {
+                        shadowEdgeManifolds.Add(shEntity, new ShadowEdgeManifold{
+                            contact1 = manifold.contact1,
+                            contact2 = manifold.contact2,
+                            mount1 = sect.mount1,
+                            mount2 = sect.mount2,
+                            shadHitEntity = shEntity,
+                            castingEntity = sect.edgeOwner,
+                            castingShapeType = sect.edgeOwnerType,
+                            overlap = manifold.overlap,
+                            lightSource = source.pos,
+                            normal = manifold.normal
+                        });
+                    }
                 }
             }
         }
@@ -366,14 +374,18 @@ public class LightManager {
                 workingSet.Add(protoEdge.opaque);
             }
         }
+
     }
 
     // nextShape is the entity of the shape which overlapped the most with the
     // edge. It is called nextShape because it is the shape right after the
     // shadow edge.
-    private void SubtractWorkingSetFromEdge(float2 edgeDir, float edgeStart, ref float edgeEnd, in Rect edgeCastingShape, out Entity? nextShape) {
-        nextShape = null;
+    private void SubtractWorkingSetFromEdge(float2 edgeDir, float edgeStart, ref float edgeEnd, in Rect edgeCastingShape, out Entity nextShape) {
+        nextShape = sourceEntity;
         foreach (Entity entityToSubtract in workingSet) {
+            if (entityToSubtract == sourceEntity) {
+                continue;
+            }
             Box boxToSubtract = boxes[entityToSubtract];
             float prevLength = edgeEnd;
 
@@ -393,23 +405,39 @@ public class LightManager {
     // Adds an OpaqueSection to sortedShadows, corresponding to protoEdge.
     // Subtracts workingSet from the resulting shadow edge
     private void AddOpaqueSection(ProtoEdge protoEdge, bool leading) {
+        bool isLightEdge = protoEdge.opaque == sourceEntity;
+
         if (math.isfinite(protoEdge.angle)) {
             float edgeEnd = 100;
+            
+            float edgeStart;
+            float2 edgeDir;
+            Rect edgeCastingShape;
 
-            float edgeStart = math.distance(source.pos, protoEdge.sg.contact1);
-            float2 edgeDir = (protoEdge.sg.contact1 - source.pos)/edgeStart;
+            if (isLightEdge) {
+                edgeStart = 0;
+                edgeDir = leading ? lightEdge1 : lightEdge2;
+                edgeCastingShape = new Rect(source.pos, float2.zero, float2.zero, 0);
+            } else {
+                edgeStart = math.distance(source.pos, protoEdge.sg.contact1);
+                edgeDir = (protoEdge.sg.contact1 - source.pos)/edgeStart;
+                edgeCastingShape = boxes[protoEdge.opaque].ToRect();
+            }
 
             SubtractWorkingSetFromEdge(
                 edgeDir: edgeDir,
                 edgeStart: edgeStart,
                 edgeEnd: ref edgeEnd,
-                edgeCastingShape: boxes[protoEdge.opaque].ToRect(),
-                nextShape: out var nextShapeNullable
+                edgeCastingShape: edgeCastingShape,
+                nextShape: out var nextShape
             );
 
+            if (isLightEdge && !leading) {
+                nextShape = sourceEntity;
+            }
+
             if (edgeEnd >= edgeStart) {
-                ShapeType nextShapeType = nextShapeNullable == null ? ShapeType.Light : ShapeType.Box;
-                Entity nextShape = nextShapeNullable ?? sourceEntity;
+                ShapeType nextShapeType = nextShape == sourceEntity ? ShapeType.Light : ShapeType.Box;
 
                 sortedShadows.Add(new OpaqueSection {
                     angle = protoEdge.angle,
@@ -419,15 +447,21 @@ public class LightManager {
                     // it.
                     occupyingShape = leading ? protoEdge.opaque : nextShape,
                     occupyingShapeType = leading ? ShapeType.Box : nextShapeType,
+                    edgeDir = edgeDir,
                     edgeStart = edgeStart,
                     edgeEnd = edgeEnd,
                     edgeOwner = protoEdge.opaque,
+                    edgeOwnerType = isLightEdge ? ShapeType.Light : ShapeType.Box,
                     mount1 = protoEdge.sg.contact1,
                     mount2 = protoEdge.sg.contact2,
-                    edgeId = new int2(protoEdge.sg.id, source.id).GetHashCode()
+                    edgeId = protoEdge.sg.id
                 });
             }
         }
+    }
+
+    private float RawAngleOfNormal(float2 normal) {
+        return 1 - math.dot(lightEdge1, normal);
     }
 
     private float Angle(float2 point) {
@@ -447,7 +481,7 @@ public class LightManager {
         if (c2 > 0) {
             return math.INFINITY;
         }
-        return 1 - math.dot(lightEdge1, n);
+        return RawAngleOfNormal(n);
     }
 
     private (float, float) Angles(float2 p1, float2 p2) {
@@ -492,16 +526,25 @@ public class LightManager {
     }
 
     public IEnumerable<float2> GetRenderPoints() {
+        yield return source.pos;
         foreach (var section in sortedShadows) {
             float2 shadowBegin = section.mount1;
             float2 shadowEnd = section.ShadowEndPoint(source.pos);
 
-            if (section.edgeOwner == section.occupyingShape) {
+            if (section.edgeOwnerType == ShapeType.Light) {
                 yield return shadowEnd;
-                yield return shadowBegin;
             } else {
-                yield return shadowBegin;
-                yield return shadowEnd;
+                if (section.edgeOwner == section.occupyingShape) {
+                    yield return shadowEnd;
+                    yield return source.pos;
+
+                    yield return shadowBegin;
+                } else {
+                    yield return shadowBegin;
+                    yield return source.pos;
+
+                    yield return shadowEnd;
+                }
             }
         }
     }

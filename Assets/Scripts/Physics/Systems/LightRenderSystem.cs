@@ -35,21 +35,12 @@ public class LightRenderSystem : SystemBase {
                 List<Vector3> verts = new List<Vector3>();
                 List<int> triangles = new List<int>();
 
-                verts.Add(Vector2.zero);
-                // TODO: This is going to be the end of the min light edge
-                verts.Add(Vector2.zero);
-                
-                // TODO: Vague function name. Maybe shift some work into/out of GetRenderPoints
                 foreach (var point in shadowEdgeSystem.GetRenderPoints(entity)) {
                     verts.Add((Vector2)light.GlobalToLocal(point));
                 }
-                // TODO: This is going to be the end of the max light edge
-                verts.Add(Vector2.zero);
                 
-                for (int i = 1; i+1 < verts.Count; i+=2) {
-                    triangles.Add(0);
+                for (int i = 0; i < verts.Count; i++) {
                     triangles.Add(i);
-                    triangles.Add(i+1);
                 }
 
                 renderMesh.mesh.vertices = verts.ToArray();
@@ -57,7 +48,6 @@ public class LightRenderSystem : SystemBase {
 
                 renderMesh.mesh.RecalculateBounds();
                 bounds.Value = renderMesh.mesh.bounds.ToAABB();
-
             }
         ).Run();
     }
