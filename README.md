@@ -10,6 +10,6 @@ This is a rewrite of my original shadows-are-walls project. Runs on (mostly) pur
 
 ![](https://github.com/EricPendergast/shadows-are-walls-REVAMP/blob/main/Gifs/Boxes%20with%20light.gif)
 
-### Opaque object physics (very unfinished)
+### Opaque object physics
 
 ![](https://github.com/EricPendergast/shadows-are-walls-REVAMP/blob/main/Gifs/Stack%20of%20opaque%20boxes.gif)
