@@ -93,7 +93,9 @@ namespace Physics.Math {
                     math.abs(math.dot(point - pos, height)) < math.lengthsq(height);
         }
 
-        //public float2 Penetration(float2 point) {
+        // Returns the shortest vector that 'point' must be translated by so
+        // that it is on the perimeter of this rectangle.
+        //public float2 SeparationVector(float2 point) {
         //    point = point - pos;
         //    float xDir = math.dot(point, width) < 0 ? -1 : 1;
         //    float yDir = math.dot(point, height) < 0 ? -1 : 1;

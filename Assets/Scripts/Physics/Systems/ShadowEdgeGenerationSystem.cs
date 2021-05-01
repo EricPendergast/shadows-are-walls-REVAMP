@@ -371,7 +371,7 @@ public class LightManager {
     // nextShape is the entity of the shape which overlapped the most with the
     // edge. It is called nextShape because it is the shape right after the
     // shadow edge.
-    private void SubtractWorkingSetFromEdge(float2 edgeDir, float edgeStart, ref float edgeEnd, out Entity? nextShape) {
+    private void SubtractWorkingSetFromEdge(float2 edgeDir, float edgeStart, ref float edgeEnd, in Rect edgeCastingShape, out Entity? nextShape) {
         nextShape = null;
         foreach (Entity entityToSubtract in workingSet) {
             Box boxToSubtract = boxes[entityToSubtract];
@@ -382,6 +382,7 @@ public class LightManager {
                 shadowDirection: edgeDir,
                 shadowStart: edgeStart,
                 shadowEnd: ref edgeEnd,
+                shadowCastingShape: edgeCastingShape,
                 toSubtract: boxToSubtract
             );
             if (prevLength != edgeEnd) {
@@ -402,10 +403,11 @@ public class LightManager {
                 edgeDir: edgeDir,
                 edgeStart: edgeStart,
                 edgeEnd: ref edgeEnd,
+                edgeCastingShape: boxes[protoEdge.opaque].ToRect(),
                 nextShape: out var nextShapeNullable
             );
 
-            if (edgeEnd > edgeStart) {
+            if (edgeEnd >= edgeStart) {
                 ShapeType nextShapeType = nextShapeNullable == null ? ShapeType.Light : ShapeType.Box;
                 Entity nextShape = nextShapeNullable ?? sourceEntity;
 

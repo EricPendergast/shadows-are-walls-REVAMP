@@ -94,13 +94,30 @@ namespace Physics.Math {
 
         // Casts a ray with direction (lightOrigin towards shadowOrigin) from
         // shadowOrigin for distance shadowLength, and updates shadowLength
-        // with the distance it traveled before hitting toSubtract
-        //public static void ShadowSubtract(float2 lightOrigin, float2 shadowOrigin, ref float shadowLength, Box toSubtract) {
-        public static void ShadowSubtract(float2 lightOrigin, float2 shadowDirection, float shadowStart, ref float shadowEnd, Box toSubtract) {
+        // with the distance it traveled before hitting toSubtract.
+        public static void ShadowSubtract(float2 lightOrigin, float2 shadowDirection, float shadowStart, ref float shadowEnd, Rect shadowCastingShape, Box toSubtract) {
             var rect = toSubtract.ToRect();
             
-            //float2 ray = math.normalize(shadowOrigin - lightOrigin);
             float2 shadowOrigin = lightOrigin + shadowDirection*shadowStart;
+
+            // Special case: if the shadow origin is in the rect, pretend the
+            // two shapes aren't intersecting. The "pretending" is achieved by
+            // getting the minimal separation vector between the two shapes.
+            if (rect.Contains(shadowOrigin)) {
+                // TODO: We don't need the manifold contact points. If its a
+                // performance problem (probably not), we can make a special
+                // function that just gets the separation vector
+                var manifoldNullable = GetIntersectData(rect, shadowCastingShape);
+                if (manifoldNullable is Manifold manifold) {
+                    float2 separation = manifold.normal * manifold.overlap;
+                    if (math.dot(separation, shadowDirection) < 0) {
+                        shadowEnd = math.min(shadowEnd, shadowStart);
+                    } else {
+                        shadowEnd = math.min(shadowEnd, shadowStart - 1);
+                    }
+                return;
+                }
+            }
 
             // Ensure the rayNorm points from the rect center to the shadowDirection
             float2 rayNorm = Lin.Cross(shadowDirection, -1);
