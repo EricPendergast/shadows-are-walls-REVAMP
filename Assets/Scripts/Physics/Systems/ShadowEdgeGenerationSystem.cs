@@ -245,8 +245,9 @@ public class LightManager {
     private struct OpaqueSection : System.IComparable<OpaqueSection> {
         public float angle;
 
-        public Entity castingShape;
-        public ShapeType castingShapeType;
+        // The shape that occupies (is fully exposed to light in) this section.
+        public Entity occupyingShape;
+        public ShapeType occupyingShapeType;
 
         public float edgeStart;
         public float edgeEnd;
@@ -414,8 +415,8 @@ public class LightManager {
                     // occupying the range is the one after the edge, which
                     // is the one which subtracted the largest amount from
                     // it.
-                    castingShape = leading ? protoEdge.opaque : nextShape,
-                    castingShapeType = leading ? ShapeType.Box : nextShapeType,
+                    occupyingShape = leading ? protoEdge.opaque : nextShape,
+                    occupyingShapeType = leading ? ShapeType.Box : nextShapeType,
                     edgeStart = edgeStart,
                     edgeEnd = edgeEnd,
                     edgeOwner = protoEdge.opaque,
@@ -493,7 +494,7 @@ public class LightManager {
             float2 shadowBegin = section.mount1;
             float2 shadowEnd = section.ShadowEndPoint(source.pos);
 
-            if (section.edgeOwner == section.castingShape) {
+            if (section.edgeOwner == section.occupyingShape) {
                 yield return shadowEnd;
                 yield return shadowBegin;
             } else {
