@@ -64,6 +64,7 @@ public class CollisionSystem : SystemBase {
             lightSources: lightSources,
             hitShadBoxEntities: hitShadBoxEntities,
             lightSourceEntities: lightSourceEntities,
+            lightEdgeManifolds: World.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetLightEdgeManifolds(),
             dt: dt
         );
 

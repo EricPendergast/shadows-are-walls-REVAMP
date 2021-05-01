@@ -11,12 +11,15 @@ using Physics.Math;
 //      using BoxLightEdgeConstraintManager = 
 //          ConstraintManager<BoxLightEdgeConstraintHelper, StandardConstraint>;
 
+using ShadowEdgeManifold = ShadowEdgeGenerationSystem.ShadowEdgeManifold;
+
 public struct BoxLightEdgeConstraintHelper : ConstraintManagerHelper<StandardConstraint> {
     private ComponentDataFromEntity<Box> boxes;
     private ComponentDataFromEntity<Velocity> vels;
     private ComponentDataFromEntity<LightSource> lightSources;
     private NativeArray<Entity> hitShadBoxEntities;
     private NativeArray<Entity> lightSourceEntities;
+    private NativeArray<ShadowEdgeManifold> lightEdgeManifolds;
     private float dt;
 
     public void Update(
@@ -25,6 +28,7 @@ public struct BoxLightEdgeConstraintHelper : ConstraintManagerHelper<StandardCon
         ComponentDataFromEntity<LightSource> lightSources,
         NativeArray<Entity> hitShadBoxEntities,
         NativeArray<Entity> lightSourceEntities,
+        NativeArray<ShadowEdgeManifold> lightEdgeManifolds,
         float dt) {
 
         this.boxes = boxes;
@@ -32,26 +36,25 @@ public struct BoxLightEdgeConstraintHelper : ConstraintManagerHelper<StandardCon
         this.lightSources = lightSources;
         this.hitShadBoxEntities = hitShadBoxEntities;
         this.lightSourceEntities = lightSourceEntities;
+        this.lightEdgeManifolds = lightEdgeManifolds;
         this.dt = dt;
     }
 
-    private void AddConstraints(ref NativeList<StandardConstraint> constraints, Entity boxEntity, Entity lightSourceEntity, bool lightEdgeFlag) {
-        var manifoldNullable = Geometry.GetIntersectData(
-            boxes[boxEntity].ToRect(),
-            lightEdgeFlag ? 
-                lightSources[lightSourceEntity].GetMinEdgeRect() : 
-                lightSources[lightSourceEntity].GetMaxEdgeRect()
-        );
+    private void AddConstraints(ref NativeList<StandardConstraint> constraints, ShadowEdgeManifold m, bool useContact1) {
+        Debug.Assert(m.castingShapeType == LightManager.ShapeType.Light);
 
-        if (manifoldNullable is Geometry.Manifold manifold) {
+        var standardManifold = new Physics.Math.Geometry.Manifold {
+            contact1 = m.contact1,
+            contact2 = m.contact2,
+            normal = m.normal,
+            overlap = m.overlap
+        };
 
-            constraints.Add(GetConstraint(boxEntity, lightSourceEntity, manifold, true));
+        constraints.Add(GetConstraint(m.shadHitEntity, m.castingEntity, standardManifold, true));
 
-            if (manifold.contact2 is Geometry.Contact contact) {
-
-                constraints.Add(GetConstraint(boxEntity, lightSourceEntity, manifold, false));
-                Debug.Assert(!manifold.contact1.id.Equals(contact.id), "Duplicate contact ids within the same manifold");
-            }
+        if (standardManifold.contact2 is Geometry.Contact contact) {
+            constraints.Add(GetConstraint(m.shadHitEntity, m.castingEntity, standardManifold, false));
+            Debug.Assert(!standardManifold.contact1.id.Equals(contact.id), "Duplicate contact ids within the same manifold");
         }
     }
 
@@ -86,14 +89,8 @@ public struct BoxLightEdgeConstraintHelper : ConstraintManagerHelper<StandardCon
     }
 
     public void FillWithConstraints(NativeList<StandardConstraint> constraints) {
-        for (int i = 0; i < hitShadBoxEntities.Length; i++ ) {
-            for (int j = 0; j < lightSourceEntities.Length; j++ ) {
-                Entity box = hitShadBoxEntities[i];
-                Entity lightSource = lightSourceEntities[j];
-
-                AddConstraints(ref constraints, box, lightSource, true);
-                AddConstraints(ref constraints, box, lightSource, false);
-            }
+        foreach (ShadowEdgeManifold seManifold in lightEdgeManifolds) {
+            AddConstraints(ref constraints, seManifold, true);
         }
     }
 }

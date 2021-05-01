@@ -73,6 +73,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
 
     Dictionary<Entity, LightManager> lightManagers;
     NativeList<ShadowEdgeManifold> finalShadowEdgeManifolds;
+    NativeList<ShadowEdgeManifold> finalLightEdgeManifolds;
     NativeMultiHashMap<Entity, ShadowEdgeManifold> boxManifolds;
 
     protected override void OnCreate() {
@@ -81,12 +82,14 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         shadHitBoxesQuery = GetEntityQuery(typeof(Box), typeof(HitShadowsObject));
         lightManagers = new Dictionary<Entity, LightManager>();
         finalShadowEdgeManifolds = new NativeList<ShadowEdgeManifold>(Allocator.Persistent);
+        finalLightEdgeManifolds = new NativeList<ShadowEdgeManifold>(Allocator.Persistent);
         boxManifolds = new NativeMultiHashMap<Entity, ShadowEdgeManifold>(0, Allocator.Persistent);
     }
 
     protected override void OnDestroy() {
         Clear(lightManagers);
         finalShadowEdgeManifolds.Dispose();
+        finalLightEdgeManifolds.Dispose();
         boxManifolds.Dispose();
     }
 
@@ -154,6 +157,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         // Step 5: Store all non illuminated manifolds
 
         finalShadowEdgeManifolds.Clear();
+        finalLightEdgeManifolds.Clear();
         foreach (var kv in boxManifolds) {
             var seManifold = kv.Value;
 
@@ -174,7 +178,14 @@ public class ShadowEdgeGenerationSystem : SystemBase {
                 }
             }
 
-            finalShadowEdgeManifolds.Add(seManifold);
+            switch (seManifold.castingShapeType) {
+                case LightManager.ShapeType.Box:
+                    finalShadowEdgeManifolds.Add(seManifold);
+                    break;
+                case LightManager.ShapeType.Light:
+                    finalLightEdgeManifolds.Add(seManifold);
+                    break;
+            }
         }
 
         // TODO: When implementing shadow corner collisions
@@ -208,6 +219,10 @@ public class ShadowEdgeGenerationSystem : SystemBase {
 
     public NativeList<ShadowEdgeManifold> GetShadowEdgeManifolds() {
         return finalShadowEdgeManifolds;
+    }
+
+    public NativeList<ShadowEdgeManifold> GetLightEdgeManifolds() {
+        return finalLightEdgeManifolds;
     }
 
     private void Clear(Dictionary<Entity, LightManager> lightManagers) {
@@ -328,22 +343,20 @@ public class LightManager {
             var shBox = shadHitBoxes[i];
             var shEntity = shadHitBoxEntities[i];
             foreach (OpaqueSection sect in sortedShadows) {
-                if (sect.edgeOwnerType == ShapeType.Box) {
-                    var manifoldNullable = Geometry.GetIntersectData(shBox.ToRect(), Rect.FromLineSegment(sect.mount1, sect.ShadowEndPoint(source.pos), sect.edgeId));
-                    if (manifoldNullable is Geometry.Manifold manifold) {
-                        shadowEdgeManifolds.Add(shEntity, new ShadowEdgeManifold{
-                            contact1 = manifold.contact1,
-                            contact2 = manifold.contact2,
-                            mount1 = sect.mount1,
-                            mount2 = sect.mount2,
-                            shadHitEntity = shEntity,
-                            castingEntity = sect.edgeOwner,
-                            castingShapeType = sect.edgeOwnerType,
-                            overlap = manifold.overlap,
-                            lightSource = source.pos,
-                            normal = manifold.normal
-                        });
-                    }
+                var manifoldNullable = Geometry.GetIntersectData(shBox.ToRect(), Rect.FromLineSegment(sect.mount1, sect.ShadowEndPoint(source.pos), sect.edgeId));
+                if (manifoldNullable is Geometry.Manifold manifold) {
+                    shadowEdgeManifolds.Add(shEntity, new ShadowEdgeManifold{
+                        contact1 = manifold.contact1,
+                        contact2 = manifold.contact2,
+                        mount1 = sect.mount1,
+                        mount2 = sect.mount2,
+                        shadHitEntity = shEntity,
+                        castingEntity = sect.edgeOwner,
+                        castingShapeType = sect.edgeOwnerType,
+                        overlap = manifold.overlap,
+                        lightSource = source.pos,
+                        normal = manifold.normal
+                    });
                 }
             }
         }
