@@ -238,9 +238,8 @@ public class ShadowEdgeGenerationSystem : SystemBase {
 public class LightManager {
     private LightSource source;
     private Entity sourceEntity;
-    // TODO: Rename these to leadingLightEdge, trailingLightEdge
-    private float2 lightEdge1;
-    private float2 lightEdge2;
+    private float2 leadingLightEdge;
+    private float2 trailingLightEdge;
     private NativeList<OpaqueSection> sortedShadows;
     private NativeList<ProtoEdge> protoEdges;
     private NativeList<Entity> workingSet;
@@ -288,8 +287,7 @@ public class LightManager {
 
     private struct ProtoEdge : System.IComparable<ProtoEdge> {
         public float angle;
-        // TODO: Rename to source
-        public Entity opaque;
+        public Entity source;
         public Geometry.ShadowGeometry sg;
     
         public int CompareTo(ProtoEdge p) {
@@ -300,9 +298,9 @@ public class LightManager {
     public LightManager(in LightSource source, in Entity sourceEntity, ComponentDataFromEntity<Box> boxes) {
         this.source = source;
         this.sourceEntity = sourceEntity;
-        lightEdge1 = source.GetMinEdgeNorm();
-        lightEdge2 = source.GetMaxEdgeNorm();
-        Debug.Assert(Lin.Cross(lightEdge1, lightEdge2) > 0);
+        leadingLightEdge = source.GetLeadingEdgeNorm();
+        trailingLightEdge = source.GetTrailingEdgeNorm();
+        Debug.Assert(Lin.Cross(leadingLightEdge, trailingLightEdge) > 0);
 
 
         protoEdges = new NativeList<ProtoEdge>(Allocator.TempJob);
@@ -326,15 +324,15 @@ public class LightManager {
             (float a1, float a2) = Angles(sg1.contact1, sg2.contact1);
             if (!math.isnan(a1)) {
                 Entity opaqueEntity = opaqueBoxEntities[i];
-                protoEdges.Add(new ProtoEdge{angle=a1, opaque=opaqueEntity, sg=sg1});
-                protoEdges.Add(new ProtoEdge{angle=a2, opaque=opaqueEntity, sg=sg2});
+                protoEdges.Add(new ProtoEdge{angle=a1, source=opaqueEntity, sg=sg1});
+                protoEdges.Add(new ProtoEdge{angle=a2, source=opaqueEntity, sg=sg2});
             }
         }
 
-        protoEdges.Add(new ProtoEdge{angle=0, opaque=sourceEntity, sg=new Geometry.ShadowGeometry{contact1=source.pos, contact2=null, id=source.minEdgeId}});
-        protoEdges.Add(new ProtoEdge{angle=RawAngleOfNormal(lightEdge2), opaque=sourceEntity, sg=new Geometry.ShadowGeometry{contact1=source.pos, contact2=null, id=source.maxEdgeId}});
+        protoEdges.Add(new ProtoEdge{angle=0, source=sourceEntity, sg=new Geometry.ShadowGeometry{contact1=source.pos, contact2=null, id=source.minEdgeId}});
+        protoEdges.Add(new ProtoEdge{angle=RawAngleOfNormal(trailingLightEdge), source=sourceEntity, sg=new Geometry.ShadowGeometry{contact1=source.pos, contact2=null, id=source.maxEdgeId}});
 
-        Compute();
+        ComputeSortedShadows();
     }
 
     public void ComputeInitialManifolds(NativeArray<Box> shadHitBoxes, NativeArray<Entity> shadHitBoxEntities, ref NativeMultiHashMap<Entity, ShadowEdgeManifold> shadowEdgeManifolds) {
@@ -362,7 +360,7 @@ public class LightManager {
         }
     }
 
-    private void Compute() {
+    private void ComputeSortedShadows() {
         protoEdges.Sort();
         workingSet.Clear();
 
@@ -371,7 +369,7 @@ public class LightManager {
             bool leading = true;
             {// Scanning
                 for (int i = 0; i < workingSet.Length; i++) {
-                    if (workingSet[i] == protoEdge.opaque) {
+                    if (workingSet[i] == protoEdge.source) {
                         workingSet.RemoveAtSwapBack(i);
                         leading = false;
                         break;
@@ -384,7 +382,7 @@ public class LightManager {
             // This is here so that the owner of protoEdge is not in the
             // working set during the subtraction calculations
             if (leading) {
-                workingSet.Add(protoEdge.opaque);
+                workingSet.Add(protoEdge.source);
             }
         }
 
@@ -418,7 +416,7 @@ public class LightManager {
     // Adds an OpaqueSection to sortedShadows, corresponding to protoEdge.
     // Subtracts workingSet from the resulting shadow edge
     private void AddOpaqueSection(ProtoEdge protoEdge, bool leading) {
-        bool isLightEdge = protoEdge.opaque == sourceEntity;
+        bool isLightEdge = protoEdge.source == sourceEntity;
 
         if (math.isfinite(protoEdge.angle)) {
             float edgeEnd = 100;
@@ -429,12 +427,12 @@ public class LightManager {
 
             if (isLightEdge) {
                 edgeStart = 0;
-                edgeDir = leading ? lightEdge1 : lightEdge2;
+                edgeDir = leading ? leadingLightEdge : trailingLightEdge;
                 edgeCastingShape = new Rect(source.pos, float2.zero, float2.zero, 0);
             } else {
                 edgeStart = math.distance(source.pos, protoEdge.sg.contact1);
                 edgeDir = (protoEdge.sg.contact1 - source.pos)/edgeStart;
-                edgeCastingShape = boxes[protoEdge.opaque].ToRect();
+                edgeCastingShape = boxes[protoEdge.source].ToRect();
             }
 
             SubtractWorkingSetFromEdge(
@@ -458,12 +456,12 @@ public class LightManager {
                     // occupying the range is the one after the edge, which
                     // is the one which subtracted the largest amount from
                     // it.
-                    occupyingShape = leading ? protoEdge.opaque : nextShape,
+                    occupyingShape = leading ? protoEdge.source : nextShape,
                     occupyingShapeType = leading ? ShapeType.Box : nextShapeType,
                     edgeDir = edgeDir,
                     edgeStart = edgeStart,
                     edgeEnd = edgeEnd,
-                    edgeOwner = protoEdge.opaque,
+                    edgeOwner = protoEdge.source,
                     edgeOwnerType = isLightEdge ? ShapeType.Light : ShapeType.Box,
                     mount1 = protoEdge.sg.contact1,
                     mount2 = protoEdge.sg.contact2,
@@ -474,17 +472,17 @@ public class LightManager {
     }
 
     private float RawAngleOfNormal(float2 normal) {
-        return 1 - math.dot(lightEdge1, normal);
+        return 1 - math.dot(leadingLightEdge, normal);
     }
 
     private float Angle(float2 point) {
         // The region the light shines on is the set of all points that are "in
-        // front" of both lightEdge1 and lightEdge2
+        // front" of both leadingLightEdge and trailingLightEdge
         float2 n = math.normalize(point - source.pos);
-        // c1 > 0 iff n is in front of lightEdge1
-        float c1 = Lin.Cross(lightEdge1, n);
-        // c2 < 0 iff n is in front of lightEdge2
-        float c2 = Lin.Cross(lightEdge2, n);
+        // c1 > 0 iff n is in front of leadingLightEdge
+        float c1 = Lin.Cross(leadingLightEdge, n);
+        // c2 < 0 iff n is in front of trailingLightEdge
+        float c2 = Lin.Cross(trailingLightEdge, n);
         if (c1 < 0 && c2 > 0) {
             return math.NAN;
         }
