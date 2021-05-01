@@ -12,4 +12,4 @@ This is a rewrite of my original shadows-are-walls project. Runs on (mostly) pur
 
 ### Opaque object physics (very unfinished)
 
-![](https://github.com/EricPendergast/shadows-are-walls-REVAMP/blob/main/Gifs/Opaque%20objects%20-%20prototype.gif)
+![](https://github.com/EricPendergast/shadows-are-walls-REVAMP/blob/main/Gifs/Stack%20of%20opaque%20boxes.gif)
