@@ -95,49 +95,29 @@ namespace Physics.Math {
         // Casts a ray with direction (lightOrigin towards shadowOrigin) from
         // shadowOrigin for distance shadowLength, and updates shadowLength
         // with the distance it traveled before hitting toSubtract.
-        public static void ShadowSubtract(float2 lightOrigin, float2 shadowDirection, float shadowStart, ref float shadowEnd, Rect shadowCastingShape, Box toSubtract) {
-            var rect = toSubtract.ToRect();
+        public static void ShadowSubtract(float2 lightOrigin, float2 shadowDirection, float shadowStart, ref float shadowEnd, Rect toSubtract) {
             
             float2 shadowOrigin = lightOrigin + shadowDirection*shadowStart;
-
-            // Special case: if the shadow origin is in the rect, pretend the
-            // two shapes aren't intersecting. The "pretending" is achieved by
-            // getting the minimal separation vector between the two shapes.
-            if (rect.Contains(shadowOrigin)) {
-                // TODO: We don't need the manifold contact points. If its a
-                // performance problem (probably not), we can make a special
-                // function that just gets the separation vector
-                var manifoldNullable = GetIntersectData(rect, shadowCastingShape);
-                if (manifoldNullable is Manifold manifold) {
-                    float2 separation = manifold.normal * manifold.overlap;
-                    if (math.dot(separation, shadowDirection) < 0) {
-                        shadowEnd = math.min(shadowEnd, shadowStart);
-                    } else {
-                        shadowEnd = math.min(shadowEnd, shadowStart - 1);
-                    }
-                return;
-                }
-            }
 
             // Ensure the rayNorm points from the rect center to the shadowDirection
             float2 rayNorm = Lin.Cross(shadowDirection, -1);
 
-            int closestVertex = rect.FurthestVertex(-shadowDirection);
+            int closestVertex = toSubtract.FurthestVertex(-shadowDirection);
 
-            float centerToRayProj = math.dot(shadowOrigin - rect.pos, rayNorm);
+            float centerToRayProj = math.dot(shadowOrigin - toSubtract.pos, rayNorm);
             if (centerToRayProj < 0) {
                 centerToRayProj *= -1;
                 rayNorm *= -1;
             }
 
-            float2 width = rect.width;
+            float2 width = toSubtract.width;
             // If corner has negative width term: (height-width) or (-height-width)
             if (closestVertex == 1 || closestVertex == 2) {
                 width *= -1;
             }
             float widthProj = math.dot(width, rayNorm);
             
-            float2 height = rect.height;
+            float2 height = toSubtract.height;
             // If corner has negative height term: (-height-width) or (-height+width)
             if (closestVertex == 2 || closestVertex == 3) {
                 height *= -1;
@@ -150,8 +130,8 @@ namespace Physics.Math {
             // Derived from: heightProj + widthProj*x = centerToRayProj
             float widthMult = (centerToRayProj - heightProj)/widthProj;
             
-            float2 p1 = rect.pos + height + width*widthMult;
-            float2 p2 = rect.pos + width + height*heightMult;
+            float2 p1 = toSubtract.pos + height + width*widthMult;
+            float2 p2 = toSubtract.pos + width + height*heightMult;
             
             float2 intersection;
             

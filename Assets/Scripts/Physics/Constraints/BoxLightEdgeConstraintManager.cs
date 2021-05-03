@@ -41,7 +41,7 @@ public struct BoxLightEdgeConstraintHelper : ConstraintManagerHelper<StandardCon
     }
 
     private void AddConstraints(ref NativeList<StandardConstraint> constraints, ShadowEdgeManifold m, bool useContact1) {
-        Debug.Assert(m.castingShapeType == LightManager.ShapeType.Light);
+        Debug.Assert(m.castingShapeType == ShapeType.Light);
 
         var standardManifold = new Physics.Math.Geometry.Manifold {
             contact1 = m.contact1,

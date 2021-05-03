@@ -24,31 +24,31 @@ public class LightRenderSystem : SystemBase {
 
         var shadowEdgeSystem = World.GetOrCreateSystem<ShadowEdgeGenerationSystem>();
 
-        Entities
-            .WithStructuralChanges()
-            .ForEach((ref RenderBounds bounds, in LightSource light, in Entity entity) => {
-
-                RenderMesh renderMesh = EntityManager.GetSharedComponentData<RenderMesh>(entity);
-
-                renderMesh.mesh.Clear();
-
-                List<Vector3> verts = new List<Vector3>();
-                List<int> triangles = new List<int>();
-
-                foreach (var point in shadowEdgeSystem.GetRenderPoints(entity)) {
-                    verts.Add((Vector2)light.GlobalToLocal(point));
-                }
-                
-                for (int i = 0; i < verts.Count; i++) {
-                    triangles.Add(i);
-                }
-
-                renderMesh.mesh.vertices = verts.ToArray();
-                renderMesh.mesh.triangles = triangles.ToArray();
-
-                renderMesh.mesh.RecalculateBounds();
-                bounds.Value = renderMesh.mesh.bounds.ToAABB();
-            }
-        ).Run();
+        //Entities
+        //    .WithStructuralChanges()
+        //    .ForEach((ref RenderBounds bounds, in LightSource light, in Entity entity) => {
+        //
+        //        RenderMesh renderMesh = EntityManager.GetSharedComponentData<RenderMesh>(entity);
+        //
+        //        renderMesh.mesh.Clear();
+        //
+        //        List<Vector3> verts = new List<Vector3>();
+        //        List<int> triangles = new List<int>();
+        //
+        //        foreach (var point in shadowEdgeSystem.GetRenderPoints(entity)) {
+        //            verts.Add((Vector2)light.GlobalToLocal(point));
+        //        }
+        //        
+        //        for (int i = 0; i < verts.Count; i++) {
+        //            triangles.Add(i);
+        //        }
+        //
+        //        renderMesh.mesh.vertices = verts.ToArray();
+        //        renderMesh.mesh.triangles = triangles.ToArray();
+        //
+        //        renderMesh.mesh.RecalculateBounds();
+        //        bounds.Value = renderMesh.mesh.bounds.ToAABB();
+        //    }
+        //).Run();
     }
 }
