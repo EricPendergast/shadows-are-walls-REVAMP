@@ -2,20 +2,13 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-using Unity.Entities;
-using Unity.Collections;
-
 public class ShadowRenderPassFeature : ScriptableRendererFeature {
-    public Shader shadowStencilShader;
-    public Shader shadowStencilBlitShader;
     public Material lightConeMaterial;
 
     class CustomRenderPass : ScriptableRenderPass {
         public readonly int numLightsId = Shader.PropertyToID(GlobalShaderProperties.numLights);
         public readonly int currentLightId = Shader.PropertyToID(GlobalShaderProperties.currentLight);
 
-        public Material shadowStencilMaterial;
-        public Material shadowStencilBlitMaterial;
         public Material lightConeMaterial;
 
         public CustomRenderPass() {
@@ -23,15 +16,12 @@ public class ShadowRenderPassFeature : ScriptableRendererFeature {
             Shader.SetGlobalInt(numLightsId, 0);
         }
 
-        //int shadowStencilId =  Random.Range(0, int.MaxValue);
         // This method is called before executing the render pass.
         // It can be used to configure render targets and their clear state. Also to create temporary render target textures.
         // When empty this render pass will render to the active camera render target.
         // You should never call CommandBuffer.SetRenderTarget. Instead call <c>ConfigureTarget</c> and <c>ConfigureClear</c>.
         // The render pipeline will ensure target setup and clearing happens in a performant manner.
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData) {
-            //cmd.GetTemporaryRT(shadowStencilId, renderingData.cameraData.camera.pixelWidth, renderingData.cameraData.camera.pixelHeight, 32, FilterMode.Point, RenderTextureFormat.Depth);
-            //ConfigureTarget(renderingData.cameraData.targetTexture, shadowStencilId);
             ConfigureClear(ClearFlag.Depth, Color.clear);
         }
 
@@ -52,8 +42,10 @@ public class ShadowRenderPassFeature : ScriptableRendererFeature {
                 name = "Render Light"
             };
 
+            // ShaderTagId corresponds to putting the following in a shader pass:
+            //      Tags { "LightMode" = "ShadowDrawPass" }
             var drawingSettings = new DrawingSettings(
-                new ShaderTagId("OpaqueObjectPass"), 
+                new ShaderTagId("ShadowDrawPass"), 
                 new SortingSettings(renderingData.cameraData.camera)) {
             };
             var filteringSettings = FilteringSettings.defaultValue;
@@ -79,17 +71,14 @@ public class ShadowRenderPassFeature : ScriptableRendererFeature {
 
         // Cleanup any allocated resources that were created during the execution of this render pass.
         public override void OnCameraCleanup(CommandBuffer cmd) {
-            //cmd.ReleaseTemporaryRT(shadowStencilId);
         }
     }
 
     CustomRenderPass m_ScriptablePass;
 
-    /// <inheritdoc/>
     public override void Create() {
-        if ( this.shadowStencilShader == null ||
-                this.shadowStencilBlitShader == null ||
-                this.lightConeMaterial == null) {
+        if (this.lightConeMaterial == null) {
+
             Debug.LogWarning("Warning: Field(s) not initialized in ShadowRenderPassFeature. Not using this pass.");
 
             m_ScriptablePass = null;
@@ -98,11 +87,8 @@ public class ShadowRenderPassFeature : ScriptableRendererFeature {
 
         m_ScriptablePass = new CustomRenderPass();
 
-        m_ScriptablePass.shadowStencilMaterial = new Material(shadowStencilShader);
-        m_ScriptablePass.shadowStencilBlitMaterial = new Material(shadowStencilBlitShader);
         m_ScriptablePass.lightConeMaterial = lightConeMaterial;
         
-        // Configures where the render pass should be injected.
         m_ScriptablePass.renderPassEvent = RenderPassEvent.BeforeRenderingOpaques;
     }
 

@@ -39,7 +39,7 @@ Shader "Custom RP/Opaque" {
             Blend Off
             ColorMask 0
             
-            Tags { "LightMode" = "OpaqueObjectPass" }
+            Tags { "LightMode" = "ShadowDrawPass" }
             // Write 1 to the stencil buffer for each fragment. Don't
             // render any fragment.
             Stencil {
