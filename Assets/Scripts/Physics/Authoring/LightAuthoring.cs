@@ -8,13 +8,6 @@ public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
     public float inertia = .1f;
     public float aperture = 40;
 
-    public Material material;
-
-    void Awake() {
-        gameObject.AddComponent<MeshFilter>().mesh = new Mesh();
-        gameObject.AddComponent<MeshRenderer>().material = material;
-    }
-
     public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem) {
         dstManager.AddComponentData(entity, 
             new LightSource {
