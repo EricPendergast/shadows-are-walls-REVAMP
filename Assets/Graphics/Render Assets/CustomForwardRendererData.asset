@@ -10,10 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: de640fe3d0db1804a85f9fc8f5cadab6, type: 3}
-  m_Name: UniversalRenderPipelineAsset_Renderer
+  m_Name: CustomForwardRendererData
   m_EditorClassIdentifier: 
-  m_RendererFeatures: []
-  m_RendererFeatureMap: 
+  m_RendererFeatures:
+  - {fileID: 8055949380967256865}
+  m_RendererFeatureMap: 21d3149d477bcc6f
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
   shaders:
@@ -42,3 +43,19 @@ MonoBehaviour:
   m_ShadowTransparentReceive: 1
   m_RenderingMode: 0
   m_AccurateGbufferNormals: 0
+--- !u!114 &8055949380967256865
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 463c98dc70ef7943e87ca1dfa2b9c7c9, type: 3}
+  m_Name: NewShadowRenderPassFeature
+  m_EditorClassIdentifier: 
+  m_Active: 1
+  shadowStencilShader: {fileID: 4800000, guid: 32f563139abd7f20c8e5796cd575cf73, type: 3}
+  shadowStencilBlitShader: {fileID: 4800000, guid: 32f563139abd7f20c8e5796cd575cf73, type: 3}
+  lightConeMaterial: {fileID: 2100000, guid: 7f1c57d44ac57dbb5aaa578e3b09457a, type: 2}
