@@ -55,6 +55,9 @@ Shader "Custom RP/Opaque" {
                 #pragma geometry geom
 
                 float4 _Color;
+                float4x4 lights[50];
+                int numLights;
+                int currentLight;
 
                 struct v2g {
                     float4 vertex : POSITION;
@@ -66,7 +69,7 @@ Shader "Custom RP/Opaque" {
 
                 v2g Vertex(float3 vertex : POSITION) {
                     v2g o;
-                    o.vertex = TransformObjectToHClip(vertex);
+                    o.vertex = float4(TransformObjectToWorld(vertex), 1);
 
                     return o;
                 }
@@ -74,6 +77,9 @@ Shader "Custom RP/Opaque" {
                 // TODO: This can be with maxvertexcount(2)
                 [maxvertexcount(18)]
                 void geom(triangle v2g input[3], inout TriangleStream<g2f> outputStream) {
+
+                    float2 lightPos = lights[currentLight]._m00_m10;
+
                     for (int i = 0; i < 3; i++) {
                         g2f o1;
                         g2f o2;
@@ -81,8 +87,13 @@ Shader "Custom RP/Opaque" {
                         g2f o4;
                         o1.vertex = input[i].vertex;
                         o2.vertex = input[(i + 1)%3].vertex;
-                        o3.vertex = float4(o1.vertex.xy*5, o1.vertex.zw);
-                        o4.vertex = float4(o2.vertex.xy*5, o2.vertex.zw);
+                        o3.vertex = float4(lightPos + normalize(o1.vertex.xy - lightPos)*200, 0, 1);
+                        o4.vertex = float4(lightPos + normalize(o2.vertex.xy - lightPos)*200, 0, 1);
+
+                        o1.vertex = TransformWorldToHClip(o1.vertex);
+                        o2.vertex = TransformWorldToHClip(o2.vertex);
+                        o3.vertex = TransformWorldToHClip(o3.vertex);
+                        o4.vertex = TransformWorldToHClip(o4.vertex);
 
                         outputStream.Append(o1);
                         outputStream.Append(o2);

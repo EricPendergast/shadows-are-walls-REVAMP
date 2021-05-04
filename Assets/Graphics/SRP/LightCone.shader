@@ -5,7 +5,7 @@ Shader "Custom RP/LightCone" {
     SubShader {
         Cull Off
         ZTest LEqual
-        /*ZWrite Off*/
+        ZWrite Off
         // This needs to be here because without it, in the build there are
         // strange artifacts around the borders of triangles.
         Blend SrcAlpha OneMinusSrcAlpha
@@ -16,31 +16,37 @@ Shader "Custom RP/LightCone" {
 
         Pass {
             // Only render the fragment if stencil is zero.
-            /*Stencil {*/
-            /*    Ref 0*/
-            /*    Comp Equal*/
-            /*    Pass keep*/
-            /*}*/
+            Stencil {
+                Ref 0
+                Comp Equal
+                Pass keep
+            }
             HLSLPROGRAM
                 #pragma target 3.5
                 #pragma vertex ProceduralVertex
                 #pragma fragment Fragment
 
                 float4 _Color;
+                float4x4 lights[50];
+                int numLights;
+                int currentLight;
 
                 float4 ProceduralVertex(uint vertexID : SV_VertexID) : POSITION {
-                    return float4(
-                        vertexID <= 1 ? -1.0 : 3.0,
-                        vertexID == 1 ? 3.0 : -1.0,
-                        0.0, 1.0
-                    );
+                    float4x4 l = lights[currentLight];
+                    float4 worldPoint = float4(0, 0, 0, 1);
+                    float2 lightPos = l._m00_m10;
+                    if (vertexID == 0) {
+                        worldPoint = float4(lightPos, 0, 1);
+                    } else if (vertexID == 1) {
+                        worldPoint = float4(lightPos + l._m01_m11*300, 0, 1);
+                    } else if (vertexID == 2) {
+                        worldPoint = float4(lightPos + l._m02_m12*300, 0, 1);
+                    }
+                    return TransformWorldToHClip(worldPoint);
                 }
-                /*float4 Vertex(float3 vertex : POSITION) : POSITION {*/
-                /*    return TransformObjectToHClip(vertex);*/
-                /*}*/
 
                 float4 Fragment(float4 position : POSITION) : SV_TARGET {
-                    return float4(_Color.rgb, 1);
+                    return _Color;
                 }
             ENDHLSL
         }

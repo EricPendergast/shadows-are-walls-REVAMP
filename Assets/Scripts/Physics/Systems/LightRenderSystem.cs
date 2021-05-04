@@ -14,41 +14,29 @@ using Utilities;
 [UpdateBefore(typeof(VelocityIntegrationSystem))]
 public class LightRenderSystem : SystemBase {
     protected override void OnUpdate() {
+        List<Matrix4x4> lights = new List<Matrix4x4>(50);
+
         Entities
+            .WithoutBurst()
             .ForEach((ref Translation pos, ref Rotation rot, in LightSource lightSource) => {
                 pos.Value = new float3(lightSource.pos, 0);
                 rot.Value = quaternion.Euler(0, 0, lightSource.rot);
+                Matrix4x4 light = new Matrix4x4(
+                    (Vector2)lightSource.pos,
+                    (Vector2)lightSource.GetLeadingEdgeNorm(),
+                    (Vector2)lightSource.GetTrailingEdgeNorm(),
+                    Vector4.zero
+                );
+                lights.Add(light);
             }).Run();
 
-        var lightSources = GetComponentDataFromEntity<LightSource>(false);
+        int lightsCount = lights.Count;
+        // Since you can't resize a matrix array, we need to allocate the max amount right away.
+        for (int i = lightsCount; i < 50; i++) {
+            lights.Add(Matrix4x4.zero);
+        }
 
-        var shadowEdgeSystem = World.GetOrCreateSystem<ShadowEdgeGenerationSystem>();
-
-        //Entities
-        //    .WithStructuralChanges()
-        //    .ForEach((ref RenderBounds bounds, in LightSource light, in Entity entity) => {
-        //
-        //        RenderMesh renderMesh = EntityManager.GetSharedComponentData<RenderMesh>(entity);
-        //
-        //        renderMesh.mesh.Clear();
-        //
-        //        List<Vector3> verts = new List<Vector3>();
-        //        List<int> triangles = new List<int>();
-        //
-        //        foreach (var point in shadowEdgeSystem.GetRenderPoints(entity)) {
-        //            verts.Add((Vector2)light.GlobalToLocal(point));
-        //        }
-        //        
-        //        for (int i = 0; i < verts.Count; i++) {
-        //            triangles.Add(i);
-        //        }
-        //
-        //        renderMesh.mesh.vertices = verts.ToArray();
-        //        renderMesh.mesh.triangles = triangles.ToArray();
-        //
-        //        renderMesh.mesh.RecalculateBounds();
-        //        bounds.Value = renderMesh.mesh.bounds.ToAABB();
-        //    }
-        //).Run();
+        Shader.SetGlobalMatrixArray(GlobalShaderProperties.lights, lights);
+        Shader.SetGlobalInt(GlobalShaderProperties.numLights, lightsCount);
     }
 }

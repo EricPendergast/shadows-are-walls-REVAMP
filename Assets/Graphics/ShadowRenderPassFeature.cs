@@ -11,9 +11,17 @@ public class ShadowRenderPassFeature : ScriptableRendererFeature {
     public Material lightConeMaterial;
 
     class CustomRenderPass : ScriptableRenderPass {
+        public readonly int numLightsId = Shader.PropertyToID(GlobalShaderProperties.numLights);
+        public readonly int currentLightId = Shader.PropertyToID(GlobalShaderProperties.currentLight);
+
         public Material shadowStencilMaterial;
         public Material shadowStencilBlitMaterial;
         public Material lightConeMaterial;
+
+        public CustomRenderPass() {
+            // In case this is uninitialized
+            Shader.SetGlobalInt(numLightsId, 0);
+        }
 
         //int shadowStencilId =  Random.Range(0, int.MaxValue);
         // This method is called before executing the render pass.
@@ -32,6 +40,7 @@ public class ShadowRenderPassFeature : ScriptableRendererFeature {
         // https://docs.unity3d.com/ScriptReference/Rendering.ScriptableRenderContext.html
         // You don't have to call ScriptableRenderContext.submit, the render pipeline will call it at specific points in the pipeline.
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData) {
+
             var camera = renderingData.cameraData.camera;
             var prevCullingMatrix = camera.cullingMatrix;
             camera.cullingMatrix = Matrix4x4.Ortho(float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue);
@@ -43,49 +52,29 @@ public class ShadowRenderPassFeature : ScriptableRendererFeature {
                 name = "Render Light"
             };
 
-            //var world = World.DefaultGameObjectInjectionWorld;
-            //
-            //var lightSourcesQuery = world.EntityManager.CreateEntityQuery(typeof(LightSource));
-            //NativeArray<LightSource> lightSources = lightSourcesQuery.ToComponentDataArray<LightSource>(Allocator.Temp);
-            //
-            //var boxesQuery = world.EntityManager.CreateEntityQuery(typeof(Box));
-            //NativeArray<Box> boxes = boxesQuery.ToComponentDataArray<Box>(Allocator.Temp);
-
             var drawingSettings = new DrawingSettings(
                 new ShaderTagId("OpaqueObjectPass"), 
                 new SortingSettings(renderingData.cameraData.camera)) {
-                //overrideMaterial = shadowStencilMaterial
             };
             var filteringSettings = FilteringSettings.defaultValue;
 
-            // TODO: Figure out how to turn off culling completely
-            //cullingParameters = new ScriptableCullingParameters(){
-            //    cullingMask = cullingParameters.cullingMask
-            //};
-            //cullingParameters.cullingOptions = CullingOptions.DisablePerObjectCulling;
-            //cullingParameters.cullingMatrix = Matrix4x4.Ortho(float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue);
-            //cullingParameters.cullingMatrix = Matrix4x4.identity;
-            //cullingParameters.isOrthographic = true;
-
-            //for (int i = 0; i < 5; i++) {
-            //    cullingParameters.cameraProperties.SetCameraCullingPlane(i, new Plane(new Vector3(1, 0, 0), 100000));
-            //}
             var cullingResults = context.Cull(ref cullingParameters);
 
-            //for (int i = 0; i < lightSources.Length; i++) {
+            int numLights = Shader.GetGlobalInt(numLightsId);
+            
+            for (int i = 0; i < numLights; i++) {
+                cmd.SetGlobalInt(currentLightId, i);
+                context.ExecuteCommandBuffer(cmd);
+                cmd.Clear();
                 context.DrawRenderers(
                     cullingResults, ref drawingSettings, ref filteringSettings);
-            //}
-
-            cmd.DrawProcedural(
-                    Matrix4x4.identity, lightConeMaterial, 0,
-                    MeshTopology.Triangles, 3);
-            //Blit(cmd, shadowStencilId, camera.activeTexture);
-
-            context.ExecuteCommandBuffer(cmd);
-
-            //lightSources.Dispose();
-            //boxes.Dispose();
+                cmd.DrawProcedural(
+                        Matrix4x4.identity, lightConeMaterial, 0,
+                        MeshTopology.Triangles, 3);
+                cmd.ClearRenderTarget(true, false, Color.clear, 1);
+                context.ExecuteCommandBuffer(cmd);
+                cmd.Clear();
+            }
         }
 
         // Cleanup any allocated resources that were created during the execution of this render pass.
