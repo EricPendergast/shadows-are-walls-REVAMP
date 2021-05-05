@@ -9,17 +9,7 @@ public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
     public float aperture = 40;
 
     public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem) {
-        dstManager.AddComponentData(entity, 
-            new LightSource {
-                pos = (Vector2)transform.position,
-                rot = transform.eulerAngles.z*Mathf.Deg2Rad,
-                inertia = inertia,
-                aperture = aperture * Mathf.Deg2Rad,
-                maxEdgeId = Random.Range(1, int.MaxValue),
-                minEdgeId = Random.Range(1, int.MaxValue),
-                id = Random.Range(1, int.MaxValue),
-            }
-        );
+        dstManager.AddComponentData(entity, GetLightSource());
 
         dstManager.AddComponentData(entity, 
             new Velocity {
@@ -34,6 +24,18 @@ public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
 
         Entity edge1 = conversionSystem.CreateAdditionalEntity(gameObject);
         Entity edge2 = conversionSystem.CreateAdditionalEntity(gameObject);
+    }
+
+    public LightSource GetLightSource() {
+        return new LightSource {
+                pos = (Vector2)transform.position,
+                rot = transform.eulerAngles.z*Mathf.Deg2Rad,
+                inertia = inertia,
+                aperture = aperture * Mathf.Deg2Rad,
+                maxEdgeId = Random.Range(1, int.MaxValue),
+                minEdgeId = Random.Range(1, int.MaxValue),
+                id = Random.Range(1, int.MaxValue),
+            };
     }
 
     void OnDrawGizmos() {

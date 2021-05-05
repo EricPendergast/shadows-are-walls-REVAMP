@@ -8,6 +8,7 @@ using UnityEngine;
 using Physics.Math;
 
 using Utilities;
+
 // Syncs the physics state with the rendering state.
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
 [UpdateAfter(typeof(ShadowEdgeGenerationSystem))]
@@ -21,13 +22,7 @@ public class LightRenderSystem : SystemBase {
             .ForEach((ref Translation pos, ref Rotation rot, in LightSource lightSource) => {
                 pos.Value = new float3(lightSource.pos, 0);
                 rot.Value = quaternion.Euler(0, 0, lightSource.rot);
-                Matrix4x4 light = new Matrix4x4(
-                    (Vector2)lightSource.pos,
-                    (Vector2)lightSource.GetLeadingEdgeNorm(),
-                    (Vector2)lightSource.GetTrailingEdgeNorm(),
-                    Vector4.zero
-                );
-                lights.Add(light);
+                lights.Add(lightSource.GetLightMatrix());
             }).Run();
 
         int lightsCount = lights.Count;
@@ -40,3 +35,4 @@ public class LightRenderSystem : SystemBase {
         Shader.SetGlobalInt(GlobalShaderProperties.numLights, lightsCount);
     }
 }
+

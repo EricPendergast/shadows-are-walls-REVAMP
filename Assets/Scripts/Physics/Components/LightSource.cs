@@ -3,6 +3,8 @@ using Unity.Mathematics;
 
 using Physics.Math;
 
+using UnityEngine;
+
 public struct LightSource : IComponentData {
     public float2 pos;
 
@@ -23,5 +25,15 @@ public struct LightSource : IComponentData {
 
     public float2 GlobalToLocal(float2 point) {
         return Lin.Rotate(point - pos, -rot);
+    }
+
+    // This is used by shaders
+    public Matrix4x4 GetLightMatrix() {
+        return new Matrix4x4(
+            (Vector2)pos,
+            (Vector2)GetLeadingEdgeNorm(),
+            (Vector2)GetTrailingEdgeNorm(),
+            Vector4.zero
+        );
     }
 }
