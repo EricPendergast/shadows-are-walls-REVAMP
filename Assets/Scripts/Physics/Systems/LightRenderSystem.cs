@@ -15,24 +15,15 @@ using Utilities;
 [UpdateBefore(typeof(VelocityIntegrationSystem))]
 public class LightRenderSystem : SystemBase {
     protected override void OnUpdate() {
-        List<Matrix4x4> lights = new List<Matrix4x4>(50);
+        ShadowRenderPassFeature.lights.Clear();
 
         Entities
             .WithoutBurst()
             .ForEach((ref Translation pos, ref Rotation rot, in LightSource lightSource) => {
                 pos.Value = new float3(lightSource.pos, 0);
                 rot.Value = quaternion.Euler(0, 0, lightSource.rot);
-                lights.Add(lightSource.GetLightMatrix());
+                ShadowRenderPassFeature.lights.Add(lightSource.GetLightMatrix());
             }).Run();
-
-        int lightsCount = lights.Count;
-        // Since you can't resize a matrix array, we need to allocate the max amount right away.
-        for (int i = lightsCount; i < 50; i++) {
-            lights.Add(Matrix4x4.zero);
-        }
-
-        Shader.SetGlobalMatrixArray(GlobalShaderProperties.lights, lights);
-        Shader.SetGlobalInt(GlobalShaderProperties.numLights, lightsCount);
     }
 }
 

@@ -1,5 +1,18 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-4111067521695908487
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 66153c7dd66c02e44bc3f33a98bb2b3d, type: 3}
+  m_Name: NewTestFeature
+  m_EditorClassIdentifier: 
+  m_Active: 1
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -14,7 +27,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_RendererFeatures:
   - {fileID: 8055949380967256865}
-  m_RendererFeatureMap: 21d3149d477bcc6f
+  - {fileID: -4111067521695908487}
+  m_RendererFeatureMap: 21d3149d477bcc6f797dabd1de8df2c6
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
   shaders:
@@ -53,9 +67,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 463c98dc70ef7943e87ca1dfa2b9c7c9, type: 3}
-  m_Name: NewShadowRenderPassFeature
+  m_Name: ShadowRenderPassFeature
   m_EditorClassIdentifier: 
   m_Active: 1
-  shadowStencilShader: {fileID: 4800000, guid: 32f563139abd7f20c8e5796cd575cf73, type: 3}
-  shadowStencilBlitShader: {fileID: 4800000, guid: 32f563139abd7f20c8e5796cd575cf73, type: 3}
   lightConeMaterial: {fileID: 2100000, guid: 7f1c57d44ac57dbb5aaa578e3b09457a, type: 2}

@@ -98,7 +98,6 @@ public class ShadowEdgeGenerationSystem : SystemBase {
     }
 
     protected override void OnUpdate() {
-
         var lightSources = lightSourceQuery.ToComponentDataArray<LightSource>(Allocator.TempJob);
         var lightSourceEntities = lightSourceQuery.ToEntityArray(Allocator.TempJob);
 

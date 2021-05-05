@@ -1,19 +1,29 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
 public class ShadowRenderPassFeature : ScriptableRendererFeature {
     public Material lightConeMaterial;
+    public static List<Matrix4x4> lights = new List<Matrix4x4>();
 
     class CustomRenderPass : ScriptableRenderPass {
+        // TODO: This doesn't need to be a list of lights. I can get away with
+        // sending one light matrix at a time
+        public readonly int lightsId = Shader.PropertyToID(GlobalShaderProperties.lights);
         public readonly int numLightsId = Shader.PropertyToID(GlobalShaderProperties.numLights);
         public readonly int currentLightId = Shader.PropertyToID(GlobalShaderProperties.currentLight);
 
         public Material lightConeMaterial;
 
         public CustomRenderPass() {
-            // In case this is uninitialized
-            Shader.SetGlobalInt(numLightsId, 0);
+            List<Matrix4x4> initialLights = new List<Matrix4x4>(50);
+            // Since you can't resize a matrix array, we need to allocate the max amount right away.
+            for (int i = 0; i < 50; i++) {
+                initialLights.Add(Matrix4x4.zero);
+            }
+            //In case this is uninitialized
+            Shader.SetGlobalMatrixArray(lightsId, initialLights);
         }
 
         // This method is called before executing the render pass.
@@ -30,7 +40,6 @@ public class ShadowRenderPassFeature : ScriptableRendererFeature {
         // https://docs.unity3d.com/ScriptReference/Rendering.ScriptableRenderContext.html
         // You don't have to call ScriptableRenderContext.submit, the render pipeline will call it at specific points in the pipeline.
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData) {
-
             var camera = renderingData.cameraData.camera;
             var prevCullingMatrix = camera.cullingMatrix;
             camera.cullingMatrix = Matrix4x4.Ortho(float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue);
@@ -52,7 +61,10 @@ public class ShadowRenderPassFeature : ScriptableRendererFeature {
 
             var cullingResults = context.Cull(ref cullingParameters);
 
-            int numLights = Shader.GetGlobalInt(numLightsId);
+            int numLights = ShadowRenderPassFeature.lights.Count;
+            if (numLights > 0) {
+                cmd.SetGlobalMatrixArray(lightsId, ShadowRenderPassFeature.lights);
+            }
             
             for (int i = 0; i < numLights; i++) {
                 cmd.SetGlobalInt(currentLightId, i);
@@ -64,9 +76,10 @@ public class ShadowRenderPassFeature : ScriptableRendererFeature {
                         Matrix4x4.identity, lightConeMaterial, 0,
                         MeshTopology.Triangles, 3);
                 cmd.ClearRenderTarget(true, false, Color.clear, 1);
-                context.ExecuteCommandBuffer(cmd);
-                cmd.Clear();
             }
+
+            context.ExecuteCommandBuffer(cmd);
+            cmd.Clear();
         }
 
         // Cleanup any allocated resources that were created during the execution of this render pass.
