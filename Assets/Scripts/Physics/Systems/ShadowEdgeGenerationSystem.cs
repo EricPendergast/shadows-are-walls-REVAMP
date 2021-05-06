@@ -459,13 +459,13 @@ public class LightManagerNew {
                 ///////////////
 
                 foreach (ShapeEdge.ShadHitData shadHitObject in shadHitWorkingSet) {
-                    var manifoldNullable = Geometry.GetIntersectData(
-                        shadHitObject.rect,
-                        Rect.FromLineSegment(
-                            startPoint,
-                            endPoint,
-                            opaqueEdge.id
-                        )
+
+                    var manifoldNullable = Geometry.GetShadowEdgeIntersectData(
+                        shadHitRect: shadHitObject.rect,
+                        edgeStart: startPoint,
+                        edgeEnd: endPoint,
+                        edgeIsLeading: !removed,
+                        edgeId: opaqueEdge.id
                     );
 
                     if (manifoldNullable is Geometry.Manifold manifold) {

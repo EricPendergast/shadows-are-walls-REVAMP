@@ -74,7 +74,7 @@ Shader "Custom RP/Opaque" {
                     return o;
                 }
 
-                // TODO: This can be with maxvertexcount(2)
+                // TODO: This can be with maxvertexcount(6)
                 [maxvertexcount(18)]
                 void geom(triangle v2g input[3], inout TriangleStream<g2f> outputStream) {
 

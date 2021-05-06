@@ -151,5 +151,19 @@ namespace Physics.Math {
             
             shadowEnd = math.min(shadowEnd, math.dot(intersection - lightOrigin, shadowDirection));
         }
+
+        public static Manifold? GetShadowEdgeIntersectData(Rect shadHitRect, float2 edgeStart, float2 edgeEnd, bool edgeIsLeading, int edgeId) {
+            float2 edgeAxis = Lin.Cross(math.normalize(edgeEnd - edgeStart), -1) * (edgeIsLeading ? 1 : -1);
+            float2 edgeMid = (edgeStart + edgeEnd)/2;
+
+            return GetIntersectData(shadHitRect, 
+                new Rect(
+                    p: edgeMid + edgeAxis*10,
+                    w: edgeAxis * 10,
+                    h: edgeStart - edgeMid,
+                    id: edgeId
+                )
+            );
+        }
     }
 }
