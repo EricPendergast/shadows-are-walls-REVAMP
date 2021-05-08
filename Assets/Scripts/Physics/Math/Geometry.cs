@@ -62,18 +62,16 @@ namespace Physics.Math {
             }
         }
 
-        public int FurthestVertex(float2 normal) {
-            int furthest = 0;
-            float max = math.dot(GetVertex(furthest), normal);
-            for (int i = 1; i < 4; i++) {
-                float dot = math.dot(GetVertex(i), normal);
-                if (dot > max) {
-                    furthest = i;
-                    max = dot;
-                }
-            }
+        public float2 FurthestVertexPoint(float2 normal) {
+            return pos + math.sign(math.dot(width, normal))*width + math.sign(math.dot(height, normal))*height;
+        }
 
-            return furthest;
+        public int FurthestVertex(float2 normal) {
+            if (math.dot(width, normal) > 0) {
+                return math.dot(height, normal) > 0 ? 0 : 3;
+            } else {
+                return math.dot(height, normal) > 0 ? 1 : 2;
+            }
         }
 
         public float2 GetVertex(int index) {

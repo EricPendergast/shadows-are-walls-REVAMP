@@ -11,6 +11,7 @@ namespace Physics.Math {
             public int id;
         }
 
+        // The slop term is so that if two edges of the rect are close to the shadow edge, then both edges are stored in ShadowGeometry.
         public static void CalculateShadowGeometry(Rect rect, float2 lightSource, float slop, out ShadowGeometry sg1, out ShadowGeometry sg2) {
             if (rect.Contains(lightSource)) {
                 Debug.Log("TODO: Opaque object contains light source. Behavior will not be correct.");
@@ -92,6 +93,9 @@ namespace Physics.Math {
             };
         }
 
+        // IMPORTANT: This function extrapolates the subtracting shape so that
+        // the raycast will always hit. This function should only be run on
+        // shapes that are already known to overlap angularly.
         // Casts a ray with direction (lightOrigin towards shadowOrigin) from
         // shadowOrigin for distance shadowLength, and updates shadowLength
         // with the distance it traveled before hitting toSubtract.
@@ -99,56 +103,67 @@ namespace Physics.Math {
             
             float2 shadowOrigin = lightOrigin + shadowDirection*shadowStart;
 
-            // Ensure the rayNorm points from the rect center to the shadowDirection
-            float2 rayNorm = Lin.Cross(shadowDirection, -1);
 
-            int closestVertex = toSubtract.FurthestVertex(-shadowDirection);
+            // Ensure the shadowNorm points from the rect center to the shadow
+            float2 shadowNorm = Lin.Cross(shadowDirection, -1);
+            float centerToShadowProj = math.dot(lightOrigin - toSubtract.pos, shadowNorm);
 
-            float centerToRayProj = math.dot(shadowOrigin - toSubtract.pos, rayNorm);
-            if (centerToRayProj < 0) {
-                centerToRayProj *= -1;
-                rayNorm *= -1;
+            if (centerToShadowProj < 0) {
+                centerToShadowProj *= -1;
+                shadowNorm *= -1;
             }
+
+            //{
+            //    float2 furthestVertex = toSubtract.FurthestVertexPoint(shadowNorm);
+            //    float2 dir = Lin.Cross(math.normalize(furthestVertex - lightOrigin), -1);
+            //    float dot = math.dot(furthestVertex - shadowOrigin, dir);
+            //    if (math.abs(dot) < epsilon) {
+            //        return;
+            //    }
+            //}
+
 
             float2 width = toSubtract.width;
-            // If corner has negative width term: (height-width) or (-height-width)
-            if (closestVertex == 1 || closestVertex == 2) {
+            // make width point towards the shadow source
+            if (math.dot(width, -shadowDirection) < 0) {
                 width *= -1;
             }
-            float widthProj = math.dot(width, rayNorm);
+            float widthProj = math.dot(width, shadowNorm);
             
             float2 height = toSubtract.height;
-            // If corner has negative height term: (-height-width) or (-height+width)
-            if (closestVertex == 2 || closestVertex == 3) {
+            // Make height point towards the shadow source
+            if (math.dot(height, -shadowDirection) < 0) {
                 height *= -1;
             }
-            float heightProj = math.dot(height, rayNorm);
+            float heightProj = math.dot(height, shadowNorm);
             
-            // Derived from: widthProj + heightProj*x = centerToRayProj
-            float heightMult = (centerToRayProj - widthProj)/heightProj;
+            // Derived from: widthProj + heightProj*x = centerToShadowProj
+            float heightMult = (centerToShadowProj - widthProj)/heightProj;
             
-            // Derived from: heightProj + widthProj*x = centerToRayProj
-            float widthMult = (centerToRayProj - heightProj)/widthProj;
+            // Derived from: heightProj + widthProj*x = centerToShadowProj
+            float widthMult = (centerToShadowProj - heightProj)/widthProj;
             
             float2 p1 = toSubtract.pos + height + width*widthMult;
             float2 p2 = toSubtract.pos + width + height*heightMult;
             
             float2 intersection;
             
-            if (math.abs(heightMult) <= 1 && math.abs(widthMult) <= 1) {
+            if (heightMult <= 1 && widthMult <= 1) {
                 if (math.dot(p1, shadowDirection) < math.dot(p2, shadowDirection)) {
                     intersection = p1;
                 } else {
                     intersection = p2;
                 }
-            } else if (math.abs(widthMult) <= 1) {
+            } else if (widthMult <= 1) {
                 intersection = p1;
-            } else if (math.abs(heightMult) <= 1) {
+            } else if (heightMult <= 1) {
                 intersection = p2;
             } else {
-                return;
+                // This part theoretically shouldn't happen, but floating point
+                // imprecision might make this possible.
+                intersection = (p1 + p2)/2;
             }
-            
+
             shadowEnd = math.min(shadowEnd, math.dot(intersection - lightOrigin, shadowDirection));
         }
 

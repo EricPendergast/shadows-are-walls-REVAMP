@@ -379,6 +379,11 @@ public class LightManagerNew {
 
     private void SubtractWorkingSetFromEdge(float2 edgeDir, float edgeStart, ref float edgeEnd) {
         foreach (ShapeEdge.OpaqueData opaqueEdge in opaqueWorkingSet) {
+            // TODO:
+            // if this edge is leading and close to opaqueEdge's leading, skip
+            // if this edge is trailing and close to opaqueEdge's trailing, skip
+            
+
             Geometry.ShadowSubtract(
                 lightOrigin: source.pos,
                 shadowDirection: edgeDir,
@@ -499,7 +504,7 @@ public class LightManagerNew {
         
         for (int i = 0; i < opaqueBoxes.Length; i++) {
             Rect rect = opaqueBoxes[i].ToRect();
-            Geometry.CalculateShadowGeometry(rect, source.pos, .05f, out var sg1, out var sg2);
+            Geometry.CalculateShadowGeometry(rect, source.pos, .005f, out var sg1, out var sg2);
 
             (float a1, float a2) = Angles(sg1.contact1, sg2.contact1);
             if (!math.isnan(a1)) {
@@ -525,7 +530,7 @@ public class LightManagerNew {
 
         for (int i = 0; i < shadHitBoxes.Length; i++) {
             Rect rect = shadHitBoxes[i].ToRect();
-            Geometry.CalculateShadowGeometry(rect, source.pos, .05f, out var sg1, out var sg2);
+            Geometry.CalculateShadowGeometry(rect, source.pos, .005f, out var sg1, out var sg2);
 
             (float a1, float a2) = Angles(sg1.contact1, sg2.contact1);
             if (!math.isnan(a1)) {
