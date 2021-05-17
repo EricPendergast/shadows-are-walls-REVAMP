@@ -244,9 +244,8 @@ public enum ShapeType {
 
 public class LightManagerNew {
     private LightSource source;
+    private AngleCalculator angleCalc;
     private Entity sourceEntity;
-    private float2 leadingLightEdge;
-    private float2 trailingLightEdge;
     private NativeList<ShapeEdge> shapeEdges;
     private NativeList<ShapeEdge.OpaqueData> opaqueWorkingSet;
     private NativeList<ShapeEdge.ShadHitData> shadHitWorkingSet;
@@ -335,9 +334,11 @@ public class LightManagerNew {
     public LightManagerNew(in LightSource source, in Entity sourceEntity/*, ComponentDataFromEntity<Box> boxes*/) {
         this.source = source;
         this.sourceEntity = sourceEntity;
-        leadingLightEdge = source.GetLeadingEdgeNorm();
-        trailingLightEdge = source.GetTrailingEdgeNorm();
-        Debug.Assert(Lin.Cross(leadingLightEdge, trailingLightEdge) > 0);
+        angleCalc = new AngleCalculator(
+            sourcePos: source.pos,
+            leadingLightEdge: source.GetLeadingEdgeNorm(),
+            trailingLightEdge: source.GetTrailingEdgeNorm()
+        );
 
         shapeEdges = new NativeList<ShapeEdge>(Allocator.TempJob);
         opaqueWorkingSet = new NativeList<ShapeEdge.OpaqueData>(Allocator.TempJob);
@@ -506,7 +507,7 @@ public class LightManagerNew {
             Rect rect = opaqueBoxes[i].ToRect();
             Geometry.CalculateShadowGeometry(rect, source.pos, .005f, out var sg1, out var sg2);
 
-            (float a1, float a2) = Angles(sg1.contact1, sg2.contact1);
+            (float a1, float a2) = angleCalc.Angles(sg1.contact1, sg2.contact1);
             if (!math.isnan(a1)) {
                 Entity opaqueEntity = opaqueBoxEntities[i];
                 shapeEdges.Add(new ShapeEdge.OpaqueData{
@@ -532,7 +533,7 @@ public class LightManagerNew {
             Rect rect = shadHitBoxes[i].ToRect();
             Geometry.CalculateShadowGeometry(rect, source.pos, .005f, out var sg1, out var sg2);
 
-            (float a1, float a2) = Angles(sg1.contact1, sg2.contact1);
+            (float a1, float a2) = angleCalc.Angles(sg1.contact1, sg2.contact1);
             if (!math.isnan(a1)) {
                 Entity shadHitEntity = shadHitBoxEntities[i];
                 shapeEdges.Add(new ShapeEdge.ShadHitData{
@@ -549,12 +550,12 @@ public class LightManagerNew {
         }
 
         shapeEdges.Add(new ShapeEdge.LightData{
-            angle = 0, 
+            angle = angleCalc.MinAngle(), 
             direction = source.GetLeadingEdgeNorm(),
             id = source.minEdgeId
         });
         shapeEdges.Add(new ShapeEdge.LightData{
-            angle = RawAngleOfNormal(trailingLightEdge),
+            angle = angleCalc.MaxAngle(),
             direction = source.GetTrailingEdgeNorm(),
             id = source.maxEdgeId
         });
@@ -590,51 +591,71 @@ public class LightManagerNew {
     }
 
 
-    private (float, float) Angles(float2 p1, float2 p2) {
-        float a1 = Angle(p1);
-        float a2 = Angle(p2);
-        if (a1 == math.NAN) {
-            if (math.isfinite(a2)) {
-                return (-math.INFINITY, a2);
-            } else {
+    public struct AngleCalculator {
+        private float2 sourcePos;
+        private float2 leadingLightEdge;
+        private float2 trailingLightEdge;
+
+        public AngleCalculator(float2 sourcePos, float2 leadingLightEdge, float2 trailingLightEdge) {
+            this.sourcePos = sourcePos;
+            this.leadingLightEdge = leadingLightEdge;
+            this.trailingLightEdge = trailingLightEdge;
+            Debug.Assert(Lin.Cross(leadingLightEdge, trailingLightEdge) > 0);
+        }
+
+        public (float, float) Angles(float2 p1, float2 p2) {
+            float a1 = Angle(p1);
+            float a2 = Angle(p2);
+            if (a1 == math.NAN) {
+                if (math.isfinite(a2)) {
+                    return (-math.INFINITY, a2);
+                } else {
+                    return (math.NAN, math.NAN);
+                }
+            }
+            if (a2 == math.NAN) {
+                if (math.isfinite(a1)) {
+                    return (a1, math.INFINITY);
+                } else {
+                    return (math.NAN, math.NAN);
+                }
+            }
+            if (a1 >= a2) {
                 return (math.NAN, math.NAN);
             }
+            return (a1, a2);
         }
-        if (a2 == math.NAN) {
-            if (math.isfinite(a1)) {
-                return (a1, math.INFINITY);
-            } else {
-                return (math.NAN, math.NAN);
+
+        public float Angle(float2 point) {
+            // The region the light shines on is the set of all points that are "in
+            // front" of both leadingLightEdge and trailingLightEdge
+            float2 n = math.normalize(point - sourcePos);
+            // c1 > 0 iff n is in front of leadingLightEdge
+            float c1 = Lin.Cross(leadingLightEdge, n);
+            // c2 < 0 iff n is in front of trailingLightEdge
+            float c2 = Lin.Cross(trailingLightEdge, n);
+            if (c1 < 0 && c2 > 0) {
+                return math.NAN;
             }
+            if (c1 < 0) {
+                return -math.INFINITY;
+            }
+            if (c2 > 0) {
+                return math.INFINITY;
+            }
+            return RawAngleOfNormal(n);
         }
-        if (a1 >= a2) {
-            return (math.NAN, math.NAN);
-        }
-        return (a1, a2);
-    }
 
-    private float Angle(float2 point) {
-        // The region the light shines on is the set of all points that are "in
-        // front" of both leadingLightEdge and trailingLightEdge
-        float2 n = math.normalize(point - source.pos);
-        // c1 > 0 iff n is in front of leadingLightEdge
-        float c1 = Lin.Cross(leadingLightEdge, n);
-        // c2 < 0 iff n is in front of trailingLightEdge
-        float c2 = Lin.Cross(trailingLightEdge, n);
-        if (c1 < 0 && c2 > 0) {
-            return math.NAN;
+        public float RawAngleOfNormal(float2 normal) {
+            return 1 - math.dot(leadingLightEdge, normal);
         }
-        if (c1 < 0) {
-            return -math.INFINITY;
-        }
-        if (c2 > 0) {
-            return math.INFINITY;
-        }
-        return RawAngleOfNormal(n);
-    }
 
-    private float RawAngleOfNormal(float2 normal) {
-        return 1 - math.dot(leadingLightEdge, normal);
+        public float MinAngle() {
+            return 0;
+        }
+        public float MaxAngle() {
+            return RawAngleOfNormal(trailingLightEdge);
+        }
     }
 
     public struct ShadowEdgeDebugInfo {
