@@ -4,8 +4,9 @@ using Unity.Entities;
 using Unity.Mathematics;
 
 public class ShadowEdgesGizmoDrawer : MonoBehaviour {
+    public bool enable = true;
     void OnDrawGizmos() {
-        if (Application.isPlaying) {
+        if (Application.isPlaying && enable) {
             var world = World.DefaultGameObjectInjectionWorld;
 
             var ids = new HashSet<int>();

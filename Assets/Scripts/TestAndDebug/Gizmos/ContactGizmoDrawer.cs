@@ -3,8 +3,9 @@ using UnityEngine;
 using Unity.Entities;
 
 public class ContactGizmoDrawer : MonoBehaviour {
+    public bool enable = true;
     void OnDrawGizmos() {
-        if (Application.isPlaying) {
+        if (Application.isPlaying && enable) {
             var world = World.DefaultGameObjectInjectionWorld;
 
             var set = new HashSet<int>();

@@ -78,7 +78,13 @@ public class ShadowEdgeGenerationSystem : SystemBase {
     Dictionary<Entity, LightManager> lightManagers;
     NativeList<ShadowEdgeManifold> finalShadowEdgeManifolds;
     NativeList<ShadowEdgeManifold> finalLightEdgeManifolds;
+    // TODO: Replace this with boxOverlappingEdges
     NativeMultiHashMap<Entity, ShadowEdgeManifold> boxManifolds;
+
+    // TODO: This will replace some of the above stuff
+    NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges;
+    NativeList<LightSource> lightSources;
+    NativeList<LightManager.AngleCalculator> lightAngleCalculators;
 
     protected override void OnCreate() {
         lightSourceQuery = GetEntityQuery(typeof(LightSource));
@@ -88,6 +94,10 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         finalShadowEdgeManifolds = new NativeList<ShadowEdgeManifold>(Allocator.Persistent);
         finalLightEdgeManifolds = new NativeList<ShadowEdgeManifold>(Allocator.Persistent);
         boxManifolds = new NativeMultiHashMap<Entity, ShadowEdgeManifold>(0, Allocator.Persistent);
+
+        boxOverlappingEdges = new NativeMultiHashMap<Entity, CornerCalculator.Edge>(0, Allocator.Persistent);
+        lightSources = new NativeList<LightSource>(Allocator.Persistent);
+        lightAngleCalculators = new NativeList<LightManager.AngleCalculator>(Allocator.Persistent);
     }
 
     protected override void OnDestroy() {
@@ -95,10 +105,23 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         finalShadowEdgeManifolds.Dispose();
         finalLightEdgeManifolds.Dispose();
         boxManifolds.Dispose();
+
+        boxOverlappingEdges.Dispose();
+        lightSources.Dispose();
+        lightAngleCalculators.Clear();
     }
 
     protected override void OnUpdate() {
-        var lightSources = lightSourceQuery.ToComponentDataArray<LightSource>(Allocator.TempJob);
+        var lightSources = this.lightSources;
+        var lightAngleCalculators = this.lightAngleCalculators;
+
+        lightSources.Clear();
+        lightAngleCalculators.Clear();
+        Entities.ForEach((in LightSource lightSource) => {
+            lightSources.Add(lightSource);
+            lightAngleCalculators.Add(new LightManager.AngleCalculator(lightSource));
+        }).Run();
+
         var lightSourceEntities = lightSourceQuery.ToEntityArray(Allocator.TempJob);
 
         var opaqueBoxes = opaqueBoxesQuery.ToComponentDataArray<Box>(Allocator.TempJob);
@@ -113,11 +136,12 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         // Can be optimized
         Clear(lightManagers);
         for (int i = 0; i < lightSources.Length; i++) {
-            lightManagers[lightSourceEntities[i]] = new LightManager(lightSources[i], lightSourceEntities[i]);
+            lightManagers[lightSourceEntities[i]] = new LightManager(lightSources[i], lightSourceEntities[i], i);
         }
 
 
         boxManifolds.Clear();
+        boxOverlappingEdges.Clear();
         // Step 2: Computing initial contact manifolds
         foreach (var lm in lightManagers.Values) {
             // Compute the sorted shadow list
@@ -125,7 +149,8 @@ public class ShadowEdgeGenerationSystem : SystemBase {
             lm.ComputeManifolds(
                 opaqueBoxes, opaqueBoxEntities,
                 shadHitBoxes, shadHitBoxEntities,
-                ref boxManifolds);
+                ref boxManifolds,
+                ref boxOverlappingEdges);
         }
 
         var (boxesWithManifolds, length) = boxManifolds.GetUniqueKeyArray(Allocator.TempJob);
@@ -201,7 +226,6 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         //}
 
         illuminatedPoints.Dispose();
-        lightSources.Dispose();
         lightSourceEntities.Dispose();
         opaqueBoxes.Dispose();
         opaqueBoxEntities.Dispose();
@@ -215,6 +239,25 @@ public class ShadowEdgeGenerationSystem : SystemBase {
                 yield return edge;
             }
         }
+    }
+
+    public List<CornerCalculator.Corner> GetShadowIslandsForDebug() {
+        var ret = new List<CornerCalculator.Corner>();
+        Entities.WithAll<Box, HitShadowsObject>()
+            .WithoutBurst()
+            .ForEach((in Box box, in Entity entity) => {
+                var cc = new CornerCalculator(
+                    box,
+                    lightSources,
+                    lightAngleCalculators,
+                    It.Iterate(boxOverlappingEdges, entity)
+                );
+
+                foreach (var item in cc.GetIslandsForDebug()) {
+                    ret.Add(item);
+                }
+            }).Run();
+        return ret;
     }
 
     //public IEnumerable<float2> GetRenderPoints(Entity lightSource) {
@@ -246,6 +289,7 @@ public class LightManagerNew {
     private LightSource source;
     private AngleCalculator angleCalc;
     private Entity sourceEntity;
+    private int sourceIndex;
     private NativeList<ShapeEdge> shapeEdges;
     private NativeList<ShapeEdge.OpaqueData> opaqueWorkingSet;
     private NativeList<ShapeEdge.ShadHitData> shadHitWorkingSet;
@@ -331,21 +375,18 @@ public class LightManagerNew {
         }
     }
 
-    public LightManagerNew(in LightSource source, in Entity sourceEntity/*, ComponentDataFromEntity<Box> boxes*/) {
+    public LightManagerNew(in LightSource source, in Entity sourceEntity, int sourceIndex) {
         this.source = source;
         this.sourceEntity = sourceEntity;
-        angleCalc = new AngleCalculator(
-            sourcePos: source.pos,
-            leadingLightEdge: source.GetLeadingEdgeNorm(),
-            trailingLightEdge: source.GetTrailingEdgeNorm()
-        );
+        angleCalc = new AngleCalculator(source);
 
         shapeEdges = new NativeList<ShapeEdge>(Allocator.TempJob);
         opaqueWorkingSet = new NativeList<ShapeEdge.OpaqueData>(Allocator.TempJob);
         shadHitWorkingSet = new NativeList<ShapeEdge.ShadHitData>(Allocator.TempJob);
 
         shadowEdgeDebugInfo = new List<ShadowEdgeDebugInfo>();
-        //this.boxes = boxes;
+
+        this.sourceIndex = sourceIndex;
     }
 
     public void Dispose() {
@@ -357,7 +398,9 @@ public class LightManagerNew {
     public void ComputeManifolds(
             NativeArray<Box> opaqueBoxes, NativeArray<Entity> opaqueBoxEntities, 
             NativeArray<Box> shadHitBoxes, NativeArray<Entity> shadHitBoxEntities,
-            ref NativeMultiHashMap<Entity, ShadowEdgeManifold> shadowEdgeManifolds) {
+            // TODO: Remove
+            ref NativeMultiHashMap<Entity, ShadowEdgeManifold> shadowEdgeManifolds,
+            ref NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges) {
 
         // FOR DEBUG
         shadowEdgeDebugInfo.Clear();
@@ -367,9 +410,9 @@ public class LightManagerNew {
 
         foreach (ShapeEdge edge in shapeEdges) {
             if (edge.type == ShapeEdge.Owner.Light) {
-                HandleLightEdge(in edge.lightData, ref shadowEdgeManifolds);
+                HandleLightEdge(in edge.lightData, ref shadowEdgeManifolds, ref boxOverlappingEdges);
             } else if (edge.type == ShapeEdge.Owner.Opaque) {
-                HandleOpaqueEdge(edge.opaqueData, ref shadowEdgeManifolds);
+                HandleOpaqueEdge(edge.opaqueData, ref shadowEdgeManifolds, ref boxOverlappingEdges);
             } else if (edge.type == ShapeEdge.Owner.ShadHit) {
                 if (!TryRemove(ref shadHitWorkingSet, edge.shadHitData.source)) {
                     shadHitWorkingSet.Add(edge.shadHitData);
@@ -395,7 +438,7 @@ public class LightManagerNew {
         }
     }
 
-    private void HandleLightEdge(in ShapeEdge.LightData lightEdge, ref NativeMultiHashMap<Entity, ShadowEdgeManifold> shadowEdgeManifolds) {
+    private void HandleLightEdge(in ShapeEdge.LightData lightEdge, ref NativeMultiHashMap<Entity, ShadowEdgeManifold> shadowEdgeManifolds, ref NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges) {
         float edgeStart = 0;
         float edgeEnd = 100;
         float2 edgeDir = lightEdge.direction;
@@ -437,13 +480,22 @@ public class LightManagerNew {
                         lightSource = source.pos,
                         normal = manifold.normal
                     });
+                    Debug.Assert(lightEdge.angle == angleCalc.MinAngle() || lightEdge.angle == angleCalc.MaxAngle());
+                    boxOverlappingEdges.Add(shadHitObject.source, new CornerCalculator.Edge{
+                        angle = lightEdge.angle,
+                        direction = lightEdge.direction,
+                        lightSource = sourceIndex,
+                        type = CornerCalculator.Edge.Type.edge,
+                        lightSide = lightEdge.angle == angleCalc.MinAngle() ? 1 : -1
+                    });
                 }
             }
         }
     }
 
-    private void HandleOpaqueEdge(in ShapeEdge.OpaqueData opaqueEdge, ref NativeMultiHashMap<Entity, ShadowEdgeManifold> shadowEdgeManifolds) {
+    private void HandleOpaqueEdge(in ShapeEdge.OpaqueData opaqueEdge, ref NativeMultiHashMap<Entity, ShadowEdgeManifold> shadowEdgeManifolds, ref NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges) {
         bool removed = TryRemove(ref opaqueWorkingSet, opaqueEdge.source);
+        bool leading = !removed;
 
         if (math.isfinite(opaqueEdge.angle)) {
             float edgeStart = math.distance(source.pos, opaqueEdge.mount1);
@@ -470,7 +522,7 @@ public class LightManagerNew {
                         shadHitRect: shadHitObject.rect,
                         edgeStart: startPoint,
                         edgeEnd: endPoint,
-                        edgeIsLeading: !removed,
+                        edgeIsLeading: leading,
                         edgeId: opaqueEdge.id
                     );
 
@@ -486,6 +538,13 @@ public class LightManagerNew {
                             overlap = manifold.overlap,
                             lightSource = source.pos,
                             normal = manifold.normal
+                        });
+                        boxOverlappingEdges.Add(shadHitObject.source, new CornerCalculator.Edge{
+                            angle = opaqueEdge.angle,
+                            direction = math.normalize(opaqueEdge.mount1 - source.pos),
+                            lightSource = sourceIndex,
+                            type = CornerCalculator.Edge.Type.edge,
+                            lightSide = leading ? -1 : 1
                         });
                     }
                 }
@@ -596,16 +655,25 @@ public class LightManagerNew {
         private float2 leadingLightEdge;
         private float2 trailingLightEdge;
 
-        public AngleCalculator(float2 sourcePos, float2 leadingLightEdge, float2 trailingLightEdge) {
-            this.sourcePos = sourcePos;
-            this.leadingLightEdge = leadingLightEdge;
-            this.trailingLightEdge = trailingLightEdge;
+        public AngleCalculator(LightSource source) {
+            this.sourcePos = source.pos;
+            this.leadingLightEdge = source.GetLeadingEdgeNorm();
+            this.trailingLightEdge = source.GetTrailingEdgeNorm();
             Debug.Assert(Lin.Cross(leadingLightEdge, trailingLightEdge) > 0);
         }
 
         public (float, float) Angles(float2 p1, float2 p2) {
             float a1 = Angle(p1);
             float a2 = Angle(p2);
+
+            bool swap = Lin.Cross(p1 - sourcePos, p2 - sourcePos) < 0;
+
+            if (swap) {
+                var tmp = a1;
+                a1 = a2;
+                a2 = tmp;
+            }
+
             if (a1 == math.NAN) {
                 if (math.isfinite(a2)) {
                     return (-math.INFINITY, a2);
@@ -620,10 +688,8 @@ public class LightManagerNew {
                     return (math.NAN, math.NAN);
                 }
             }
-            if (a1 >= a2) {
-                return (math.NAN, math.NAN);
-            }
-            return (a1, a2);
+
+            return swap ? (a2, a1) : (a1, a2);
         }
 
         public float Angle(float2 point) {
