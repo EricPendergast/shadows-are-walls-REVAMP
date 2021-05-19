@@ -73,7 +73,7 @@ public struct CornerCalculator {
         }
     }
     private NativeArray<LightSource> lights;
-    private NativeArray<LightManagerNew.AngleCalculator> lightAngleCalculators;
+    private NativeArray<ShadowEdgeCalculator.AngleCalculator> lightAngleCalculators;
     private FixedList512<Edge> edges;
     private FixedList512<Corner> islands;
     public FixedList512<Corner> GetIslandsForDebug() {
@@ -81,7 +81,7 @@ public struct CornerCalculator {
     }
     private Rect box;
 
-    public CornerCalculator(Box box, NativeArray<LightSource> lights, NativeArray<LightManagerNew.AngleCalculator> lightAngleCalculators, MultiHashMapIterator<Entity, Edge> edges) {
+    public CornerCalculator(Box box, NativeArray<LightSource> lights, NativeArray<ShadowEdgeCalculator.AngleCalculator> lightAngleCalculators, MultiHashMapIterator<Entity, Edge> edges) {
         this.box = box.ToRect();
         this.lights = lights;
         this.edges = new FixedList512<Edge>();
