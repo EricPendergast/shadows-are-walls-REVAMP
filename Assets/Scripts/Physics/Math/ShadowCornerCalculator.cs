@@ -157,6 +157,8 @@ public struct CornerCalculator {
 
             Wedge wedge;
             if (edge.lightSide == -1) {
+                // This should not happen very often. This might happen if
+                // shapes are deeply overlapping.
                 if (firstEdge) {
                     wedge = new Wedge{
                         angleNegative = -math.INFINITY,
@@ -169,6 +171,8 @@ public struct CornerCalculator {
                     continue;
                 }
             } else {
+                // This also should not happen very often. For the same reasons
+                // as above.
                 if (edgeIdx+1 < edges.Length) {
                     var nextEdge = edges[edgeIdx+1];
                     wedge = new Wedge{

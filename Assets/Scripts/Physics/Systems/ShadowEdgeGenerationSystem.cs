@@ -331,6 +331,7 @@ public class LightManagerNew {
             public float angle;
             public Entity source;
             public Rect rect;
+            public float2 mount;
         }
         [FieldOffset(5)]
         public ShadHitData shadHitData;
@@ -414,9 +415,7 @@ public class LightManagerNew {
             } else if (edge.type == ShapeEdge.Owner.Opaque) {
                 HandleOpaqueEdge(edge.opaqueData, ref shadowEdgeManifolds, ref boxOverlappingEdges);
             } else if (edge.type == ShapeEdge.Owner.ShadHit) {
-                if (!TryRemove(ref shadHitWorkingSet, edge.shadHitData.source)) {
-                    shadHitWorkingSet.Add(edge.shadHitData);
-                }
+                HandleShadHitEdge(in edge.shadHitData, ref shadowEdgeManifolds, ref boxOverlappingEdges);
             }
         }
     }
@@ -541,7 +540,7 @@ public class LightManagerNew {
                         });
                         boxOverlappingEdges.Add(shadHitObject.source, new CornerCalculator.Edge{
                             angle = opaqueEdge.angle,
-                            direction = math.normalize(opaqueEdge.mount1 - source.pos),
+                            direction = edgeDir,
                             lightSource = sourceIndex,
                             type = CornerCalculator.Edge.Type.edge,
                             lightSide = leading ? -1 : 1
@@ -553,6 +552,37 @@ public class LightManagerNew {
 
         if (!removed) {
             opaqueWorkingSet.Add(opaqueEdge);
+        }
+    }
+
+    private void HandleShadHitEdge(in ShapeEdge.ShadHitData shadHitEdge, ref NativeMultiHashMap<Entity, ShadowEdgeManifold> shadowEdgeManifolds, ref NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges) {
+        bool removed = TryRemove(ref shadHitWorkingSet, shadHitEdge.source);
+        if (!removed) {
+            shadHitWorkingSet.Add(shadHitEdge);
+        }
+
+        bool leading = !removed;
+
+        float edgeStart = math.distance(source.pos, shadHitEdge.mount);
+        float edgeEnd = 100;
+        float2 edgeDir = (shadHitEdge.mount - source.pos)/edgeStart;
+
+        SubtractWorkingSetFromEdge(
+            edgeDir: edgeDir,
+            edgeStart: edgeStart,
+            edgeEnd: ref edgeEnd
+        );
+
+        // If the mount of this edge is illuminated, add a distant shadow edge
+        // with its light side toward this edge of the shadow hitting object.
+        if (edgeEnd > edgeStart) {
+            boxOverlappingEdges.Add(shadHitEdge.source, new CornerCalculator.Edge{
+                angle = leading ? -math.INFINITY : math.INFINITY,
+                direction = edgeDir,
+                lightSource = sourceIndex,
+                type = CornerCalculator.Edge.Type.edge,
+                lightSide = leading ? 1 : -1
+            });
         }
     }
 
@@ -598,12 +628,14 @@ public class LightManagerNew {
                 shapeEdges.Add(new ShapeEdge.ShadHitData{
                     angle = a1, 
                     source = shadHitEntity,
-                    rect = rect
+                    rect = rect,
+                    mount = sg1.contact1
                 });
                 shapeEdges.Add(new ShapeEdge.ShadHitData{
                     angle = a2, 
                     source = shadHitEntity,
-                    rect = rect
+                    rect = rect,
+                    mount = sg2.contact1
                 });
             }
         }
