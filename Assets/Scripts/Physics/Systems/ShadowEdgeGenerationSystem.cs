@@ -64,6 +64,8 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         public float2 lightSource;
     }
 
+    public struct CornerManifold {}
+
     Dictionary<Entity, ShadowEdgeCalculator> lightManagers;
     NativeList<ShadowEdgeManifold> finalShadowEdgeManifolds;
     NativeList<ShadowEdgeManifold> finalLightEdgeManifolds;
@@ -74,6 +76,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
     NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges;
     NativeList<LightSource> lightSources;
     NativeList<ShadowEdgeCalculator.AngleCalculator> lightAngleCalculators;
+    NativeList<CornerManifold> cornerManifolds;
 
     protected override void OnCreate() {
         lightSourceQuery = GetEntityQuery(typeof(LightSource));
@@ -142,59 +145,12 @@ public class ShadowEdgeGenerationSystem : SystemBase {
                 ref boxOverlappingEdges);
         }
 
-        var (boxesWithManifolds, length) = boxManifolds.GetUniqueKeyArray(Allocator.TempJob);
-        // Step 3: Computing shadow corners
-        // can optimize with IJobNativeMultiHashMapMergedSharedKeyIndices
-        // TODO: Implement functions called here
-        //for (int i = 0; i < length; i++) {
-        //    Entity box = boxesWithManifolds[i];
-        //    var manIt = It.Iterate(boxManifolds, box);
-        //    while (manIt.MoveNext()) {
-        //        var m1 = manIt.Current;
-        //        var manIt2 = manIt;
-        //        while (manIt2.MoveNext()) {
-        //            var m2 = manIt2.Current;
-        //            if (m1.Intersect(m2) is ShadowCornerManifold scm) {
-        //                shadowCornerManifolds.Add(scm);
-        //            }
-        //        }
-        //    }
-        //}
-
-        boxesWithManifolds.Dispose();
-
-        // Step 4: Removing illuminated manifolds
-        var illuminatedPoints = new NativeHashSet<float2>(0, Allocator.TempJob);
-
-        // TODO: Implement functions called here
-        //foreach (var lm in lightManagers.Values) {
-        //    lm.MarkIlluminated(shadowCornerManifolds, illuminatedPoints);
-        //    lm.MarkIlluminated(boxManifolds, illuminatedPoints);
-        //}
-
         // Step 5: Store all non illuminated manifolds
 
         finalShadowEdgeManifolds.Clear();
         finalLightEdgeManifolds.Clear();
         foreach (var kv in boxManifolds) {
             var seManifold = kv.Value;
-
-            float2 c1 = seManifold.contact1.point;
-            float2? c2Nullable = seManifold.contact2?.point;
-
-            // Removing illuminated contact points
-            if (illuminatedPoints.Contains(c1)) {
-                if (c2Nullable is float2 c2 && !illuminatedPoints.Contains(c2)) {
-                    seManifold.contact1 = (Geometry.Contact)seManifold.contact2;
-                    seManifold.contact2 = null;
-                } else {
-                    continue;
-                }
-            } else {
-                if (c2Nullable is float2 c2 && illuminatedPoints.Contains((float2)c2)) {
-                    seManifold.contact2 = null;
-                }
-            }
 
             switch (seManifold.castingShapeType) {
                 case ShapeType.Box:
@@ -206,15 +162,6 @@ public class ShadowEdgeGenerationSystem : SystemBase {
             }
         }
 
-        // TODO: When implementing shadow corner collisions
-        //finalShadowCornerManifolds.Clear();
-        //foreach (var scManifold in shadowCornerManifolds) {
-        //    if (!illuminatedPoints.Contains(scManifold.point)) {
-        //        finalShadowCornerManifolds.Add(scManifold);
-        //    }
-        //}
-
-        illuminatedPoints.Dispose();
         lightSourceEntities.Dispose();
         opaqueBoxes.Dispose();
         opaqueBoxEntities.Dispose();
@@ -246,6 +193,16 @@ public class ShadowEdgeGenerationSystem : SystemBase {
                     ret.Add(item);
                 }
             }).Run();
+        return ret;
+    }
+
+    public List<CornerManifold> GetCornerManifoldsForDebug() {
+        var ret = new List<CornerManifold>();
+
+        foreach (var m in cornerManifolds) {
+            ret.Add(m);
+        }
+
         return ret;
     }
 
