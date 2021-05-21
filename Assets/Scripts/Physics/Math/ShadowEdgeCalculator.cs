@@ -125,11 +125,10 @@ public class ShadowEdgeCalculator {
         shadHitWorkingSet.Dispose();
     }
 
+    // TODO: Rename to something better. (This does not compute the manifolds anymore)
     public void ComputeManifolds(
             NativeArray<Box> opaqueBoxes, NativeArray<Entity> opaqueBoxEntities, 
             NativeArray<Box> shadHitBoxes, NativeArray<Entity> shadHitBoxEntities,
-            // TODO: Remove
-            ref NativeMultiHashMap<Entity, ShadowEdgeManifold> shadowEdgeManifolds,
             ref NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges) {
 
         // FOR DEBUG
@@ -140,11 +139,11 @@ public class ShadowEdgeCalculator {
 
         foreach (ShapeEdge edge in shapeEdges) {
             if (edge.type == ShapeEdge.Owner.Light) {
-                HandleLightEdge(in edge.lightData, ref shadowEdgeManifolds, ref boxOverlappingEdges);
+                HandleLightEdge(in edge.lightData, ref boxOverlappingEdges);
             } else if (edge.type == ShapeEdge.Owner.Opaque) {
-                HandleOpaqueEdge(edge.opaqueData, ref shadowEdgeManifolds, ref boxOverlappingEdges);
+                HandleOpaqueEdge(edge.opaqueData, ref boxOverlappingEdges);
             } else if (edge.type == ShapeEdge.Owner.ShadHit) {
-                HandleShadHitEdge(in edge.shadHitData, ref shadowEdgeManifolds, ref boxOverlappingEdges);
+                HandleShadHitEdge(in edge.shadHitData, ref boxOverlappingEdges);
             }
         }
     }
@@ -166,7 +165,7 @@ public class ShadowEdgeCalculator {
         }
     }
 
-    private void HandleLightEdge(in ShapeEdge.LightData lightEdge, ref NativeMultiHashMap<Entity, ShadowEdgeManifold> shadowEdgeManifolds, ref NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges) {
+    private void HandleLightEdge(in ShapeEdge.LightData lightEdge, ref NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges) {
         float edgeStart = 0;
         float edgeEnd = 100;
         float2 edgeDir = lightEdge.direction;
@@ -196,18 +195,6 @@ public class ShadowEdgeCalculator {
                 );
 
                 if (manifoldNullable is Geometry.Manifold manifold) {
-                    shadowEdgeManifolds.Add(shadHitObject.source, new ShadowEdgeManifold{
-                        contact1 = manifold.contact1,
-                        contact2 = manifold.contact2,
-                        mount1 = source.pos,
-                        mount2 = null,
-                        shadHitEntity = shadHitObject.source,
-                        castingEntity = sourceEntity,
-                        castingShapeType = ShapeType.Light,
-                        overlap = manifold.overlap,
-                        lightSource = source.pos,
-                        normal = manifold.normal
-                    });
                     Debug.Assert(lightEdge.angle == angleCalc.MinAngle() || lightEdge.angle == angleCalc.MaxAngle());
                     boxOverlappingEdges.Add(shadHitObject.source, new CornerCalculator.Edge{
                         angle = lightEdge.angle,
@@ -226,7 +213,7 @@ public class ShadowEdgeCalculator {
         }
     }
 
-    private void HandleOpaqueEdge(in ShapeEdge.OpaqueData opaqueEdge, ref NativeMultiHashMap<Entity, ShadowEdgeManifold> shadowEdgeManifolds, ref NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges) {
+    private void HandleOpaqueEdge(in ShapeEdge.OpaqueData opaqueEdge, ref NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges) {
         bool removed = TryRemove(ref opaqueWorkingSet, opaqueEdge.source);
         bool leading = !removed;
 
@@ -260,18 +247,6 @@ public class ShadowEdgeCalculator {
                     );
 
                     if (manifoldNullable is Geometry.Manifold manifold) {
-                        shadowEdgeManifolds.Add(shadHitObject.source, new ShadowEdgeManifold{
-                            contact1 = manifold.contact1,
-                            contact2 = manifold.contact2,
-                            mount1 = opaqueEdge.mount1,
-                            mount2 = opaqueEdge.mount2,
-                            shadHitEntity = shadHitObject.source,
-                            castingEntity = opaqueEdge.source,
-                            castingShapeType = ShapeType.Box,
-                            overlap = manifold.overlap,
-                            lightSource = source.pos,
-                            normal = manifold.normal
-                        });
                         boxOverlappingEdges.Add(shadHitObject.source, new CornerCalculator.Edge{
                             angle = opaqueEdge.angle,
                             direction = edgeDir,
@@ -294,34 +269,37 @@ public class ShadowEdgeCalculator {
         }
     }
 
-    private void HandleShadHitEdge(in ShapeEdge.ShadHitData shadHitEdge, ref NativeMultiHashMap<Entity, ShadowEdgeManifold> shadowEdgeManifolds, ref NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges) {
+    private void HandleShadHitEdge(in ShapeEdge.ShadHitData shadHitEdge, ref NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges) {
         bool removed = TryRemove(ref shadHitWorkingSet, shadHitEdge.source);
         if (!removed) {
             shadHitWorkingSet.Add(shadHitEdge);
         }
 
-        bool leading = !removed;
+        // Do an illumination check if the edge is in the range of the light
+        if (math.isfinite(shadHitEdge.angle)) {
+            bool leading = !removed;
 
-        float edgeStart = math.distance(source.pos, shadHitEdge.mount);
-        float edgeEnd = 100;
-        float2 edgeDir = (shadHitEdge.mount - source.pos)/edgeStart;
+            float edgeStart = math.distance(source.pos, shadHitEdge.mount);
+            float edgeEnd = 100;
+            float2 edgeDir = (shadHitEdge.mount - source.pos)/edgeStart;
 
-        SubtractWorkingSetFromEdge(
-            edgeDir: edgeDir,
-            edgeStart: edgeStart,
-            edgeEnd: ref edgeEnd
-        );
+            SubtractWorkingSetFromEdge(
+                edgeDir: edgeDir,
+                edgeStart: edgeStart,
+                edgeEnd: ref edgeEnd
+            );
 
-        // If the mount of this edge is illuminated, add a distant shadow edge
-        // with its light side toward this edge of the shadow hitting object.
-        if (edgeEnd > edgeStart) {
-            boxOverlappingEdges.Add(shadHitEdge.source, new CornerCalculator.Edge{
-                angle = leading ? -math.INFINITY : math.INFINITY,
-                direction = edgeDir,
-                lightSource = sourceIndex,
-                type = CornerCalculator.Edge.Type.illuminationTag,
-                lightSide = (sbyte)(leading ? 1 : -1),
-            });
+            // If the mount of this edge is illuminated, add a distant shadow edge
+            // with its light side toward this edge of the shadow hitting object.
+            if (edgeEnd > edgeStart) {
+                boxOverlappingEdges.Add(shadHitEdge.source, new CornerCalculator.Edge{
+                    angle = leading ? -math.INFINITY : math.INFINITY,
+                    direction = edgeDir,
+                    lightSource = sourceIndex,
+                    type = CornerCalculator.Edge.Type.illuminationTag,
+                    lightSide = (sbyte)(leading ? 1 : -1),
+                });
+            }
         }
     }
 
@@ -461,14 +439,14 @@ public struct AngleCalculator {
             a2 = tmp;
         }
 
-        if (a1 == math.NAN) {
+        if (math.isnan(a1)) {
             if (math.isfinite(a2)) {
                 return new FloatPair(-math.INFINITY, a2);
             } else {
                 return new FloatPair(math.NAN, math.NAN);
             }
         }
-        if (a2 == math.NAN) {
+        if (math.isnan(a2)) {
             if (math.isfinite(a1)) {
                 return new FloatPair(a1, math.INFINITY);
             } else {
@@ -497,6 +475,13 @@ public struct AngleCalculator {
             return math.INFINITY;
         }
         return RawAngleOfNormal(n);
+    }
+
+    // Gives the cost of rotating an edge with given direction to the point.
+    // Positive angle rotation gives a positive cost.
+    public float CostOfRotationTo(float2 edgeDirection, float2 point) {
+        float2 n = math.normalize(point - sourcePos);
+        return Lin.Cross(edgeDirection, n);
     }
 
     public float RawAngleOfNormal(float2 normal) {

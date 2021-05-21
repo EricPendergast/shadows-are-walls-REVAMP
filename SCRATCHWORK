@@ -1,0 +1,4 @@
+Note about #8:
+    For an endpoint of an edge, create an edge contact if the corner after that
+    endpoint is a box corner
+

@@ -2062,6 +2062,7 @@ GameObject:
   - component: {fileID: 721104814}
   - component: {fileID: 721104813}
   - component: {fileID: 721104816}
+  - component: {fileID: 721104817}
   m_Layer: 0
   m_Name: gizmos
   m_TagString: Untagged
@@ -2121,6 +2122,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ee1985f849dfe6f5a6342b42b29b311, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  enable: 0
+--- !u!114 &721104817
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 721104812}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b28585effbbb6abfa12ca63af4e20b3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
   enable: 1
 --- !u!1 &732661975
 GameObject:
@@ -2132,7 +2146,7 @@ GameObject:
   m_Component:
   - component: {fileID: 732661976}
   m_Layer: 0
-  m_Name: Test 6 (2)
+  m_Name: Test 8 (??)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2168,7 +2182,7 @@ GameObject:
   m_Component:
   - component: {fileID: 734983561}
   m_Layer: 0
-  m_Name: Test 4
+  m_Name: Test 4 (Shadow edge case)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2629,7 +2643,7 @@ GameObject:
   m_Component:
   - component: {fileID: 918401472}
   m_Layer: 0
-  m_Name: Test 3
+  m_Name: Test 3 (many boxes)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2895,7 +2909,7 @@ GameObject:
   m_Component:
   - component: {fileID: 997408913}
   m_Layer: 0
-  m_Name: Test 5
+  m_Name: Test 5 (shadow edge case)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -3089,7 +3103,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1095250050}
   m_Layer: 0
-  m_Name: Test 2
+  m_Name: Shadow Test 2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -3122,12 +3136,12 @@ GameObject:
   m_Component:
   - component: {fileID: 1104390388}
   m_Layer: 0
-  m_Name: Islands Test 2
+  m_Name: Test 11 (islands, multiple light sources)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1104390388
 Transform:
   m_ObjectHideFlags: 0
@@ -3243,7 +3257,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1164584048}
   m_Layer: 0
-  m_Name: Test 1
+  m_Name: Shadow Test 1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -3363,7 +3377,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1241962327}
   m_Layer: 0
-  m_Name: Test 6 (3)
+  m_Name: Test 9 (shadow edge case)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -4323,7 +4337,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1809592976}
   m_Layer: 0
-  m_Name: Test 6 (1)
+  m_Name: Test 7 (shadow edge case, deep penetration)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -4609,7 +4623,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1914473963}
   m_Layer: 0
-  m_Name: Test 6
+  m_Name: Test 6 (shadow edge case)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -4832,7 +4846,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1943651751}
   m_Layer: 0
-  m_Name: Islands Test
+  m_Name: Test 10 (Islands)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

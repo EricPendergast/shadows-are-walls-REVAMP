@@ -34,9 +34,6 @@ public class ShadowEdgeGenerationSystem : SystemBase {
 
     Dictionary<Entity, ShadowEdgeCalculator> lightManagers;
     NativeList<ShadowEdgeManifold> finalShadowEdgeManifolds;
-    NativeList<ShadowEdgeManifold> finalLightEdgeManifolds;
-    // TODO: Replace this with boxOverlappingEdges
-    NativeMultiHashMap<Entity, ShadowEdgeManifold> boxManifolds;
 
     // TODO: This will replace some of the above stuff
     NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges;
@@ -50,8 +47,6 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         shadHitBoxesQuery = GetEntityQuery(typeof(Box), typeof(HitShadowsObject));
         lightManagers = new Dictionary<Entity, ShadowEdgeCalculator>();
         finalShadowEdgeManifolds = new NativeList<ShadowEdgeManifold>(Allocator.Persistent);
-        finalLightEdgeManifolds = new NativeList<ShadowEdgeManifold>(Allocator.Persistent);
-        boxManifolds = new NativeMultiHashMap<Entity, ShadowEdgeManifold>(0, Allocator.Persistent);
 
         boxOverlappingEdges = new NativeMultiHashMap<Entity, CornerCalculator.Edge>(0, Allocator.Persistent);
         lightSources = new NativeList<LightSource>(Allocator.Persistent);
@@ -61,8 +56,6 @@ public class ShadowEdgeGenerationSystem : SystemBase {
     protected override void OnDestroy() {
         Clear(lightManagers);
         finalShadowEdgeManifolds.Dispose();
-        finalLightEdgeManifolds.Dispose();
-        boxManifolds.Dispose();
 
         boxOverlappingEdges.Dispose();
         lightSources.Dispose();
@@ -101,7 +94,6 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         }
 
 
-        boxManifolds.Clear();
         boxOverlappingEdges.Clear();
         // Step 2: Computing initial contact manifolds
         foreach (var lm in lightManagers.Values) {
@@ -110,14 +102,12 @@ public class ShadowEdgeGenerationSystem : SystemBase {
             lm.ComputeManifolds(
                 opaqueBoxes, opaqueBoxEntities,
                 shadHitBoxes, shadHitBoxEntities,
-                ref boxManifolds,
                 ref boxOverlappingEdges);
         }
 
         // Step 5: Store all non illuminated manifolds
 
         finalShadowEdgeManifolds.Clear();
-        finalLightEdgeManifolds.Clear();
 
         Entities.WithAll<Box, HitShadowsObject>()
             .ForEach((in Box box, in Entity entity) => {
@@ -169,25 +159,9 @@ public class ShadowEdgeGenerationSystem : SystemBase {
 
     public List<ShadowEdgeManifold> GetEdgeManifoldsForDebug() {
         var ret = new List<ShadowEdgeManifold>();
-        var manifolds = new NativeList<ShadowEdgeManifold>(Allocator.TempJob);
-
-        Entities.WithAll<Box, HitShadowsObject>()
-            .WithoutBurst()
-            .ForEach((in Box box, in Entity entity) => {
-                var cc = new CornerCalculator(
-                    box,
-                    entity,
-                    lightSources,
-                    lightAngleCalculators,
-                    It.Iterate(boxOverlappingEdges, entity)
-                );
-                cc.ComputeManifolds(ref manifolds);
-            }).Run();
-
-        foreach (var item in manifolds) {
+        foreach (var item in finalShadowEdgeManifolds) {
             ret.Add(item);
         }
-        manifolds.Dispose();
         return ret;
     }
 
@@ -197,10 +171,6 @@ public class ShadowEdgeGenerationSystem : SystemBase {
 
     public NativeList<ShadowEdgeManifold> GetShadowEdgeManifolds() {
         return finalShadowEdgeManifolds;
-    }
-
-    public NativeList<ShadowEdgeManifold> GetLightEdgeManifolds() {
-        return finalLightEdgeManifolds;
     }
 
     private void Clear(Dictionary<Entity, ShadowEdgeCalculator> lightManagers) {

@@ -4,7 +4,6 @@ using Unity.Mathematics;
 using System.Collections.Generic;
 
 using BoxBoxConstraintManager = ConstraintManager<BoxBoxConstraintHelper, StandardConstraint>;
-using BoxLightEdgeConstraintManager = ConstraintManager<BoxLightEdgeConstraintHelper, StandardConstraint>;
 using ShadowEdgeConstraintManager = ConstraintManager<ShadowEdgeConstraintHelper, ShadowEdgeConstraint>;
 
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
@@ -21,7 +20,6 @@ public class CollisionSystem : SystemBase {
     public static float globalFriction = .5f;
 
     private BoxBoxConstraintManager boxBoxCM;
-    private BoxLightEdgeConstraintManager boxLightEdgeCM;
     private ShadowEdgeConstraintManager shadowEdgeCM;
 
     protected override void OnCreate() {
@@ -30,13 +28,11 @@ public class CollisionSystem : SystemBase {
         lightSourcesQuery = GetEntityQuery(typeof(LightSource));
 
         boxBoxCM = new BoxBoxConstraintManager();
-        boxLightEdgeCM = new BoxLightEdgeConstraintManager();
         shadowEdgeCM = new ShadowEdgeConstraintManager();
     }
 
     protected override void OnDestroy() {
         boxBoxCM.Dispose();
-        boxLightEdgeCM.Dispose();
         shadowEdgeCM.Dispose();
     }
 
@@ -58,40 +54,26 @@ public class CollisionSystem : SystemBase {
             dt: dt
         );
 
-        boxLightEdgeCM.helper.Update(
-            boxes: boxes,
-            vels: velocities,
-            lightSources: lightSources,
-            hitShadBoxEntities: hitShadBoxEntities,
-            lightSourceEntities: lightSourceEntities,
-            lightEdgeManifolds: World.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetLightEdgeManifolds(),
-            dt: dt
-        );
-
         shadowEdgeCM.helper.Update(
             vels: velocities,
             boxes: boxes,
+            lightSources: lightSources,
             shadowEdgeManifolds: World.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetShadowEdgeManifolds(),
-            hitShadBoxEntities: hitShadBoxEntities,
             dt: dt
         );
 
         boxBoxCM.FindConstraints();
-        boxLightEdgeCM.FindConstraints();
         shadowEdgeCM.FindConstraints();
 
         boxBoxCM.PreSteps(dt);
-        boxLightEdgeCM.PreSteps(dt);
         shadowEdgeCM.PreSteps(dt);
 
         for (int i = 0; i < 10; i++) {
             boxBoxCM.ApplyImpulses(dt);
-            boxLightEdgeCM.ApplyImpulses(dt);
             shadowEdgeCM.ApplyImpulses(dt);
         }
 
         boxBoxCM.PostSteps();
-        boxLightEdgeCM.PostSteps();
         shadowEdgeCM.PostSteps();
 
 
@@ -108,9 +90,6 @@ public class CollisionSystem : SystemBase {
 
     public IEnumerable<DebugContactInfo> GetContactsForDebug() {
         foreach (var item in boxBoxCM.GetContactsForDebug()) {
-            yield return item;
-        }
-        foreach (var item in boxLightEdgeCM.GetContactsForDebug()) {
             yield return item;
         }
         foreach (var item in shadowEdgeCM.GetContactsForDebug()) {

@@ -153,16 +153,13 @@ public struct CornerCalculator {
         }
         islands.Add(new Corner{isNull = true});
 
-        int prevLightSource = -1;
-
         edges.Sort();
         for (int edgeIdx = 0; edgeIdx < edges.Length; edgeIdx++) {
             var edge = edges[edgeIdx];
-            bool firstEdge = edge.lightSource != prevLightSource;
-            prevLightSource = edge.lightSource;
 
             Wedge wedge;
             if (edge.lightSide == -1) {
+                bool firstEdge = edgeIdx == 0 || edge.lightSource != edges[edgeIdx-1].lightSource;
                 // This should not happen very often. This might happen if
                 // shapes are deeply overlapping.
                 if (firstEdge) {
@@ -177,23 +174,24 @@ public struct CornerCalculator {
                     continue;
                 }
             } else {
+                bool lastEdge = edgeIdx >= edges.Length || edge.lightSource != edges[edgeIdx].lightSource;
                 // This also should not happen very often. For the same reasons
                 // as above.
-                if (edgeIdx+1 < edges.Length) {
+                if (lastEdge) {
+                    wedge = new Wedge{
+                        angleNegative = edge.angle,
+                        anglePositive = math.INFINITY,
+                        negativeEdge = edgeIdx,
+                        positiveEdge = 1337,
+                        lightSource = edge.lightSource
+                    };
+                } else {
                     var nextEdge = edges[edgeIdx+1];
                     wedge = new Wedge{
                         angleNegative = edge.angle,
                         anglePositive = nextEdge.angle,
                         negativeEdge = edgeIdx,
                         positiveEdge = edgeIdx+1,
-                        lightSource = edge.lightSource
-                    };
-                } else {
-                    wedge = new Wedge{
-                        angleNegative = edge.angle,
-                        anglePositive = math.INFINITY,
-                        negativeEdge = edgeIdx,
-                        positiveEdge = 1337,
                         lightSource = edge.lightSource
                     };
                 }
@@ -217,6 +215,7 @@ public struct CornerCalculator {
         var islandNegOut = new FixedList512<Corner>();
         var islandPosOut = new FixedList512<Corner>();
 
+        var angleCalculator = lightAngleCalculators[wedge.lightSource];
 
         for (int i = islandStart; true; i++) {
             var corner = islands[i];
@@ -228,9 +227,8 @@ public struct CornerCalculator {
                 nextCorner = islands[islandStart];
             }
 
-            var angles = lightAngleCalculators[wedge.lightSource].Angles(corner.point, nextCorner.point);
-            var angle = angles.Item1;
-            var nextAngle = angles.Item2;
+            var angle = angleCalculator.Angle(corner.point);
+            var nextAngle = angleCalculator.Angle(nextCorner.point);
 
             int side = wedge.SideOf(angle);
             int nextSide = wedge.SideOf(nextAngle);
@@ -331,7 +329,7 @@ public struct CornerCalculator {
             for (int corner2Idx = islandStart; !islands[corner2Idx].isNull; corner2Idx++) {
                 Corner corner = islands[corner2Idx];
 
-                float cost = edgeLightAngleCalc.Angle(corner.point) * -edge.lightSide;
+                float cost = edgeLightAngleCalc.CostOfRotationTo(edge.direction, corner.point) * -edge.lightSide;
 
                 if (cost > maxCost) {
                     maxCost = cost;

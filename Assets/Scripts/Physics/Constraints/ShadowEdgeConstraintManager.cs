@@ -12,26 +12,24 @@ using ShadowEdgeManifold = ShadowEdgeGenerationSystem.ShadowEdgeManifold;
 public struct ShadowEdgeConstraintHelper : ConstraintManagerHelper<ShadowEdgeConstraint> {
     private ComponentDataFromEntity<Velocity> vels;
     private ComponentDataFromEntity<Box> boxes;
-    private NativeArray<Entity> hitShadBoxEntities;
+    private ComponentDataFromEntity<LightSource> lightSources;
     private NativeArray<ShadowEdgeManifold> shadowEdgeManifolds;
     private float dt;
 
     public void Update(
             ComponentDataFromEntity<Velocity> vels,
             ComponentDataFromEntity<Box> boxes,
-            NativeArray<Entity> hitShadBoxEntities,
+            ComponentDataFromEntity<LightSource> lightSources,
             NativeArray<ShadowEdgeManifold> shadowEdgeManifolds,
             float dt) {
         this.vels = vels;
         this.boxes = boxes;
-        this.hitShadBoxEntities = hitShadBoxEntities;
+        this.lightSources = lightSources;
         this.shadowEdgeManifolds = shadowEdgeManifolds;
         this.dt = dt;
     }
 
     private void AddConstraints(ref NativeList<ShadowEdgeConstraint> constraints, ShadowEdgeManifold m, bool useContact1) {
-        Debug.Assert(m.castingShapeType == ShapeType.Box);
-
         var standardManifold = new Physics.Math.Geometry.Manifold{
             contact1 = m.contact1,
             contact2 = m.contact2,
@@ -39,33 +37,49 @@ public struct ShadowEdgeConstraintHelper : ConstraintManagerHelper<ShadowEdgeCon
             overlap = m.overlap
         };
 
-        constraints.Add(new ShadowEdgeConstraint(
-            e1: m.shadHitEntity, 
-            e2: m.castingEntity,
-            box1: boxes[m.shadHitEntity], 
-            box2: boxes[m.castingEntity],
-            shadowOrigin: m.mount1,
-            lightOrigin: m.lightSource,
-            manifold: standardManifold,
-            useContact1: useContact1,
-            dt: dt,
-            contactIdScrambler: 1
-        ));
-
-        if (m.mount2 is float2 shadowOrigin) {
+        if (m.castingShapeType == ShapeType.Box) {
             constraints.Add(new ShadowEdgeConstraint(
                 e1: m.shadHitEntity, 
                 e2: m.castingEntity,
                 box1: boxes[m.shadHitEntity], 
                 box2: boxes[m.castingEntity],
-                shadowOrigin: shadowOrigin,
+                shadowOrigin: m.mount1,
                 lightOrigin: m.lightSource,
                 manifold: standardManifold,
                 useContact1: useContact1,
                 dt: dt,
-                contactIdScrambler: 2
+                contactIdScrambler: 1
             ));
+
+            if (m.mount2 is float2 shadowOrigin) {
+                constraints.Add(new ShadowEdgeConstraint(
+                    e1: m.shadHitEntity, 
+                    e2: m.castingEntity,
+                    box1: boxes[m.shadHitEntity], 
+                    box2: boxes[m.castingEntity],
+                    shadowOrigin: shadowOrigin,
+                    lightOrigin: m.lightSource,
+                    manifold: standardManifold,
+                    useContact1: useContact1,
+                    dt: dt,
+                    contactIdScrambler: 2
+                ));
+            }
+        } else if (m.castingShapeType == ShapeType.Light) {
+            constraints.Add(GetConstraint(m.shadHitEntity, m.castingEntity, standardManifold, useContact1));
+        } else {
+            Debug.Assert(false, "Unanticipated shape type: " + m.castingShapeType);
         }
+    }
+
+    private ShadowEdgeConstraint GetConstraint(Entity box, Entity lightSource, Geometry.Manifold manifold, bool useContact1) {
+        return new ShadowEdgeConstraint(
+            box, lightSource,
+            boxes[box], lightSources[lightSource],
+            manifold,
+            useContact1,
+            dt
+        );
     }
 
     public void ApplyImpulse(ref ShadowEdgeConstraint constraint, float dt) {
