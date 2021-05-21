@@ -181,7 +181,7 @@ namespace Physics.Math {
 
         public struct Contact {
             public float2 point;
-            public ContactId id;
+            public int id;
         }
         public struct Manifold {
             public float2 normal;
@@ -315,14 +315,14 @@ namespace Physics.Math {
             }
         }
 
-        private static ContactId GetContactId(int shape1Id, int shape2Id, EdgeId e1, EdgeId e2) {
-            return new ContactId(shape1Id, shape2Id, e1, e2);
-        }
+        //private static ContactId GetContactId(int shape1Id, int shape2Id, EdgeId e1, EdgeId e2) {
+        //    return new ContactId(shape1Id, shape2Id, e1, e2);
+        //}
         // Debug/optimization note: If you want to make contact points be ints,
         // use this version of GetContactId instead of the above function:
-        //private static int GetContactId(int shape1Id, int shape2Id, EdgeId e1, EdgeId e2) {
-        //    return new ContactId(shape1Id, shape2Id, e1, e2).GetHashCode();
-        //}
+        private static int GetContactId(int shape1Id, int shape2Id, EdgeId e1, EdgeId e2) {
+            return new ContactId(shape1Id, shape2Id, e1, e2).GetHashCode();
+        }
 
         private static void ComputeContacts(in Rect r1, in Rect r2, float2 normal, out Contact? contact1, out Contact? contact2, float skin) {
             contact1 = null;

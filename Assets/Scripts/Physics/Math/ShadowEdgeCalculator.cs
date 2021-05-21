@@ -12,6 +12,8 @@ using Rect = Physics.Math.Rect;
 
 using ShadowEdgeManifold = ShadowEdgeGenerationSystem.ShadowEdgeManifold;
 
+using FloatPair = System.ValueTuple<float, float>;
+
 public class ShadowEdgeCalculator {
     private LightSource source;
     private AngleCalculator angleCalc;
@@ -212,7 +214,12 @@ public class ShadowEdgeCalculator {
                         direction = lightEdge.direction,
                         lightSource = sourceIndex,
                         type = CornerCalculator.Edge.Type.edge,
-                        lightSide = lightEdge.angle == angleCalc.MinAngle() ? 1 : -1
+                        lightSide = lightEdge.angle == angleCalc.MinAngle() ? (sbyte)1 : (sbyte)-1,
+                        castingEntity = sourceEntity,
+                        castingShapeType = ShapeType.Light,
+                        id = lightEdge.id,
+                        mount1 = source.pos,
+                        mount2 = null
                     });
                 }
             }
@@ -270,7 +277,12 @@ public class ShadowEdgeCalculator {
                             direction = edgeDir,
                             lightSource = sourceIndex,
                             type = CornerCalculator.Edge.Type.edge,
-                            lightSide = leading ? -1 : 1
+                            lightSide = (sbyte)(leading ? -1 : 1),
+                            castingEntity = opaqueEdge.source,
+                            castingShapeType = ShapeType.Box,
+                            id = opaqueEdge.id,
+                            mount1 = opaqueEdge.mount1,
+                            mount2 = opaqueEdge.mount2
                         });
                     }
                 }
@@ -307,8 +319,8 @@ public class ShadowEdgeCalculator {
                 angle = leading ? -math.INFINITY : math.INFINITY,
                 direction = edgeDir,
                 lightSource = sourceIndex,
-                type = CornerCalculator.Edge.Type.edge,
-                lightSide = leading ? 1 : -1
+                type = CornerCalculator.Edge.Type.illuminationTag,
+                lightSide = (sbyte)(leading ? 1 : -1),
             });
         }
     }
@@ -323,7 +335,10 @@ public class ShadowEdgeCalculator {
             Rect rect = opaqueBoxes[i].ToRect();
             Geometry.CalculateShadowGeometry(rect, source.pos, .005f, out var sg1, out var sg2);
 
-            (float a1, float a2) = angleCalc.Angles(sg1.contact1, sg2.contact1);
+            var fp = angleCalc.Angles(sg1.contact1, sg2.contact1);
+            float a1 = fp.Item1;
+            float a2 = fp.Item2;
+
             if (!math.isnan(a1)) {
                 Entity opaqueEntity = opaqueBoxEntities[i];
                 shapeEdges.Add(new ShapeEdge.OpaqueData{
@@ -349,7 +364,9 @@ public class ShadowEdgeCalculator {
             Rect rect = shadHitBoxes[i].ToRect();
             Geometry.CalculateShadowGeometry(rect, source.pos, .005f, out var sg1, out var sg2);
 
-            (float a1, float a2) = angleCalc.Angles(sg1.contact1, sg2.contact1);
+            var fp = angleCalc.Angles(sg1.contact1, sg2.contact1);
+            float a1 = fp.Item1;
+            float a2 = fp.Item2;
             if (!math.isnan(a1)) {
                 Entity shadHitEntity = shadHitBoxEntities[i];
                 shapeEdges.Add(new ShapeEdge.ShadHitData{
@@ -408,81 +425,6 @@ public class ShadowEdgeCalculator {
         return removed;
     }
 
-
-    public struct AngleCalculator {
-        private float2 sourcePos;
-        private float2 leadingLightEdge;
-        private float2 trailingLightEdge;
-
-        public AngleCalculator(LightSource source) {
-            this.sourcePos = source.pos;
-            this.leadingLightEdge = source.GetLeadingEdgeNorm();
-            this.trailingLightEdge = source.GetTrailingEdgeNorm();
-            Debug.Assert(Lin.Cross(leadingLightEdge, trailingLightEdge) > 0);
-        }
-
-        public (float, float) Angles(float2 p1, float2 p2) {
-            float a1 = Angle(p1);
-            float a2 = Angle(p2);
-
-            bool swap = Lin.Cross(p1 - sourcePos, p2 - sourcePos) < 0;
-
-            if (swap) {
-                var tmp = a1;
-                a1 = a2;
-                a2 = tmp;
-            }
-
-            if (a1 == math.NAN) {
-                if (math.isfinite(a2)) {
-                    return (-math.INFINITY, a2);
-                } else {
-                    return (math.NAN, math.NAN);
-                }
-            }
-            if (a2 == math.NAN) {
-                if (math.isfinite(a1)) {
-                    return (a1, math.INFINITY);
-                } else {
-                    return (math.NAN, math.NAN);
-                }
-            }
-
-            return swap ? (a2, a1) : (a1, a2);
-        }
-
-        public float Angle(float2 point) {
-            // The region the light shines on is the set of all points that are "in
-            // front" of both leadingLightEdge and trailingLightEdge
-            float2 n = math.normalize(point - sourcePos);
-            // c1 > 0 iff n is in front of leadingLightEdge
-            float c1 = Lin.Cross(leadingLightEdge, n);
-            // c2 < 0 iff n is in front of trailingLightEdge
-            float c2 = Lin.Cross(trailingLightEdge, n);
-            if (c1 < 0 && c2 > 0) {
-                return math.NAN;
-            }
-            if (c1 < 0) {
-                return -math.INFINITY;
-            }
-            if (c2 > 0) {
-                return math.INFINITY;
-            }
-            return RawAngleOfNormal(n);
-        }
-
-        public float RawAngleOfNormal(float2 normal) {
-            return 1 - math.dot(leadingLightEdge, normal);
-        }
-
-        public float MinAngle() {
-            return 0;
-        }
-        public float MaxAngle() {
-            return RawAngleOfNormal(trailingLightEdge);
-        }
-    }
-
     public struct ShadowEdgeDebugInfo {
         public float2 mount1;
         public float2? mount2;
@@ -492,5 +434,79 @@ public class ShadowEdgeCalculator {
 
     public IEnumerable<ShadowEdgeDebugInfo> IterShadowEdgeDebugInfo() {
         return this.shadowEdgeDebugInfo;
+    }
+}
+
+public struct AngleCalculator {
+    private float2 sourcePos;
+    private float2 leadingLightEdge;
+    private float2 trailingLightEdge;
+
+    public AngleCalculator(LightSource source) {
+        this.sourcePos = source.pos;
+        this.leadingLightEdge = source.GetLeadingEdgeNorm();
+        this.trailingLightEdge = source.GetTrailingEdgeNorm();
+        Debug.Assert(Lin.Cross(leadingLightEdge, trailingLightEdge) > 0);
+    }
+
+    public FloatPair Angles(float2 p1, float2 p2) {
+        float a1 = Angle(p1);
+        float a2 = Angle(p2);
+
+        bool swap = Lin.Cross(p1 - sourcePos, p2 - sourcePos) < 0;
+
+        if (swap) {
+            var tmp = a1;
+            a1 = a2;
+            a2 = tmp;
+        }
+
+        if (a1 == math.NAN) {
+            if (math.isfinite(a2)) {
+                return new FloatPair(-math.INFINITY, a2);
+            } else {
+                return new FloatPair(math.NAN, math.NAN);
+            }
+        }
+        if (a2 == math.NAN) {
+            if (math.isfinite(a1)) {
+                return new FloatPair(a1, math.INFINITY);
+            } else {
+                return new FloatPair(math.NAN, math.NAN);
+            }
+        }
+
+        return swap ? new FloatPair(a2, a1) : new FloatPair(a1, a2);
+    }
+
+    public float Angle(float2 point) {
+        // The region the light shines on is the set of all points that are "in
+        // front" of both leadingLightEdge and trailingLightEdge
+        float2 n = math.normalize(point - sourcePos);
+        // c1 > 0 iff n is in front of leadingLightEdge
+        float c1 = Lin.Cross(leadingLightEdge, n);
+        // c2 < 0 iff n is in front of trailingLightEdge
+        float c2 = Lin.Cross(trailingLightEdge, n);
+        if (c1 < 0 && c2 > 0) {
+            return math.NAN;
+        }
+        if (c1 < 0) {
+            return -math.INFINITY;
+        }
+        if (c2 > 0) {
+            return math.INFINITY;
+        }
+        return RawAngleOfNormal(n);
+    }
+
+    public float RawAngleOfNormal(float2 normal) {
+        return 1 - math.dot(leadingLightEdge, normal);
+    }
+
+    public float MinAngle() {
+        return 0;
+    }
+    public float MaxAngle() {
+        return RawAngleOfNormal(trailingLightEdge);
     }
 }

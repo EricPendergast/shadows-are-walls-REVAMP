@@ -9,6 +9,10 @@ using Rect = Physics.Math.Rect;
 
 using Utilities;
 
+using ShadowEdgeManifold = ShadowEdgeGenerationSystem.ShadowEdgeManifold;
+
+using EdgeCorner = System.ValueTuple<CornerCalculator.Edge, CornerCalculator.Corner>;
+
 public struct CornerCalculator {
     public struct Edge : System.IComparable<Edge> {
         public enum Type : byte {
@@ -21,14 +25,14 @@ public struct CornerCalculator {
         public float2 direction;
         // Indicates the illuminated side of the edge. +1/-1 means illumination
         // for angles larger/smaller than this edge's angle.
-        public int lightSide;
+        public sbyte lightSide;
 
         // Required for converting to a ShadowEdgeManifold
-        //public Entity castingEntity;
-        //public float2 mount1;
-        //public float2? mount2;
-        //public ShapeType castingShapeType;
-        //public int edgeId;
+        public Entity castingEntity;
+        public float2 mount1;
+        public float2? mount2;
+        public ShapeType castingShapeType;
+        public int id;
 
         public int CompareTo(Edge other) {
             if (this.lightSource == other.lightSource) {
@@ -73,16 +77,18 @@ public struct CornerCalculator {
         }
     }
     private NativeArray<LightSource> lights;
-    private NativeArray<ShadowEdgeCalculator.AngleCalculator> lightAngleCalculators;
+    private NativeArray<AngleCalculator> lightAngleCalculators;
     private FixedList512<Edge> edges;
     private FixedList512<Corner> islands;
+    private Entity boxEntity;
     public FixedList512<Corner> GetIslandsForDebug() {
         return islands;
     }
     private Rect box;
 
-    public CornerCalculator(Box box, NativeArray<LightSource> lights, NativeArray<ShadowEdgeCalculator.AngleCalculator> lightAngleCalculators, MultiHashMapIterator<Entity, Edge> edges) {
+    public CornerCalculator(Box box, Entity boxEntity, NativeArray<LightSource> lights, NativeArray<AngleCalculator> lightAngleCalculators, MultiHashMapIterator<Entity, Edge> edges) {
         this.box = box.ToRect();
+        this.boxEntity = boxEntity;
         this.lights = lights;
         this.edges = new FixedList512<Edge>();
         foreach (var edge in edges) {
@@ -136,7 +142,7 @@ public struct CornerCalculator {
             // corner i+1. Thus, the corner that edge i and edge i-1 share is
             // corner i.
             int nextEdge = i;
-            int prevEdge = i - 1;
+            int prevEdge = (i - 1 + 4)%4;
             // Subtracting 8 to ensure it is negative, and that it has the same
             // value mod 4.
             islands.Add(new Corner(
@@ -211,6 +217,7 @@ public struct CornerCalculator {
         var islandNegOut = new FixedList512<Corner>();
         var islandPosOut = new FixedList512<Corner>();
 
+
         for (int i = islandStart; true; i++) {
             var corner = islands[i];
             if (corner.isNull) {
@@ -221,7 +228,9 @@ public struct CornerCalculator {
                 nextCorner = islands[islandStart];
             }
 
-            var (angle, nextAngle) = lightAngleCalculators[wedge.lightSource].Angles(corner.point, nextCorner.point);
+            var angles = lightAngleCalculators[wedge.lightSource].Angles(corner.point, nextCorner.point);
+            var angle = angles.Item1;
+            var nextAngle = angles.Item2;
 
             int side = wedge.SideOf(angle);
             int nextSide = wedge.SideOf(nextAngle);
@@ -282,6 +291,139 @@ public struct CornerCalculator {
                 islandsOut.Add(item);
             }
             islandsOut.Add(Corner.Null);
+        }
+    }
+
+    public void ComputeManifolds(
+            ref NativeList<ShadowEdgeManifold> edgeManifolds
+            //NativeList<ShadowCornerManifold> boxCornerManifolds,
+            ) {
+
+        for (int i = 0; i < islands.Length; i++) {
+            if (i == 0 || islands[i-1].isNull) {
+                ComputeManifoldsForIsland(i, ref edgeManifolds);
+            }
+        }
+    }
+
+    // TODO: There is a O(n) algorithm we can use here. Currently this is O(n^2).
+    private void ComputeManifoldsForIsland(int islandStart,
+            ref NativeList<ShadowEdgeManifold> edgeManifolds) {
+
+        EdgeCorner? bestPair = null;
+        int2? bestPairIdx = null;
+        float minCost = math.INFINITY;
+
+
+        for (int corner1Idx = islandStart; !islands[corner1Idx].isNull; corner1Idx++) {
+            int edgeIdx = islands[corner1Idx].nextEdge;
+            if (edgeIdx < 0) {
+                continue;
+            }
+            Edge edge = edges[edgeIdx];
+            var edgeLightAngleCalc = this.lightAngleCalculators[edge.lightSource];
+            float2 edgeLightPos = this.lights[edge.lightSource].pos;
+
+            EdgeCorner? worstPair = null;
+            int2? worstPairIdx = null;
+            float maxCost = -math.INFINITY;
+
+            for (int corner2Idx = islandStart; !islands[corner2Idx].isNull; corner2Idx++) {
+                Corner corner = islands[corner2Idx];
+
+                float cost = edgeLightAngleCalc.Angle(corner.point) * -edge.lightSide;
+
+                if (cost > maxCost) {
+                    maxCost = cost;
+                    worstPair = new EdgeCorner(edge, corner);
+                    worstPairIdx = new int2(corner1Idx, corner2Idx);
+                }
+            }
+
+            // The best pair is the best of the worst pairs
+            if (maxCost < minCost) {
+                minCost = maxCost;
+                bestPair = worstPair;
+                bestPairIdx = worstPairIdx;
+            }
+        }
+
+        if (bestPair is EdgeCorner ec) {
+            Edge e = ec.Item1;
+            Corner c = ec.Item2;
+
+            Corner edgeCorner1 = islands[bestPairIdx.Value.x];
+            Corner edgeCorner2 = islands[bestPairIdx.Value.x+1];
+            if (edgeCorner2.isNull) {
+                edgeCorner2 = islands[islandStart];
+            }
+
+            int edgePrevEdge = edgeCorner1.prevEdge;
+            int edgeNextEdge = edgeCorner2.nextEdge;
+
+            Geometry.Contact? contact1 = null;
+            Geometry.Contact? contact2 = null;
+
+            if (edgePrevEdge < 0) {
+                contact1 = new Geometry.Contact{
+                    id = new int3(
+                        e.id,
+                        box.id,
+                        edgePrevEdge
+                    ).GetHashCode() ^ 69489, //Arbitrary number. Don't use anywhere else.
+                    point = edgeCorner1.point
+                };
+            }
+
+            if (edgeNextEdge < 0) {
+                if (contact1 != null) {
+                    contact2 = contact1;
+                }
+                contact1 = new Geometry.Contact{
+                    id = new int3(
+                        e.id,
+                        box.id,
+                        edgeNextEdge
+                    ).GetHashCode() ^ 47446, //Arbitrary number. Don't use anywhere else.
+                    point = edgeCorner2.point
+                };
+            }
+
+
+            // If the edge and the corner simply form a triangle, use a single corner contact
+            if (c.nextEdge < 0 && c.prevEdge < 0 && edgePrevEdge == c.nextEdge && edgeNextEdge == c.prevEdge) {
+                contact1 = new Geometry.Contact{
+                    id = new int4(
+                        e.id,
+                        box.id,
+                        edgePrevEdge,
+                        edgeNextEdge
+                    ).GetHashCode() ^ 4391, //Arbitrary number. Don't use anywhere else.
+                    point = c.point
+                };
+                contact2 = null;
+            }
+
+            if (contact1 != null) {
+                // Normal points in the direction the shadow edge should resolve in.
+                float2 normal = Lin.Cross(e.direction, e.lightSide);
+                float2 lightSource = lights[e.lightSource].pos;
+
+                float overlap = math.dot(c.point - lightSource, normal);
+
+                edgeManifolds.Add(new ShadowEdgeManifold {
+                    castingEntity = e.castingEntity,
+                    castingShapeType = e.castingShapeType,
+                    contact1 = contact1.Value,
+                    contact2 = contact2,
+                    lightSource = lightSource,
+                    mount1 = e.mount1,
+                    mount2 = e.mount2,
+                    shadHitEntity = boxEntity,
+                    normal = normal,
+                    overlap = overlap
+                });
+            }
         }
     }
 }

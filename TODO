@@ -1,0 +1,16 @@
+TODOs:
+
+✓1. Make ShadowHitting objects always resolve to light areas
+✓2. Calculate shadow islands
+✓3. Handle case where an object is fully illuminated by a light (make it not generate any shadow islands)
+4. Create edge triangle manifolds
+5. Convert certain corner manifolds into edge constraints
+6. Remove old edge manifold stuff
+7. Implement corner-box constraints
+8. Convert certain corner manifolds into corner-box constraints
+9. Implement corner-edge constraints
+10. Convert certain corner manifolds into corner-edge constraints
+11. Fix problems with partial shadow edges
+
+2. Make ShadowHitting objects choose to always resolve to light areas or dark areas.
+3. Allow for overlapping shadow edges

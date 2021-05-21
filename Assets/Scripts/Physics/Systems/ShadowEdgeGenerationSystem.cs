@@ -6,40 +6,6 @@ using System.Collections.Generic;
 using Physics.Math;
 
 using Utilities;
-// Current plans for this class:
-// Generate all manifolds representing contact between a shadow edge and a box, or a light edge and a box.
-// These manifolds will be used to generate constraints elsewhere.
-//
-// Inputs to algorithm:
-// - List of opaque boxes
-// - List of light sources
-// - List of shadowhitting boxes
-//
-// Global data structures:
-// - box_to_manifold: multi map from shadowHit boxes to shadow edge manifolds involving them
-// - initial_shadow_corner_manifolds: NativeList of shadow corner manifolds
-// Steps of algorithm:
-// 1. Ensure each light source has a corresponding LightManager, freshly initialized
-// 2. For each light manager
-//      2.a Take in all opaque boxes and shadowHitting boxes
-//      2.b. Generate a list of (angle, shape) sorted by angle, where an entry
-//          (a, s) means "'s' occupies the angular space starting at 'a', and
-//          ending at the angle of the next entry"
-//      2.c. Use the generated list to calculate manifolds for each shadowEdge, shadowHittingObj pair
-//          Put these manifolds in box_to_manifold
-//
-//  3. For each box with manifolds m1, m2 ... mn
-//      3.a. For each pair of manifolds mi, mj
-//          3.a.a. If mi and mj intersect to create a shadow corner intersecting their box,
-//              add the shadow corner to initial_shadow_corner_manifolds
-//
-//  4. For each light manager
-//      4.a Mark any manifold (in box_to_manifold and
-//      initial_shadow_corner_manifolds) illuminated by this light manager as
-//      trash
-//
-//  5. Return all non-trash manifolds
-//
 
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
 [UpdateAfter(typeof(GravitySystem))]
@@ -75,7 +41,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
     // TODO: This will replace some of the above stuff
     NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges;
     NativeList<LightSource> lightSources;
-    NativeList<ShadowEdgeCalculator.AngleCalculator> lightAngleCalculators;
+    NativeList<AngleCalculator> lightAngleCalculators;
     NativeList<CornerManifold> cornerManifolds;
 
     protected override void OnCreate() {
@@ -89,7 +55,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
 
         boxOverlappingEdges = new NativeMultiHashMap<Entity, CornerCalculator.Edge>(0, Allocator.Persistent);
         lightSources = new NativeList<LightSource>(Allocator.Persistent);
-        lightAngleCalculators = new NativeList<ShadowEdgeCalculator.AngleCalculator>(Allocator.Persistent);
+        lightAngleCalculators = new NativeList<AngleCalculator>(Allocator.Persistent);
     }
 
     protected override void OnDestroy() {
@@ -104,14 +70,17 @@ public class ShadowEdgeGenerationSystem : SystemBase {
     }
 
     protected override void OnUpdate() {
+        // Moving into local scope because required by Entities.ForEach
         var lightSources = this.lightSources;
         var lightAngleCalculators = this.lightAngleCalculators;
+        var boxOverlappingEdges = this.boxOverlappingEdges;
+        var finalShadowEdgeManifolds = this.finalShadowEdgeManifolds;
 
         lightSources.Clear();
         lightAngleCalculators.Clear();
         Entities.ForEach((in LightSource lightSource) => {
             lightSources.Add(lightSource);
-            lightAngleCalculators.Add(new ShadowEdgeCalculator.AngleCalculator(lightSource));
+            lightAngleCalculators.Add(new AngleCalculator(lightSource));
         }).Run();
 
         var lightSourceEntities = lightSourceQuery.ToEntityArray(Allocator.TempJob);
@@ -149,18 +118,19 @@ public class ShadowEdgeGenerationSystem : SystemBase {
 
         finalShadowEdgeManifolds.Clear();
         finalLightEdgeManifolds.Clear();
-        foreach (var kv in boxManifolds) {
-            var seManifold = kv.Value;
 
-            switch (seManifold.castingShapeType) {
-                case ShapeType.Box:
-                    finalShadowEdgeManifolds.Add(seManifold);
-                    break;
-                case ShapeType.Light:
-                    finalLightEdgeManifolds.Add(seManifold);
-                    break;
-            }
-        }
+        Entities.WithAll<Box, HitShadowsObject>()
+            .ForEach((in Box box, in Entity entity) => {
+                var cc = new CornerCalculator(
+                    box,
+                    entity,
+                    lightSources,
+                    lightAngleCalculators,
+                    It.Iterate(boxOverlappingEdges, entity)
+                );
+
+                cc.ComputeManifolds(ref finalShadowEdgeManifolds);
+            }).Run();
 
         lightSourceEntities.Dispose();
         opaqueBoxes.Dispose();
@@ -184,6 +154,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
             .ForEach((in Box box, in Entity entity) => {
                 var cc = new CornerCalculator(
                     box,
+                    entity,
                     lightSources,
                     lightAngleCalculators,
                     It.Iterate(boxOverlappingEdges, entity)
@@ -196,13 +167,27 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         return ret;
     }
 
-    public List<CornerManifold> GetCornerManifoldsForDebug() {
-        var ret = new List<CornerManifold>();
+    public List<ShadowEdgeManifold> GetEdgeManifoldsForDebug() {
+        var ret = new List<ShadowEdgeManifold>();
+        var manifolds = new NativeList<ShadowEdgeManifold>(Allocator.TempJob);
 
-        foreach (var m in cornerManifolds) {
-            ret.Add(m);
+        Entities.WithAll<Box, HitShadowsObject>()
+            .WithoutBurst()
+            .ForEach((in Box box, in Entity entity) => {
+                var cc = new CornerCalculator(
+                    box,
+                    entity,
+                    lightSources,
+                    lightAngleCalculators,
+                    It.Iterate(boxOverlappingEdges, entity)
+                );
+                cc.ComputeManifolds(ref manifolds);
+            }).Run();
+
+        foreach (var item in manifolds) {
+            ret.Add(item);
         }
-
+        manifolds.Dispose();
         return ret;
     }
 
