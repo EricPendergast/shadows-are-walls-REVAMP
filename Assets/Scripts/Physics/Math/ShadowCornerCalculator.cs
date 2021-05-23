@@ -11,9 +11,12 @@ using Utilities;
 
 using ShadowEdgeManifold = ShadowEdgeGenerationSystem.ShadowEdgeManifold;
 
-using EdgeCorner = System.ValueTuple<CornerCalculator.Edge, CornerCalculator.Corner>;
-
 public struct CornerCalculator {
+    private struct EdgeCornerIdx {
+        public int edgeFirstCornerIdx;
+        public int cornerIdx;
+    }
+
     public struct Edge : System.IComparable<Edge> {
         public enum Type : byte {
             illuminationTag,
@@ -112,6 +115,12 @@ public struct CornerCalculator {
         } else {
             s1 = box.GetVertex(edge1Idx);
             r1 = box.GetVertex(edge1Idx+1) - s1;
+
+            // If the edges are both box edges and they are not adjacent, then
+            // they don't intersect.
+            if (edge2Idx < 0 && (edge1Idx - edge2Idx)%2 == 0) {
+                return new float2(math.INFINITY, math.INFINITY);
+            }
         }
 
         float2 s2;
@@ -143,11 +152,11 @@ public struct CornerCalculator {
             // corner i.
             int nextEdge = i;
             int prevEdge = (i - 1 + 4)%4;
-            // Subtracting 8 to ensure it is negative, and that it has the same
+            // Subtracting 4 to ensure it is negative, and that it has the same
             // value mod 4.
             islands.Add(new Corner(
-                nextEdge: nextEdge - 8,
-                prevEdge: prevEdge - 8,
+                nextEdge: nextEdge - 4,
+                prevEdge: prevEdge - 4,
                 point: box.GetVertex(i)
             ));
         }
@@ -297,24 +306,31 @@ public struct CornerCalculator {
             //NativeList<ShadowCornerManifold> boxCornerManifolds,
             ) {
 
+        int islandStart = 0;
         for (int i = 0; i < islands.Length; i++) {
-            if (i == 0 || islands[i-1].isNull) {
-                ComputeManifoldsForIsland(i, ref edgeManifolds);
+            if (islands[i].isNull) {
+                ComputeManifoldsForIsland(islandStart, i, ref edgeManifolds);
+                islandStart = i+1;
             }
         }
     }
 
-    // TODO: There is a O(n) algorithm we can use here. Currently this is O(n^2).
-    private void ComputeManifoldsForIsland(int islandStart,
-            ref NativeList<ShadowEdgeManifold> edgeManifolds) {
+    private static int WrapIndex(int index, int start, int end) {
+        WrapIndex(ref index, start, end);
+        return index;
+    }
+    private static void WrapIndex(ref int index, int start, int end) {
+        int len = end - start;
+        index = ((index - start)%len + len)%len + start;
+    }
 
-        EdgeCorner? bestPair = null;
-        int2? bestPairIdx = null;
+    private EdgeCornerIdx? ComputeBestResolutionForIsland(int islandStart, int islandEnd) {
+        EdgeCornerIdx? bestPairIdx = null;
         float minCost = math.INFINITY;
 
-
-        for (int corner1Idx = islandStart; !islands[corner1Idx].isNull; corner1Idx++) {
-            int edgeIdx = islands[corner1Idx].nextEdge;
+        // The outer loop iterates over all the edges in the island.
+        for (int edgeFirstCornerIdx = islandStart; edgeFirstCornerIdx < islandEnd; edgeFirstCornerIdx++) {
+            int edgeIdx = islands[edgeFirstCornerIdx].nextEdge;
             if (edgeIdx < 0) {
                 continue;
             }
@@ -322,8 +338,7 @@ public struct CornerCalculator {
             var edgeLightAngleCalc = this.lightAngleCalculators[edge.lightSource];
             float2 edgeLightPos = this.lights[edge.lightSource].pos;
 
-            EdgeCorner? worstPair = null;
-            int2? worstPairIdx = null;
+            EdgeCornerIdx? worstPairIdx = null;
             float maxCost = -math.INFINITY;
 
             for (int corner2Idx = islandStart; !islands[corner2Idx].isNull; corner2Idx++) {
@@ -333,95 +348,112 @@ public struct CornerCalculator {
 
                 if (cost > maxCost) {
                     maxCost = cost;
-                    worstPair = new EdgeCorner(edge, corner);
-                    worstPairIdx = new int2(corner1Idx, corner2Idx);
+                    worstPairIdx = new EdgeCornerIdx{edgeFirstCornerIdx = edgeFirstCornerIdx, cornerIdx = corner2Idx};
                 }
             }
 
             // The best pair is the best of the worst pairs
             if (maxCost < minCost) {
                 minCost = maxCost;
-                bestPair = worstPair;
                 bestPairIdx = worstPairIdx;
             }
         }
 
-        if (bestPair is EdgeCorner ec) {
-            Edge e = ec.Item1;
-            Corner c = ec.Item2;
+        return bestPairIdx;
+    }
 
-            Corner edgeCorner1 = islands[bestPairIdx.Value.x];
-            Corner edgeCorner2 = islands[bestPairIdx.Value.x+1];
-            if (edgeCorner2.isNull) {
-                edgeCorner2 = islands[islandStart];
-            }
 
-            int edgePrevEdge = edgeCorner1.prevEdge;
-            int edgeNextEdge = edgeCorner2.nextEdge;
+    // TODO: There is a O(n) algorithm we can use here. Currently this is O(n^2).
+    private void ComputeManifoldsForIsland(int islandStart, int islandEnd,
+            ref NativeList<ShadowEdgeManifold> edgeManifolds) {
 
-            Geometry.Contact? contact1 = null;
-            Geometry.Contact? contact2 = null;
+        if (ComputeBestResolutionForIsland(islandStart, islandEnd) is EdgeCornerIdx ecIdx) {
 
-            if (edgePrevEdge < 0) {
-                contact1 = new Geometry.Contact{
-                    id = new int3(
-                        e.id,
-                        box.id,
-                        edgePrevEdge
-                    ).GetHashCode() ^ 69489, //Arbitrary number. Don't use anywhere else.
-                    point = edgeCorner1.point
-                };
-            }
+            Corner edgeCorner1 = islands[ecIdx.edgeFirstCornerIdx];
+            Corner edgeCorner2 = islands[WrapIndex(ecIdx.edgeFirstCornerIdx+1, islandStart, islandEnd)];
 
-            if (edgeNextEdge < 0) {
-                if (contact1 != null) {
-                    contact2 = contact1;
+            Edge e = edges[edgeCorner1.nextEdge];
+            Corner c = islands[ecIdx.cornerIdx];
+
+            AddManifold(edgeCorner1.nextEdge, c.prevEdge, c.nextEdge, ref edgeManifolds);
+
+            if (c.nextEdge < 0 && c.prevEdge < 0) {
+                if (edgeCorner2.nextEdge != c.prevEdge) {
+                    AddManifold(c.prevEdge, edgeCorner2.nextEdge, edgeCorner2.prevEdge, ref edgeManifolds);
                 }
-                contact1 = new Geometry.Contact{
-                    id = new int3(
-                        e.id,
-                        box.id,
-                        edgeNextEdge
-                    ).GetHashCode() ^ 47446, //Arbitrary number. Don't use anywhere else.
-                    point = edgeCorner2.point
-                };
+                if (edgeCorner1.prevEdge != c.nextEdge) {
+                    AddManifold(c.nextEdge, edgeCorner1.nextEdge, edgeCorner1.prevEdge, ref edgeManifolds);
+                }
             }
+        }
+    }
 
 
-            // If the edge and the corner simply form a triangle, use a single corner contact
-            if (c.nextEdge < 0 && c.prevEdge < 0 && edgePrevEdge == c.nextEdge && edgeNextEdge == c.prevEdge) {
+    private void AddManifold(int edge1Idx, int edge2Idx, int edge3Idx, ref NativeList<ShadowEdgeManifold> edgeManifolds) {
+        void Swap(ref int a, ref int b) {
+            var tmp = a;
+            a = b;
+            b = tmp;
+        }
+
+        // Shifting all box edges to the beginning of the sequence (edge1Idx, edge2Idx, edge3Idx)
+        if (edge1Idx >= 0) {
+            Swap(ref edge1Idx, ref edge2Idx);
+        }
+        if (edge2Idx >= 0) {
+            Swap(ref edge2Idx, ref edge3Idx);
+        }
+        if (edge1Idx >= 0) {
+            Swap(ref edge1Idx, ref edge2Idx);
+        }
+
+        if (edge3Idx < 0) {
+            // All the edges are box edges in this case, so there is nothing to resolve
+            return;
+        } else if (edge2Idx < 0) {
+            // 2 box edges, one shadow edge
+
+            int boxEdge1 = edge1Idx;
+            int boxEdge2 = edge2Idx;
+            int shadowEdge = edge3Idx;
+
+            float2 corner = Intersection(boxEdge1, boxEdge2);
+            // Sometimes the box edges are opposite each other, and so don't
+            // intersect.
+            if (!math.isfinite(corner.x) || !math.isfinite(corner.y)) {
+                return;
+            }
+            Edge e = edges[shadowEdge];
+
+            float2 normal = Lin.Cross(e.direction, e.lightSide);
+            float2 lightSource = lights[e.lightSource].pos;
+        
+            float overlap = math.dot(corner - lightSource, normal);
+        
+            edgeManifolds.Add(new ShadowEdgeManifold {
+                castingEntity = e.castingEntity,
+                castingShapeType = e.castingShapeType,
                 contact1 = new Geometry.Contact{
+                    point = corner,
                     id = new int4(
                         e.id,
                         box.id,
-                        edgePrevEdge,
-                        edgeNextEdge
-                    ).GetHashCode() ^ 4391, //Arbitrary number. Don't use anywhere else.
-                    point = c.point
-                };
-                contact2 = null;
-            }
-
-            if (contact1 != null) {
-                // Normal points in the direction the shadow edge should resolve in.
-                float2 normal = Lin.Cross(e.direction, e.lightSide);
-                float2 lightSource = lights[e.lightSource].pos;
-
-                float overlap = math.dot(c.point - lightSource, normal);
-
-                edgeManifolds.Add(new ShadowEdgeManifold {
-                    castingEntity = e.castingEntity,
-                    castingShapeType = e.castingShapeType,
-                    contact1 = contact1.Value,
-                    contact2 = contact2,
-                    lightSource = lightSource,
-                    mount1 = e.mount1,
-                    mount2 = e.mount2,
-                    shadHitEntity = boxEntity,
-                    normal = normal,
-                    overlap = overlap
-                });
-            }
+                        boxEdge1,
+                        boxEdge2
+                    ).GetHashCode() ^ 30345 //Arbitrary number. Don't use anywhere else.
+                },
+                contact2 = null,
+                lightSource = lightSource,
+                mount1 = e.mount1,
+                mount2 = e.mount2,
+                shadHitEntity = boxEntity,
+                normal = normal,
+                overlap = overlap
+            });
+        } else if (edge1Idx < 0) {
+            int boxEdge = edge1Idx;
+            int shadowEdge1 = edge2Idx;
+            int shadowEdge2 = edge3Idx;
         }
     }
 }

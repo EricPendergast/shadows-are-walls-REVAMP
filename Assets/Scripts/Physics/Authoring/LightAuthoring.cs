@@ -21,9 +21,6 @@ public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
         dstManager.AddComponentData(entity,
             new GravityScale {gravityScale = 0}
         );
-
-        Entity edge1 = conversionSystem.CreateAdditionalEntity(gameObject);
-        Entity edge2 = conversionSystem.CreateAdditionalEntity(gameObject);
     }
 
     public LightSource GetLightSource() {

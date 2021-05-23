@@ -6,12 +6,13 @@ TODOs:
 ✓5. Convert certain corner manifolds into edge constraints
 ✓6. Handle light edges
 ✓7. Remove old edge manifold stuff
-8. Make edge contacts not be created as often.
+✓8. Make edge contacts not be created as often.
 9. Implement corner-box constraints
 10. Convert certain corner manifolds into corner-box constraints
 11. Implement corner-edge constraints
 13. Convert certain corner manifolds into corner-edge constraints
 14. Fix problems with partial shadow edges
+15. Handle edge cases with wedge subtractions
 
 2. Make ShadowHitting objects choose to always resolve to light areas or dark areas.
 3. Allow for overlapping shadow edges
