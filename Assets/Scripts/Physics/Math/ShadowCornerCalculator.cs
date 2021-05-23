@@ -505,6 +505,7 @@ public struct CornerCalculator {
                 // This works because rect vertices wind counterclockwise
                 m.normal = Lin.Cross(math.normalize(boxEdgeP2 - boxEdgeP1), 1);
                 m.linePoint = boxEdgeP1;
+                m.id = new int3(box.id, shadowEdge1.id, shadowEdge2.id).GetHashCode()^40235;
             } else {
                 Edge shadowEdge3 = edges[lineIdx];
                 m.lineEntity = shadowEdge3.castingEntity;
@@ -512,6 +513,7 @@ public struct CornerCalculator {
                 m.lineEntityCastingType = shadowEdge3.castingShapeType;
                 m.normal = lightAngleCalculators[shadowEdge3.lightSource].NormalTowardsLight(shadowEdge3.direction, shadowEdge3.lightSide);
                 m.linePoint = shadowEdge3.mount1;
+                m.id = new int3(shadowEdge1.id, shadowEdge2.id, shadowEdge3.id).GetHashCode()^506744;
             }
 
             cornerManifolds.Add(m);

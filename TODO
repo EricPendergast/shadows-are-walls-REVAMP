@@ -7,10 +7,10 @@ TODOs:
 ✓6. Handle light edges
 ✓7. Remove old edge manifold stuff
 ✓8. Make edge contacts not be created as often.
-9. Implement corner-box constraints
-10. Corner contact ids
-10. Convert certain corner manifolds into corner-box constraints
-11. Implement corner-edge constraints
+✓9. Corner contact ids
+10. Implement corner-box constraints
+11. Convert certain corner manifolds into corner-box constraints
+12. Implement corner-edge constraints
 13. Convert certain corner manifolds into corner-edge constraints
 14. Fix problems with partial shadow edges
 15. Handle edge cases with wedge subtractions

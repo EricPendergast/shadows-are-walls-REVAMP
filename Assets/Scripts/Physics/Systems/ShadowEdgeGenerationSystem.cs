@@ -52,7 +52,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
 
 
         public float2 normal;
-
+        public int id;
     }
 
     Dictionary<Entity, ShadowEdgeCalculator> lightManagers;
