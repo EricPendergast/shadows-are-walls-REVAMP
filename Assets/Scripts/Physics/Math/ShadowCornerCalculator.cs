@@ -10,6 +10,7 @@ using Rect = Physics.Math.Rect;
 using Utilities;
 
 using ShadowEdgeManifold = ShadowEdgeGenerationSystem.ShadowEdgeManifold;
+using ShadowCornerManifold = ShadowEdgeGenerationSystem.ShadowCornerManifold;
 
 public struct CornerCalculator {
     private struct EdgeCornerIdx {
@@ -59,6 +60,13 @@ public struct CornerCalculator {
             this.isNull = false;
         }
 
+        public bool LiesOnBoxEdge() {
+            return nextEdge < 0 || prevEdge < 0;
+        }
+        public bool IsBoxCorner() {
+            return nextEdge < 0 && prevEdge < 0;
+        }
+
         public static Corner Null => new Corner{isNull = true};
     }
 
@@ -105,7 +113,7 @@ public struct CornerCalculator {
     }
 
     // Negative edge index indicates it is an edge of the box
-    public float2 Intersection(int edge1Idx, int edge2Idx) {
+    public float2 Intersection(int edge1Idx, int edge2Idx, bool treatAsRays=false) {
         float2 s1;
         float2 r1;
         if (edge1Idx >= 0) {
@@ -138,7 +146,16 @@ public struct CornerCalculator {
         float det = Lin.Cross(r2, r1);
         
         float u = Lin.Cross(r2, d) / det;
-        //float v = Lin.Cross(edge1.direction, d) / det;
+        if (treatAsRays) {
+            if (edge1Idx >= 0 && u < 0) {
+                return new float2(math.INFINITY, math.INFINITY);
+            }
+
+            float v = Lin.Cross(r1, d) / det;
+            if (edge2Idx >= 0 && v < 0) {
+                return new float2(math.INFINITY, math.INFINITY);
+            }
+        }
 
         return new float2(s1 + u*r1);
     }
@@ -302,14 +319,13 @@ public struct CornerCalculator {
     }
 
     public void ComputeManifolds(
-            ref NativeList<ShadowEdgeManifold> edgeManifolds
-            //NativeList<ShadowCornerManifold> boxCornerManifolds,
-            ) {
+            ref NativeList<ShadowEdgeManifold> edgeManifolds,
+            ref NativeList<ShadowCornerManifold> cornerManifolds) {
 
         int islandStart = 0;
         for (int i = 0; i < islands.Length; i++) {
             if (islands[i].isNull) {
-                ComputeManifoldsForIsland(islandStart, i, ref edgeManifolds);
+                ComputeManifoldsForIsland(islandStart, i, ref edgeManifolds, ref cornerManifolds);
                 islandStart = i+1;
             }
         }
@@ -365,7 +381,8 @@ public struct CornerCalculator {
 
     // TODO: There is a O(n) algorithm we can use here. Currently this is O(n^2).
     private void ComputeManifoldsForIsland(int islandStart, int islandEnd,
-            ref NativeList<ShadowEdgeManifold> edgeManifolds) {
+            ref NativeList<ShadowEdgeManifold> edgeManifolds,
+            ref NativeList<ShadowCornerManifold> cornerManifolds) {
 
         if (ComputeBestResolutionForIsland(islandStart, islandEnd) is EdgeCornerIdx ecIdx) {
 
@@ -375,21 +392,20 @@ public struct CornerCalculator {
             Edge e = edges[edgeCorner1.nextEdge];
             Corner c = islands[ecIdx.cornerIdx];
 
-            AddManifold(edgeCorner1.nextEdge, c.prevEdge, c.nextEdge, ref edgeManifolds);
+            AddManifold(edgeCorner1.nextEdge, c.prevEdge, c.nextEdge, ref edgeManifolds, ref cornerManifolds);
 
             if (c.nextEdge < 0 && c.prevEdge < 0) {
                 if (edgeCorner2.nextEdge != c.prevEdge) {
-                    AddManifold(c.prevEdge, edgeCorner2.nextEdge, edgeCorner2.prevEdge, ref edgeManifolds);
+                    AddManifold(c.prevEdge, edgeCorner2.nextEdge, edgeCorner2.prevEdge, ref edgeManifolds, ref cornerManifolds);
                 }
                 if (edgeCorner1.prevEdge != c.nextEdge) {
-                    AddManifold(c.nextEdge, edgeCorner1.nextEdge, edgeCorner1.prevEdge, ref edgeManifolds);
+                    AddManifold(c.nextEdge, edgeCorner1.nextEdge, edgeCorner1.prevEdge, ref edgeManifolds, ref cornerManifolds);
                 }
             }
         }
     }
 
-
-    private void AddManifold(int edge1Idx, int edge2Idx, int edge3Idx, ref NativeList<ShadowEdgeManifold> edgeManifolds) {
+    private void AddManifold(int edge1Idx, int edge2Idx, int edge3Idx, ref NativeList<ShadowEdgeManifold> edgeManifolds, ref NativeList<ShadowCornerManifold> cornerManifolds) {
         void Swap(ref int a, ref int b) {
             var tmp = a;
             a = b;
@@ -450,10 +466,55 @@ public struct CornerCalculator {
                 normal = normal,
                 overlap = overlap
             });
-        } else if (edge1Idx < 0) {
-            int boxEdge = edge1Idx;
-            int shadowEdge1 = edge2Idx;
-            int shadowEdge2 = edge3Idx;
+        } else {
+            // 1 box or shadow edge, 2 shadow edges.
+            // This is handling 2 cases at once, since the cases are very similar
+            int lineIdx = edge1Idx;
+            int shadowEdge1Idx = edge2Idx;
+            int shadowEdge2Idx = edge3Idx;
+
+            Edge shadowEdge1 = edges[shadowEdge1Idx];
+            Edge shadowEdge2 = edges[shadowEdge2Idx];
+
+
+            var m = new ShadowCornerManifold {
+                castingEntity1 = shadowEdge1.castingEntity,
+                castingEntity1Type = shadowEdge1.castingShapeType,
+                casting1Corner = Intersection(lineIdx, shadowEdge1Idx, treatAsRays:true),
+                e1Mount1 = shadowEdge1.mount1,
+                e1Mount2 = shadowEdge1.mount2,
+
+                castingEntity2 = shadowEdge2.castingEntity,
+                castingEntity2Type = shadowEdge2.castingShapeType,
+                casting2Corner = Intersection(lineIdx, shadowEdge2Idx, treatAsRays:true),
+                e2Mount1 = shadowEdge2.mount1,
+                e2Mount2 = shadowEdge2.mount2,
+
+                lineOppositeCorner = Intersection(shadowEdge1Idx, shadowEdge2Idx, treatAsRays:true),
+            };
+
+            if (lineIdx < 0) {
+                float2 boxEdgeP1 = box.GetVertex(lineIdx);
+                float2 boxEdgeP2 = box.GetVertex(lineIdx+1);
+
+                m.lineEntity = boxEntity;
+                m.lineIsShadowEdge = false;
+                // Purposely not setting lineEntityType because it is not used
+                // when the line is not a shadow edge.
+                //m.lineEntityType = null
+                // This works because rect vertices wind counterclockwise
+                m.normal = Lin.Cross(math.normalize(boxEdgeP2 - boxEdgeP1), 1);
+                m.linePoint = boxEdgeP1;
+            } else {
+                Edge shadowEdge3 = edges[lineIdx];
+                m.lineEntity = shadowEdge3.castingEntity;
+                m.lineIsShadowEdge = true;
+                m.lineEntityCastingType = shadowEdge3.castingShapeType;
+                m.normal = lightAngleCalculators[shadowEdge3.lightSource].NormalTowardsLight(shadowEdge3.direction, shadowEdge3.lightSide);
+                m.linePoint = shadowEdge3.mount1;
+            }
+
+            cornerManifolds.Add(m);
         }
     }
 }

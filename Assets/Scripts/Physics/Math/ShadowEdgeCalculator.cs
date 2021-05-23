@@ -484,6 +484,11 @@ public struct AngleCalculator {
         return Lin.Cross(edgeDirection, n);
     }
 
+    // Gives edgeDirection rotated by 90 degrees towards its illuminated side
+    public float2 NormalTowardsLight(float2 edgeDirection, int lightDirection) {
+        return Lin.Cross(lightDirection, edgeDirection);
+    }
+
     public float RawAngleOfNormal(float2 normal) {
         return 1 - math.dot(leadingLightEdge, normal);
     }

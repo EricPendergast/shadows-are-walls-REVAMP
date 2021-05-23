@@ -30,23 +30,48 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         public float2 lightSource;
     }
 
-    public struct CornerManifold {}
+    public struct ShadowCornerManifold {
+        public Entity castingEntity1;
+        public ShapeType castingEntity1Type;
+        public float2 e1Mount1;
+        public float2? e1Mount2;
+        public float2 casting1Corner;
+
+        public Entity castingEntity2;
+        public ShapeType castingEntity2Type;
+        public float2 e2Mount1;
+        public float2? e2Mount2;
+        public float2 casting2Corner;
+
+        public Entity lineEntity;
+        public bool lineIsShadowEdge;
+        public ShapeType lineEntityCastingType;
+        // Can be any point on the line
+        public float2 linePoint;
+        public float2 lineOppositeCorner;
+
+
+        public float2 normal;
+
+    }
 
     Dictionary<Entity, ShadowEdgeCalculator> lightManagers;
     NativeList<ShadowEdgeManifold> finalShadowEdgeManifolds;
+    NativeList<ShadowCornerManifold> finalShadowCornerManifolds;
 
     // TODO: This will replace some of the above stuff
     NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges;
     NativeList<LightSource> lightSources;
     NativeList<AngleCalculator> lightAngleCalculators;
-    NativeList<CornerManifold> cornerManifolds;
 
     protected override void OnCreate() {
         lightSourceQuery = GetEntityQuery(typeof(LightSource));
         opaqueBoxesQuery = GetEntityQuery(typeof(Box), typeof(OpaqueObject));
         shadHitBoxesQuery = GetEntityQuery(typeof(Box), typeof(HitShadowsObject));
         lightManagers = new Dictionary<Entity, ShadowEdgeCalculator>();
+
         finalShadowEdgeManifolds = new NativeList<ShadowEdgeManifold>(Allocator.Persistent);
+        finalShadowCornerManifolds = new NativeList<ShadowCornerManifold>(Allocator.Persistent);
 
         boxOverlappingEdges = new NativeMultiHashMap<Entity, CornerCalculator.Edge>(0, Allocator.Persistent);
         lightSources = new NativeList<LightSource>(Allocator.Persistent);
@@ -68,6 +93,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         var lightAngleCalculators = this.lightAngleCalculators;
         var boxOverlappingEdges = this.boxOverlappingEdges;
         var finalShadowEdgeManifolds = this.finalShadowEdgeManifolds;
+        var finalShadowCornerManifolds = this.finalShadowCornerManifolds;
 
         lightSources.Clear();
         lightAngleCalculators.Clear();
@@ -108,6 +134,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         // Step 5: Store all non illuminated manifolds
 
         finalShadowEdgeManifolds.Clear();
+        finalShadowCornerManifolds.Clear();
 
         Entities.WithAll<Box, HitShadowsObject>()
             .ForEach((in Box box, in Entity entity) => {
@@ -119,7 +146,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
                     It.Iterate(boxOverlappingEdges, entity)
                 );
 
-                cc.ComputeManifolds(ref finalShadowEdgeManifolds);
+                cc.ComputeManifolds(ref finalShadowEdgeManifolds, ref finalShadowCornerManifolds);
             }).Run();
 
         lightSourceEntities.Dispose();
@@ -157,6 +184,14 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         return ret;
     }
 
+    public List<ShadowCornerManifold> GetCornerManifoldsForDebug() {
+        var ret = new List<ShadowCornerManifold>();
+        foreach (var item in finalShadowCornerManifolds) {
+            ret.Add(item);
+        }
+        return ret;
+    }
+
     public List<ShadowEdgeManifold> GetEdgeManifoldsForDebug() {
         var ret = new List<ShadowEdgeManifold>();
         foreach (var item in finalShadowEdgeManifolds) {
@@ -182,7 +217,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
 
 }
 
-public enum ShapeType {
+public enum ShapeType : byte {
     Box, Light
 }
 
