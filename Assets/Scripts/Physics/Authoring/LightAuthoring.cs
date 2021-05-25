@@ -1,6 +1,8 @@
 using Unity.Entities;
 using UnityEngine;
-using Unity.Rendering;
+using Unity.Mathematics;
+
+using Random = UnityEngine.Random;
 
 public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
 
@@ -15,6 +17,12 @@ public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
             new Velocity {
                 vel = 0,
                 angVel = angularVelocity*Mathf.Deg2Rad,
+            }
+        );
+        dstManager.AddComponentData(entity, 
+            new Mass {
+                mass = math.INFINITY,
+                inertia = inertia
             }
         );
 

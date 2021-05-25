@@ -1,4 +1,12 @@
-Note about #8:
-    For an endpoint of an edge, create an edge contact if the corner after that
-    endpoint is a box corner
+Multi contacts tasks:
+    1. Compute edge mounts
 
+How to handle ids:
+    The id of a shadow edge contact should encompass:
+        1. The id of the casting object
+        2. The id of where the edge is mounted on the casting object
+        3. The id of the ShadowHitting object
+        4. The id of where the edge is hitting the ShadowHitting object
+
+    Notice that the shadow edge itself does not have an id.
+    (1) and (2) will be encompassed by EdgeMount.id

@@ -4,119 +4,104 @@ using Unity.Mathematics;
 using Physics.Math;
 
 using ContactId = Physics.Math.Geometry.ContactId;
+using ShadowEdgeManifold = ShadowEdgeGenerationSystem.ShadowEdgeManifold;
 
 public struct ShadowEdgeConstraint : IConstraint {
     // TODO: Much of these fields don't need to be stored
-    // The non opaque object
-    public Entity e1 {get;}
     // The opaque object
-    public Entity e2 {get;}
+    public Entity e1;
+    // The shadow hitting object
+    public Entity e2;
     private Lambdas accum;
     public Lambdas GetAccumulatedLambdas() {
         return accum;
     }
-    public float2 normal {get;}
-    public float2 contact {get => contact1;}
+    //public float2 normal {get;}
+    //public float2 contact {get => contact1;}
     // The contact on e1
-    public float2 contact1 {get;}
+    //public float2 contact1 {get;}
     // The contact on e2 (the origin of the shadow edge)
     //public float2 contact2 {get;}
-    public float overlap;
+    //public float overlap;
 
-    public int id {get;}
+    public int id {get; set;}
 
     Float6 M_inv;
 
     PenetrationConstraint<Float6> penConstraint;
 
-    public ShadowEdgeConstraint(Entity e1, Entity e2, Box box1, Box box2, float2 shadowOrigin, float2 lightOrigin, Geometry.Manifold manifold, bool useContact1, float dt, int contactIdScrambler) {
-        this.e1 = e1;
-        this.e2 = e2;
-        this.normal = manifold.normal;
-        { 
-            var contact = useContact1 ? manifold.contact1 : (Geometry.Contact)manifold.contact2;
-            this.contact1 = contact.point;
-            this.id = new int2(contact.id.GetHashCode(), contactIdScrambler).GetHashCode();
-        }
-        var contact2 = shadowOrigin;
-        this.overlap = manifold.overlap;
+    public ShadowEdgeConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt) {
+        e1 = p.e1;
+        e2 = p.e2;
+
+        Float6 M_inv = new Float6(masses[e1].M_inv, masses[e2].M_inv);
+        id = p.id;
+        penConstraint = new PenetrationConstraint<Float6>(p.J_n, M_inv, p.bias/dt);
+        this.M_inv = M_inv;
 
         accum = new Lambdas();
-
-        M_inv = new Float6(
-            1/box1.mass, 1/box1.mass, 1/box1.inertia,
-            1/box2.mass, 1/box2.mass, 1/box2.inertia
-        );
-
-        { // Normal precomputation
-
-            float thing = math.dot(contact2 - lightOrigin, contact1 - lightOrigin) / math.lengthsq(contact2 - lightOrigin);
-            Float6 J_n = new Float6(
-                new float3(-normal, -Lin.Cross(contact1-box1.pos, normal)), 
-                new float3(normal*thing, Lin.Cross(contact2-box2.pos, normal))
-            );
-
-            float delta = -overlap;
-            float beta = CollisionSystem.positionCorrection ? .1f : 0;
-            float delta_slop = -.01f;
-
-            float bias = 0;
-
-            if (delta < delta_slop) {
-                bias = (beta/dt) * (delta - delta_slop);
-            }
-
-            penConstraint = new PenetrationConstraint<Float6>(J_n, M_inv, bias);
-        }
     }
+    public struct Partial {
+        public Entity e1;
+        public Entity e2;
+        public int id;
 
-    public ShadowEdgeConstraint(Entity e1, Entity e2, Box box, LightSource le, Geometry.Manifold manifold, bool useContact1, float dt) {
-        this.e1 = e1;
-        this.e2 = e2;
-        this.normal = manifold.normal;
-        { 
-            var contact = useContact1 ? manifold.contact1 : (Geometry.Contact)manifold.contact2;
-            this.contact1 = contact.point;
-            this.id = contact.id.GetHashCode();
-        }
-        this.overlap = manifold.overlap;
+        public Float6 J_n;
+        public float bias;
 
-        accum = new Lambdas();
 
-        M_inv = new Float6(
-            1/box.mass, 1/box.mass, 1/box.inertia,
-            0, 0, 1/le.inertia
-        );
-
-        { // Normal precomputation
-            Float6 J_n = new Float6(
-                new float3(-normal, -Lin.Cross(contact1-box.pos, normal)), 
-                new float3(0, 0, Lin.Cross(contact1-le.pos, normal))
-            );
-
-            float delta = -overlap;
-            float beta = CollisionSystem.positionCorrection ? .1f : 0;
-            float delta_slop = -.01f;
-
-            float bias = 0;
-
-            if (delta < delta_slop) {
-                bias = (beta/dt) * (delta - delta_slop);
+        public Partial(in Prototype p, in CornerCalculator.EdgeMount mount, in ShadowEdgeManifold m) {
+            e2 = p.e2;
+            e1 = mount.castingEntity;
+            id = new int2(p.id, mount.castingEntity.GetHashCode()).GetHashCode();
+            J_n = p.J_n;
+            bias = p.bias;
+            if (mount.castingShapeType == ShapeType.Box) {
+                float2 velMult = Lin.Cross(1, mount.point - m.x1)/math.lengthsq(mount.point - m.x1);
+                float angVelMult = math.dot(mount.point - mount.shapeCenter, mount.point - m.x1)/math.lengthsq(mount.point - m.x1);
+                J_n.v1 = new float3(
+                    J_n.v1.z * velMult,
+                    J_n.v1.z * angVelMult
+                );
+                // The previous version of this code:
+                // {
+                //     float thing = math.dot(mount.point - m.x1, m.p - m.x1) / math.lengthsq(mount.point - m.x1);
+                    
+                //     J_n = new Float6(
+                //         new float3(m.n*thing, Lin.Cross(mount.point-mount.shapeCenter, m.n)*thing),
+                //         new float3(-m.n, -Lin.Cross(m.p-m.x2, m.n))
+                //     );
+                // }
+            } else {
+                // Do nothing
             }
-
-            penConstraint = new PenetrationConstraint<Float6>(J_n, M_inv, bias);
         }
 
+        public struct Prototype {
+            public Entity e2;
+            public int id;
+            public Float6 J_n;
+            public float bias;
 
-        //{ // Tangent precomputation (friction)
-        //    float2 tangent = Lin.Cross(normal, -1);
-        //
-        //    Float6 J_t = new Float6(
-        //        new float3(tangent, Lin.Cross(contact-box.pos, tangent)), 
-        //        new float3(-tangent, -Lin.Cross(contact-le.pos, tangent)));
-        //
-        //    fricConstraint = new FrictionConstraint<Float6>(J_t, M_inv, CollisionSystem.globalFriction);
-        //}
+            public Prototype(in ShadowEdgeManifold m) {
+                e2 = m.e2;
+                id = m.id;
+
+                J_n = new Float6(
+                    new float3(0, 0, Lin.Cross(m.p - m.x1, m.n)), 
+                    new float3(-m.n, -Lin.Cross(m.p - m.x2, m.n))
+                );
+
+                float beta = CollisionSystem.positionCorrection ? .1f : 0;
+                float delta_slop = -.01f;
+
+                bias = 0;
+
+                if (m.delta < delta_slop) {
+                    bias = beta * (m.delta - delta_slop);
+                }
+            }
+        }
     }
 
     public void PreStep(ref Velocity v1, ref Velocity v2, float dt, Lambdas prevLambdas) {

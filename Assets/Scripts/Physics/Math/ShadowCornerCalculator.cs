@@ -1,3 +1,6 @@
+using System.Collections.Generic;
+
+using Unity.Burst;
 using Unity.Entities;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -13,17 +16,48 @@ using ShadowEdgeManifold = ShadowEdgeGenerationSystem.ShadowEdgeManifold;
 using ShadowCornerManifold = ShadowEdgeGenerationSystem.ShadowCornerManifold;
 
 public struct CornerCalculator {
+
+    public struct Outputs {
+        public NativeList<ShadowEdgeConstraint.Partial>? partialEdgeConstraints;
+        public NativeList<ShadowCornerManifold>? cornerManifolds;
+
+        [BurstDiscard]
+        public List<ShadowEdgeManifold> debugEdgeManifoldCollector {get; set;}
+        [BurstDiscard]
+        public List<System.ValueTuple<ShadowEdgeManifold, EdgeMount>> debugEdgeMounts {get; set;}
+
+        [BurstDiscard]
+        public void DebugCollect(ShadowEdgeManifold m) {
+            if (debugEdgeManifoldCollector != null) {
+                debugEdgeManifoldCollector.Add(m);
+            }
+        }
+
+        [BurstDiscard]
+        public void DebugCollect(ShadowEdgeManifold manifold, EdgeMount mount) {
+            if (debugEdgeMounts != null) {
+                debugEdgeMounts.Add(new System.ValueTuple<ShadowEdgeManifold, EdgeMount>(manifold, mount));
+            }
+        }
+
+        public void Collect(in ShadowEdgeConstraint.Partial c) {
+            if (partialEdgeConstraints != null) {
+                partialEdgeConstraints.Value.Add(c);
+            }
+        }
+        public void Collect(in ShadowCornerManifold m) {
+            if (partialEdgeConstraints != null) {
+                cornerManifolds.Value.Add(m);
+            }
+        }
+    }
+
     private struct EdgeCornerIdx {
         public int edgeFirstCornerIdx;
         public int cornerIdx;
     }
 
     public struct Edge : System.IComparable<Edge> {
-        public enum Type : byte {
-            illuminationTag,
-            edge
-        }
-        public Type type;
         public int lightSource;
         public float angle;
         public float2 direction;
@@ -31,11 +65,7 @@ public struct CornerCalculator {
         // for angles larger/smaller than this edge's angle.
         public sbyte lightSide;
 
-        // Required for converting to a ShadowEdgeManifold
-        public Entity castingEntity;
-        public float2 mount1;
-        public float2? mount2;
-        public ShapeType castingShapeType;
+        // TODO: this will not have an id in the future
         public int id;
 
         public int CompareTo(Edge other) {
@@ -45,6 +75,33 @@ public struct CornerCalculator {
                 return lightSource.CompareTo(other.lightSource);
             }
         }
+
+        public struct EdgeKey : System.IEquatable<EdgeKey> {
+            public int lightSource;
+            public float angle;
+
+            public bool Equals(EdgeKey o) {
+                return lightSource == o.lightSource && angle == o.angle;
+            }
+        }
+
+        public EdgeKey GetEdgeKey() {
+            return new EdgeKey {
+                lightSource = lightSource,
+                angle = angle
+            };
+        }
+    }
+
+
+    // TODO: Might want to make this have an optional second contact
+    public struct EdgeMount {
+        public Entity castingEntity;
+        public ShapeType castingShapeType;
+        public float2 shapeCenter;
+        public float2 point;
+        // TODO: Implement edge mount ids
+        //public int id;
     }
 
     public struct Corner {
@@ -92,12 +149,16 @@ public struct CornerCalculator {
     private FixedList512<Edge> edges;
     private FixedList512<Corner> islands;
     private Entity boxEntity;
+    private NativeMultiHashMap<Edge.EdgeKey, EdgeMount> edgeMounts;
+
     public FixedList512<Corner> GetIslandsForDebug() {
         return islands;
     }
     private Rect box;
 
-    public CornerCalculator(Box box, Entity boxEntity, NativeArray<LightSource> lights, NativeArray<AngleCalculator> lightAngleCalculators, MultiHashMapIterator<Entity, Edge> edges) {
+    private Outputs o;
+
+    public CornerCalculator(Box box, Entity boxEntity, NativeArray<LightSource> lights, NativeArray<AngleCalculator> lightAngleCalculators, MultiHashMapIterator<Entity, Edge> edges, ref NativeMultiHashMap<Edge.EdgeKey, EdgeMount> edgeMounts, in Outputs o) {
         this.box = box.ToRect();
         this.boxEntity = boxEntity;
         this.lights = lights;
@@ -108,8 +169,12 @@ public struct CornerCalculator {
 
         this.lightAngleCalculators = lightAngleCalculators;
         islands = new FixedList512<Corner>();
+        this.edgeMounts = edgeMounts;
+
+        this.o = o;
 
         Compute();
+        ComputeManifolds();
     }
 
     // Negative edge index indicates it is an edge of the box
@@ -318,14 +383,11 @@ public struct CornerCalculator {
         }
     }
 
-    public void ComputeManifolds(
-            ref NativeList<ShadowEdgeManifold> edgeManifolds,
-            ref NativeList<ShadowCornerManifold> cornerManifolds) {
-
+    private void ComputeManifolds() {
         int islandStart = 0;
         for (int i = 0; i < islands.Length; i++) {
             if (islands[i].isNull) {
-                ComputeManifoldsForIsland(islandStart, i, ref edgeManifolds, ref cornerManifolds);
+                ComputeManifoldsForIsland(islandStart, i);
                 islandStart = i+1;
             }
         }
@@ -380,9 +442,7 @@ public struct CornerCalculator {
 
 
     // TODO: There is a O(n) algorithm we can use here. Currently this is O(n^2).
-    private void ComputeManifoldsForIsland(int islandStart, int islandEnd,
-            ref NativeList<ShadowEdgeManifold> edgeManifolds,
-            ref NativeList<ShadowCornerManifold> cornerManifolds) {
+    private void ComputeManifoldsForIsland(int islandStart, int islandEnd) {
 
         if (ComputeBestResolutionForIsland(islandStart, islandEnd) is EdgeCornerIdx ecIdx) {
 
@@ -392,20 +452,20 @@ public struct CornerCalculator {
             Edge e = edges[edgeCorner1.nextEdge];
             Corner c = islands[ecIdx.cornerIdx];
 
-            AddManifold(edgeCorner1.nextEdge, c.prevEdge, c.nextEdge, ref edgeManifolds, ref cornerManifolds);
+            AddManifold(edgeCorner1.nextEdge, c.prevEdge, c.nextEdge);
 
             if (c.nextEdge < 0 && c.prevEdge < 0) {
                 if (edgeCorner2.nextEdge != c.prevEdge) {
-                    AddManifold(c.prevEdge, edgeCorner2.nextEdge, edgeCorner2.prevEdge, ref edgeManifolds, ref cornerManifolds);
+                    AddManifold(c.prevEdge, edgeCorner2.nextEdge, edgeCorner2.prevEdge);
                 }
                 if (edgeCorner1.prevEdge != c.nextEdge) {
-                    AddManifold(c.nextEdge, edgeCorner1.nextEdge, edgeCorner1.prevEdge, ref edgeManifolds, ref cornerManifolds);
+                    AddManifold(c.nextEdge, edgeCorner1.nextEdge, edgeCorner1.prevEdge);
                 }
             }
         }
     }
 
-    private void AddManifold(int edge1Idx, int edge2Idx, int edge3Idx, ref NativeList<ShadowEdgeManifold> edgeManifolds, ref NativeList<ShadowCornerManifold> cornerManifolds) {
+    private void AddManifold(int edge1Idx, int edge2Idx, int edge3Idx) {
         void Swap(ref int a, ref int b) {
             var tmp = a;
             a = b;
@@ -441,82 +501,93 @@ public struct CornerCalculator {
             }
             Edge e = edges[shadowEdge];
 
-            float2 normal = Lin.Cross(e.direction, e.lightSide);
+            float2 normal = -lightAngleCalculators[e.lightSource].NormalTowardsLight(e.direction, e.lightSide);
             float2 lightSource = lights[e.lightSource].pos;
         
-            float overlap = math.dot(corner - lightSource, normal);
-        
-            edgeManifolds.Add(new ShadowEdgeManifold {
-                castingEntity = e.castingEntity,
-                castingShapeType = e.castingShapeType,
-                contact1 = new Geometry.Contact{
-                    point = corner,
-                    id = new int4(
-                        e.id,
-                        box.id,
-                        boxEdge1,
-                        boxEdge2
-                    ).GetHashCode() ^ 30345 //Arbitrary number. Don't use anywhere else.
-                },
-                contact2 = null,
-                lightSource = lightSource,
-                mount1 = e.mount1,
-                mount2 = e.mount2,
-                shadHitEntity = boxEntity,
-                normal = normal,
-                overlap = overlap
-            });
-        } else {
-            // 1 box or shadow edge, 2 shadow edges.
-            // This is handling 2 cases at once, since the cases are very similar
-            int lineIdx = edge1Idx;
-            int shadowEdge1Idx = edge2Idx;
-            int shadowEdge2Idx = edge3Idx;
+            float delta = -math.dot(corner - lightSource, normal);
 
-            Edge shadowEdge1 = edges[shadowEdge1Idx];
-            Edge shadowEdge2 = edges[shadowEdge2Idx];
-
-
-            var m = new ShadowCornerManifold {
-                castingEntity1 = shadowEdge1.castingEntity,
-                castingEntity1Type = shadowEdge1.castingShapeType,
-                casting1Corner = Intersection(lineIdx, shadowEdge1Idx, treatAsRays:true),
-                e1Mount1 = shadowEdge1.mount1,
-                e1Mount2 = shadowEdge1.mount2,
-
-                castingEntity2 = shadowEdge2.castingEntity,
-                castingEntity2Type = shadowEdge2.castingShapeType,
-                casting2Corner = Intersection(lineIdx, shadowEdge2Idx, treatAsRays:true),
-                e2Mount1 = shadowEdge2.mount1,
-                e2Mount2 = shadowEdge2.mount2,
-
-                lineOppositeCorner = Intersection(shadowEdge1Idx, shadowEdge2Idx, treatAsRays:true),
+            var manifold = new ShadowEdgeManifold {
+                p = corner,
+                id = new int4(
+                    e.id,
+                    box.id,
+                    boxEdge1,
+                    boxEdge2
+                ).GetHashCode() ^ 30345, //Arbitrary number. Don't use anywhere else.
+                x1 = lightSource,
+                d1 = e.direction,
+                e2 = boxEntity,
+                x2 = box.pos,
+                n = normal,
+                delta = delta,
             };
 
-            if (lineIdx < 0) {
-                float2 boxEdgeP1 = box.GetVertex(lineIdx);
-                float2 boxEdgeP2 = box.GetVertex(lineIdx+1);
+            o.DebugCollect(manifold);
+        
+            var prototype = new ShadowEdgeConstraint.Partial.Prototype(manifold);
 
-                m.lineEntity = boxEntity;
-                m.lineIsShadowEdge = false;
-                // Purposely not setting lineEntityType because it is not used
-                // when the line is not a shadow edge.
-                //m.lineEntityType = null
-                // This works because rect vertices wind counterclockwise
-                m.normal = Lin.Cross(math.normalize(boxEdgeP2 - boxEdgeP1), 1);
-                m.linePoint = boxEdgeP1;
-                m.id = new int3(box.id, shadowEdge1.id, shadowEdge2.id).GetHashCode()^40235;
-            } else {
-                Edge shadowEdge3 = edges[lineIdx];
-                m.lineEntity = shadowEdge3.castingEntity;
-                m.lineIsShadowEdge = true;
-                m.lineEntityCastingType = shadowEdge3.castingShapeType;
-                m.normal = lightAngleCalculators[shadowEdge3.lightSource].NormalTowardsLight(shadowEdge3.direction, shadowEdge3.lightSide);
-                m.linePoint = shadowEdge3.mount1;
-                m.id = new int3(shadowEdge1.id, shadowEdge2.id, shadowEdge3.id).GetHashCode()^506744;
+            foreach (EdgeMount mount in It.Iterate(edgeMounts, e.GetEdgeKey())) {
+                var p = new ShadowEdgeConstraint.Partial(in prototype, in mount, in manifold);
+                o.Collect(p);
+                o.DebugCollect(manifold, mount);
             }
-
-            cornerManifolds.Add(m);
-        }
+        }// else {
+            // 1 box or shadow edge, 2 shadow edges.
+            // This is handling 2 cases at once, since the cases are very similar
+        //    int lineIdx = edge1Idx;
+        //    int shadowEdge1Idx = edge2Idx;
+        //    int shadowEdge2Idx = edge3Idx;
+        //
+        //    Edge shadowEdge1 = edges[shadowEdge1Idx];
+        //    Edge shadowEdge2 = edges[shadowEdge2Idx];
+        //
+        //
+        //    var m = new ShadowCornerManifold {
+        //        e1 = shadowEdge1.castingEntity,
+        //        e1Type = shadowEdge1.castingShapeType,
+        //        p1 = Intersection(lineIdx, shadowEdge1Idx, treatAsRays:true),
+        //        c1 = shadowEdge1.mount1,
+        //        c1_prime = shadowEdge1.mount2,
+        //        x1 = lights[shadowEdge1.lightSource].pos,
+        //
+        //        e2 = shadowEdge2.castingEntity,
+        //        e2Type = shadowEdge2.castingShapeType,
+        //        p2 = Intersection(lineIdx, shadowEdge2Idx, treatAsRays:true),
+        //        c2 = shadowEdge2.mount1,
+        //        c2_prime = shadowEdge2.mount2,
+        //        x2 = lights[shadowEdge2.lightSource].pos,
+        //
+        //        p = Intersection(shadowEdge1Idx, shadowEdge2Idx, treatAsRays:true),
+        //    };
+        //
+        //    if (lineIdx < 0) {
+        //        float2 boxEdgeP1 = box.GetVertex(lineIdx);
+        //        float2 boxEdgeP2 = box.GetVertex(lineIdx+1);
+        //
+        //        m.e3 = boxEntity;
+        //        //m.lineIsShadowEdge = false;
+        //        // Purposely not setting lineEntityType because it is not used
+        //        // when the line is not a shadow edge.
+        //        //m.lineEntityType = null
+        //        // This works because rect vertices wind counterclockwise
+        //        m.n = Lin.Cross(math.normalize(boxEdgeP2 - boxEdgeP1), 1);
+        //        m.s = boxEdgeP1;
+        //        m.id = new int3(box.id, shadowEdge1.id, shadowEdge2.id).GetHashCode()^40235;
+        //        m.c3 = box.pos;
+        //        m.c3_prime = null;
+        //    } else {
+        //        Edge shadowEdge3 = edges[lineIdx];
+        //        m.e3 = shadowEdge3.castingEntity;
+        //        //m.lineIsShadowEdge = true;
+        //        //m.lineEntityCastingType = shadowEdge3.castingShapeType;
+        //        m.n = lightAngleCalculators[shadowEdge3.lightSource].NormalTowardsLight(shadowEdge3.direction, shadowEdge3.lightSide);
+        //        m.s = shadowEdge3.mount1;
+        //        m.id = new int3(shadowEdge1.id, shadowEdge2.id, shadowEdge3.id).GetHashCode()^506744;
+        //        m.lineMount1 = shadowEdge3.mount1;
+        //        m.lineMount2 = shadowEdge3.mount2;
+        //    }
+        //
+        //    cornerManifolds.Add(m);
+        //}
     }
 }

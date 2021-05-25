@@ -7,6 +7,40 @@ public interface FloatX<T> {
     public T Mult(float other);
 }
 
+public struct Float9 : FloatX<Float9> {
+    public float3 v1;
+    public float3 v2;
+    public float3 v3;
+
+    public Float9(float3 v1, float3 v2, float3 v3) {
+        this.v1 = v1;
+        this.v2 = v2;
+        this.v3 = v3;
+    }
+
+    public Float9(float f1, float f2, float f3, float f4, float f5, float f6, float f7, float f8, float f9) {
+        this.v1 = new float3(f1, f2, f3);
+        this.v2 = new float3(f4, f5, f6);
+        this.v3 = new float3(f7, f8, f9);
+    }
+
+    public Float9 Add(Float9 o) {
+        return new Float9(v1 + o.v1, v2 + o.v2, v3 + o.v3);
+    }
+
+    public float Dot(Float9 o) {
+        return math.dot(v1, o.v1) + math.dot(v2, o.v2) + math.dot(v3, o.v3);
+    }
+
+    public Float9 Mult(Float9 o) {
+        return new Float9(v1*o.v1, v2*o.v2, v3*o.v3);
+    }
+
+    public Float9 Mult(float o) {
+        return new Float9(v1*o, v2*o, v3*o);
+    }
+}
+
 public struct Float6 : FloatX<Float6> {
     public float3 v1;
     public float3 v2;

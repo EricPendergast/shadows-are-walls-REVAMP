@@ -43,6 +43,7 @@ public class CollisionSystem : SystemBase {
 
         var boxes = GetComponentDataFromEntity<Box>(false);
         var velocities = GetComponentDataFromEntity<Velocity>(false);
+        var masses = GetComponentDataFromEntity<Mass>(false);
         var lightSources = GetComponentDataFromEntity<LightSource>(false);
 
         float dt = Time.DeltaTime;
@@ -58,7 +59,8 @@ public class CollisionSystem : SystemBase {
             vels: velocities,
             boxes: boxes,
             lightSources: lightSources,
-            shadowEdgeManifolds: World.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetShadowEdgeManifolds(),
+            partialConstraints: World.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetPartialEdgeConstraints(),
+            masses: masses,
             dt: dt
         );
 
@@ -88,12 +90,13 @@ public class CollisionSystem : SystemBase {
         public int id;
     }
 
-    public IEnumerable<DebugContactInfo> GetContactsForDebug() {
-        foreach (var item in boxBoxCM.GetContactsForDebug()) {
-            yield return item;
-        }
-        foreach (var item in shadowEdgeCM.GetContactsForDebug()) {
-            yield return item;
-        }
-    }
+    // TODO: Make debug contact rendering not be broken
+    //public IEnumerable<DebugContactInfo> GetContactsForDebug() {
+    //    foreach (var item in boxBoxCM.GetContactsForDebug()) {
+    //        yield return item;
+    //    }
+    //    foreach (var item in shadowEdgeCM.GetContactsForDebug()) {
+    //        yield return item;
+    //    }
+    //}
 }

@@ -27,5 +27,9 @@ namespace Physics.Math {
         public static float2 Rotate(float2 vec, float angle) {
             return math.mul(float2x2.Rotate(angle), vec);
         }
+
+        public static bool IsFinite(float2 vec) {
+            return math.isfinite(vec.x) && math.isfinite(vec.y);
+        }
     }
 }

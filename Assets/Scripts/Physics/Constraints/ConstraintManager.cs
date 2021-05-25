@@ -11,8 +11,8 @@ using ContactId = Physics.Math.Geometry.ContactId;
 
 public interface IConstraint {
     public int id {get;}
-    public float2 normal {get;}
-    public float2 contact {get;}
+    //public float2 normal {get;}
+    //public float2 contact {get;}
     public Lambdas GetAccumulatedLambdas();
 }
 
@@ -69,11 +69,11 @@ public class ConstraintManager<H, C>
         warmStart.SaveLambdas(constraints);
     }
 
-    public IEnumerable<CollisionSystem.DebugContactInfo> GetContactsForDebug() {
-        foreach (var constraint in constraints) {
-            yield return new CollisionSystem.DebugContactInfo{normal = constraint.normal, contact = constraint.contact, id = constraint.id};
-        }
-    }
+    //public IEnumerable<CollisionSystem.DebugContactInfo> GetContactsForDebug() {
+    //    foreach (var constraint in constraints) {
+    //        yield return new CollisionSystem.DebugContactInfo{normal = constraint.normal, contact = constraint.contact, id = constraint.id};
+    //    }
+    //}
 
     public void Dispose() {
         warmStart.Dispose();
@@ -102,11 +102,6 @@ public class ConstraintManager<H, C>
         public void SaveLambdas(NativeArray<C> constraints) {
             prevLambdas.Clear();
             foreach (var constraint in constraints) {
-                // TODO: This assert actually fails naturally sometimes. It's
-                // because sometimes contact ids can refer to the corner of a
-                // shape, which may be intersecting multiple other shapes, thus
-                // giving duplicate contact ids. Having arbiters would fix this.
-                // But I think its not a big deal.
                 Debug.Assert(!prevLambdas.ContainsKey(constraint.id), "Duplicate contact id: " + constraint.id.ToString());
                 prevLambdas[constraint.id] = constraint.GetAccumulatedLambdas();
             }

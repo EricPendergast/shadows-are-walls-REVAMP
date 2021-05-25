@@ -23,12 +23,13 @@ public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
     public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem) {
         float w = transform.localScale.x*width;
         float h = transform.localScale.y*height;
+        var inertia = mass*(w*w + h*h)/12;
         dstManager.AddComponentData(entity, 
             new Box {
                 pos = (Vector2)transform.position,
                 rot = transform.eulerAngles.z*Mathf.Deg2Rad,
                 mass = mass,
-                inertia = mass*(w*w + h*h)/12,
+                inertia = inertia,
                 width = w,
                 height = h,
                 id = Random.Range(1, int.MaxValue)
@@ -38,6 +39,11 @@ public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
             new Velocity {
                 vel = velocity,
                 angVel = angularVelocity*Mathf.Deg2Rad,
+            });
+        dstManager.AddComponentData(entity, 
+            new Mass {
+                mass = mass,
+                inertia = inertia
             });
 
         if (gravityScale != 1) {
