@@ -14,13 +14,7 @@ public class EdgeMountsGizmoDrawer : MonoBehaviour {
 
             foreach (var p in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetEdgeMountsForDebug()) {
                 var (manifold, mount) = p;
-                //Gizmos.color = Color.red;
-                //Gizmos.DrawRay((Vector2)manifold.p, (Vector2)manifold.n);
                 int id = Mathf.Abs(manifold.id.GetHashCode());
-                // Indicates there is a duplicate contact. This should never happen
-                //Debug.Assert(!set.Contains(id), "Duplicate edge manifolds with id " + id);
-                //float m = set.Contains(id) ? 5 : 1;
-                //set.Add(manifold.id);
                 int thisMountCount;
                 if (mountCount.ContainsKey(mount.point)) {
                     thisMountCount = mountCount[mount.point]+1;

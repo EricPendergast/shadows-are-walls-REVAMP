@@ -7,7 +7,6 @@ using ContactId = Physics.Math.Geometry.ContactId;
 using ShadowEdgeManifold = ShadowEdgeGenerationSystem.ShadowEdgeManifold;
 
 public struct ShadowEdgeConstraint : IConstraint {
-    // TODO: Much of these fields don't need to be stored
     // The opaque object
     public Entity e1;
     // The shadow hitting object
@@ -16,13 +15,6 @@ public struct ShadowEdgeConstraint : IConstraint {
     public Lambdas GetAccumulatedLambdas() {
         return accum;
     }
-    //public float2 normal {get;}
-    //public float2 contact {get => contact1;}
-    // The contact on e1
-    //public float2 contact1 {get;}
-    // The contact on e2 (the origin of the shadow edge)
-    //public float2 contact2 {get;}
-    //public float overlap;
 
     public int id {get; set;}
 
