@@ -490,7 +490,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &58698948
 Transform:
   m_ObjectHideFlags: 0
@@ -4719,7 +4719,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a079fdf1cb0fcf38c81c9da4d65a8b56, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  enable: 1
+  enable: 0
 --- !u!114 &1301271241
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4732,8 +4732,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b5f82a528bf2021f89fa82ff4236b437, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  drawRadius: 0.3
   enable: 1
+  drawRadius: 0.3
+  renderMountsWithManifoldColor: 1
 --- !u!4 &1317323491 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 254186761601639556, guid: ee72e632f0b9f9993a8068c0eb7d4075, type: 3}
@@ -7719,7 +7720,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 254186761601639557, guid: ee72e632f0b9f9993a8068c0eb7d4075, type: 3}
       propertyPath: inertia
-      value: 1000
+      value: Infinity
       objectReference: {fileID: 0}
     - target: {fileID: 254186761601639557, guid: ee72e632f0b9f9993a8068c0eb7d4075, type: 3}
       propertyPath: aperture

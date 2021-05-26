@@ -45,7 +45,7 @@ public struct ShadowEdgeConstraint : IConstraint {
         public Partial(in Prototype p, in CornerCalculator.EdgeMount mount, in ShadowEdgeManifold m) {
             e2 = p.e2;
             e1 = mount.castingEntity;
-            id = new int2(p.id, mount.castingEntity.GetHashCode()).GetHashCode();
+            id = new int2(m.id, mount.id).GetHashCode();
             J_n = p.J_n;
             bias = p.bias;
             if (mount.castingShapeType == ShapeType.Box) {
@@ -71,13 +71,11 @@ public struct ShadowEdgeConstraint : IConstraint {
 
         public struct Prototype {
             public Entity e2;
-            public int id;
             public Float6 J_n;
             public float bias;
 
             public Prototype(in ShadowEdgeManifold m) {
                 e2 = m.e2;
-                id = m.id;
 
                 J_n = new Float6(
                     new float3(0, 0, Lin.Cross(m.p - m.x1, m.n)), 

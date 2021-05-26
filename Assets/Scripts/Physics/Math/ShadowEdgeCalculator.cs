@@ -51,9 +51,11 @@ public class ShadowEdgeCalculator {
             public float angle;
             public Entity source;
             public Rect rect;
+            // TODO: This maybe should be 2 objects. So it would just have mount and id
             public float2 mount1;
+            public int id1;
             public float2? mount2;
-            public int id;
+            public int? id2;
         }
         [FieldOffset(5)]
         public OpaqueData opaqueData;
@@ -184,37 +186,34 @@ public class ShadowEdgeCalculator {
             float2 endPoint = source.pos + edgeDir*edgeEnd;
 
             // FOR DEBUG //
-            shadowEdgeDebugInfo.Add(new ShadowEdgeDebugInfo{endpoint = endPoint, id = lightEdge.id, mount1 = startPoint, mount2 = null});
+            shadowEdgeDebugInfo.Add(new ShadowEdgeDebugInfo{endpoint = endPoint, id1 = lightEdge.id, id2 = null, mount1 = startPoint, mount2 = null});
             ///////////////
 
+            var edge = new CornerCalculator.Edge{
+                angle = lightEdge.angle,
+                direction = lightEdge.direction,
+                lightSource = sourceIndex,
+                lightSide = lightEdge.angle == angleCalc.MinAngle() ? (sbyte)1 : (sbyte)-1,
+            };
+
+            edgeMounts.Add(edge.GetEdgeKey(), new EdgeMount {
+                castingEntity = sourceEntity,
+                castingShapeType = ShapeType.Light,
+                point = source.pos,
+                shapeCenter = source.pos,
+                id = lightEdge.id,
+            });
+
             foreach (ShapeEdge.ShadHitData shadHitObject in shadHitWorkingSet) {
-                // TODO: Replace this with the code in HandleOpaqueEdge
-                var manifoldNullable = Geometry.GetIntersectData(
-                    shadHitObject.rect,
-                    Rect.FromLineSegment(
-                        startPoint,
-                        endPoint,
-                        lightEdge.id
-                    )
+                bool intersecting = Geometry.IsIntersectingShadowEdge(
+                    shadHitRect: shadHitObject.rect,
+                    edgeStart: startPoint,
+                    edgeEnd: endPoint
                 );
 
-                if (manifoldNullable is Geometry.Manifold manifold) {
+                if (intersecting) {
                     Debug.Assert(lightEdge.angle == angleCalc.MinAngle() || lightEdge.angle == angleCalc.MaxAngle());
-                    var edge = new CornerCalculator.Edge{
-                        angle = lightEdge.angle,
-                        direction = lightEdge.direction,
-                        lightSource = sourceIndex,
-                        lightSide = lightEdge.angle == angleCalc.MinAngle() ? (sbyte)1 : (sbyte)-1,
-                        id = lightEdge.id,
-                    };
                     boxOverlappingEdges.Add(shadHitObject.source, edge);
-                    edgeMounts.Add(edge.GetEdgeKey(), new EdgeMount {
-                        castingEntity = sourceEntity,
-                        castingShapeType = ShapeType.Light,
-                        point = source.pos,
-                        shapeCenter = source.pos,
-                        //id = new int2(source.id, edge.lightSide).GetHashCode()
-                    });
                 }
             }
         }
@@ -240,45 +239,41 @@ public class ShadowEdgeCalculator {
                 float2 endPoint = source.pos + edgeDir*edgeEnd;
 
                 // FOR DEBUG //
-                shadowEdgeDebugInfo.Add(new ShadowEdgeDebugInfo{endpoint = endPoint, id = opaqueEdge.id, mount1 = opaqueEdge.mount1, mount2 = opaqueEdge.mount2});
+                shadowEdgeDebugInfo.Add(new ShadowEdgeDebugInfo{endpoint = endPoint, id1 = opaqueEdge.id1, id2 = opaqueEdge.id2, mount1 = opaqueEdge.mount1, mount2 = opaqueEdge.mount2});
                 ///////////////
 
-                foreach (ShapeEdge.ShadHitData shadHitObject in shadHitWorkingSet) {
+                var edge = new CornerCalculator.Edge{
+                    angle = opaqueEdge.angle,
+                    direction = edgeDir,
+                    lightSource = sourceIndex,
+                    lightSide = (sbyte)(leading ? -1 : 1),
+                };
+                edgeMounts.Add(edge.GetEdgeKey(), new EdgeMount{
+                    castingEntity = opaqueEdge.source,
+                    castingShapeType = ShapeType.Box,
+                    point = opaqueEdge.mount1,
+                    shapeCenter = opaqueEdge.rect.pos,
+                    id = opaqueEdge.id1
+                });
+                if (opaqueEdge.mount2 is float2 mount) {
+                    edgeMounts.Add(edge.GetEdgeKey(), new EdgeMount{
+                        castingEntity = opaqueEdge.source,
+                        castingShapeType = ShapeType.Box,
+                        point = mount,
+                        shapeCenter = opaqueEdge.rect.pos,
+                        id = opaqueEdge.id2.Value
+                    });
+                }
 
-                    var manifoldNullable = Geometry.GetShadowEdgeIntersectData(
+                foreach (ShapeEdge.ShadHitData shadHitObject in shadHitWorkingSet) {
+                    bool intersecting = Geometry.IsIntersectingShadowEdge(
                         shadHitRect: shadHitObject.rect,
                         edgeStart: startPoint,
-                        edgeEnd: endPoint,
-                        edgeIsLeading: leading,
-                        edgeId: opaqueEdge.id
+                        edgeEnd: endPoint
                     );
 
-                    if (manifoldNullable is Geometry.Manifold manifold) {
-                        var edge = new CornerCalculator.Edge{
-                            angle = opaqueEdge.angle,
-                            direction = edgeDir,
-                            lightSource = sourceIndex,
-                            lightSide = (sbyte)(leading ? -1 : 1),
-                            id = opaqueEdge.id,
-                        };
+                    if (intersecting) {
                         boxOverlappingEdges.Add(shadHitObject.source, edge);
-                        
-                        edgeMounts.Add(edge.GetEdgeKey(), new EdgeMount{
-                            castingEntity = opaqueEdge.source,
-                            castingShapeType = ShapeType.Box,
-                            point = opaqueEdge.mount1,
-                            shapeCenter = opaqueEdge.rect.pos,
-                            //id = opaqueEdge.id1
-                        });
-                        if (opaqueEdge.mount2 is float2 mount) {
-                            edgeMounts.Add(edge.GetEdgeKey(), new EdgeMount{
-                                castingEntity = opaqueEdge.source,
-                                castingShapeType = ShapeType.Box,
-                                point = mount,
-                                shapeCenter = opaqueEdge.rect.pos,
-                                //id = opaqueEdge.id2
-                            });
-                        }
                     }
                 }
             }
@@ -343,7 +338,8 @@ public class ShadowEdgeCalculator {
                     source = opaqueEntity,
                     mount1 = sg1.contact1,
                     mount2 = sg1.contact2,
-                    id = sg1.id,
+                    id1 = sg1.id1,
+                    id2 = sg1.id2,
                     rect = rect
                 });
                 shapeEdges.Add(new ShapeEdge.OpaqueData{
@@ -351,7 +347,8 @@ public class ShadowEdgeCalculator {
                     source = opaqueEntity,
                     mount1 = sg2.contact1,
                     mount2 = sg2.contact2,
-                    id = sg2.id,
+                    id1 = sg2.id1,
+                    id2 = sg2.id2,
                     rect = rect
                 });
             }
@@ -426,7 +423,8 @@ public class ShadowEdgeCalculator {
         public float2 mount1;
         public float2? mount2;
         public float2 endpoint;
-        public int id;
+        public int id1;
+        public int? id2;
     }
 
     public IEnumerable<ShadowEdgeDebugInfo> IterShadowEdgeDebugInfo() {

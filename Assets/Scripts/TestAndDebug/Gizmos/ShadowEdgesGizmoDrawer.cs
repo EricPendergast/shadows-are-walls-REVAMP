@@ -12,25 +12,33 @@ public class ShadowEdgesGizmoDrawer : MonoBehaviour {
             var ids = new HashSet<int>();
 
             foreach (var shadowEdge in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetShadowEdgesForDebug()) {
-                int id = shadowEdge.id;
-                if (ids.Contains(id)) {
-                    Debug.LogError("Duplicate shadow edges with id: " + id);
+                void CheckId(int id) {
+                    if (ids.Contains(id)) {
+                        Debug.LogError("Duplicate shadow edges with id: " + id);
+                    }
+                    ids.Add(id);
                 }
-                ids.Add(id);
+                CheckId(shadowEdge.id1);
+                if (shadowEdge.id2 != null) {
+                    CheckId(shadowEdge.id2.Value);
+                }
 
-                id = math.abs(id);
+                void DrawMount(float2 point, int id) {
+                    id = math.abs(id);
 
-                Gizmos.color = new Color(
-                        (id % 4591 % 256)/256.0f, 
-                        (id % 5347 % 256)/265.0f,
-                        (id % 3797 % 256)/265.0f);
+                    Gizmos.color = new Color(
+                            (id % 4591 % 256)/256.0f, 
+                            (id % 5347 % 256)/265.0f,
+                            (id % 3797 % 256)/265.0f);
+                    Gizmos.DrawSphere((Vector2)point, .05f);
+                }
 
+                Gizmos.color = Color.red;
                 Gizmos.DrawLine((Vector2)shadowEdge.mount1, (Vector2)shadowEdge.endpoint);
 
-                Gizmos.DrawSphere((Vector2)shadowEdge.mount1, .05f);
+                DrawMount(shadowEdge.mount1, shadowEdge.id1);
                 if (shadowEdge.mount2 != null) {
-                    Gizmos.color = Color.green;
-                    Gizmos.DrawSphere((Vector2)shadowEdge.mount2, .05f);
+                    DrawMount(shadowEdge.mount2.Value, shadowEdge.id2.Value);
                 }
             }
         }

@@ -4,8 +4,9 @@ using Unity.Entities;
 using Unity.Mathematics;
 
 public class EdgeMountsGizmoDrawer : MonoBehaviour {
-    public float drawRadius = .3f;
     public bool enable = true;
+    public float drawRadius = .3f;
+    public bool renderMountsWithManifoldColor = true;
     void OnDrawGizmos() {
         if (Application.isPlaying && enable) {
             var world = World.DefaultGameObjectInjectionWorld;
@@ -14,7 +15,7 @@ public class EdgeMountsGizmoDrawer : MonoBehaviour {
 
             foreach (var p in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetEdgeMountsForDebug()) {
                 var (manifold, mount) = p;
-                int id = Mathf.Abs(manifold.id.GetHashCode());
+                int id = renderMountsWithManifoldColor ? Mathf.Abs(manifold.id.GetHashCode()) : Mathf.Abs(mount.id);
                 int thisMountCount;
                 if (mountCount.ContainsKey(mount.point)) {
                     thisMountCount = mountCount[mount.point]+1;

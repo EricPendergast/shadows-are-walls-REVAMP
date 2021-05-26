@@ -65,9 +65,6 @@ public struct CornerCalculator {
         // for angles larger/smaller than this edge's angle.
         public sbyte lightSide;
 
-        // TODO: this will not have an id in the future
-        public int id;
-
         public int CompareTo(Edge other) {
             if (this.lightSource == other.lightSource) {
                 return angle.CompareTo(other.angle);
@@ -100,8 +97,7 @@ public struct CornerCalculator {
         public ShapeType castingShapeType;
         public float2 shapeCenter;
         public float2 point;
-        // TODO: Implement edge mount ids
-        //public int id;
+        public int id;
     }
 
     public struct Corner {
@@ -265,7 +261,7 @@ public struct CornerCalculator {
                     continue;
                 }
             } else {
-                bool lastEdge = edgeIdx >= edges.Length || edge.lightSource != edges[edgeIdx].lightSource;
+                bool lastEdge = edgeIdx >= edges.Length - 1 || edge.lightSource != edges[edgeIdx].lightSource;
                 // This also should not happen very often. For the same reasons
                 // as above.
                 if (lastEdge) {
@@ -508,8 +504,7 @@ public struct CornerCalculator {
 
             var manifold = new ShadowEdgeManifold {
                 p = corner,
-                id = new int4(
-                    e.id,
+                id = new int3(
                     box.id,
                     boxEdge1,
                     boxEdge2

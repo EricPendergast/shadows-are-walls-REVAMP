@@ -8,7 +8,8 @@ namespace Physics.Math {
         public struct ShadowGeometry {
             public float2 contact1;
             public float2? contact2;
-            public int id;
+            public int id1;
+            public int? id2;
         }
 
         // The slop term is so that if two edges of the rect are close to the shadow edge, then both edges are stored in ShadowGeometry.
@@ -80,17 +81,23 @@ namespace Physics.Math {
 
             sg1 = new ShadowGeometry{
                 contact1 = corners[l1] + lightSource,
-                contact2 = reject1 < slop ? corners[o1] + lightSource : (float2?)null,
-                id = new float2(rect.id, 1).GetHashCode()
+                id1 = new float2(rect.id, l1).GetHashCode(),
             };
+            if (reject1 < slop) {
+                sg1.contact2 = corners[o1] + lightSource;
+                sg1.id2 = new float2(rect.id, o1).GetHashCode();
+            }
 
             float reject2 = math.abs(Lin.Cross(cornersN[l2], corners[o2]));
 
             sg2 = new ShadowGeometry{
                 contact1 = corners[l2] + lightSource,
-                contact2 = reject2 < slop ? corners[o2] + lightSource : (float2?)null,
-                id = new float2(rect.id, 2).GetHashCode()
+                id1 = new float2(rect.id, l2).GetHashCode()
             };
+            if (reject2 < slop) {
+                sg2.contact2 = corners[o2] + lightSource;
+                sg2.id2 = new float2(rect.id, o2).GetHashCode();
+            }
         }
 
         // IMPORTANT: This function extrapolates the subtracting shape so that
@@ -167,7 +174,12 @@ namespace Physics.Math {
             shadowEnd = math.min(shadowEnd, math.dot(intersection - lightOrigin, shadowDirection));
         }
 
-        public static Manifold? GetShadowEdgeIntersectData(Rect shadHitRect, float2 edgeStart, float2 edgeEnd, bool edgeIsLeading, int edgeId) {
+        // TODO: This can be implemented much better. Also it needs to account for partial shadow edges.
+        public static bool IsIntersectingShadowEdge(Rect shadHitRect, float2 edgeStart, float2 edgeEnd) {
+            return GetShadowEdgeIntersectData(shadHitRect, edgeStart, edgeEnd,  false, 0) != null;
+        }
+
+        private static Manifold? GetShadowEdgeIntersectData(Rect shadHitRect, float2 edgeStart, float2 edgeEnd, bool edgeIsLeading, int edgeId) {
             float2 edgeAxis = Lin.Cross(math.normalize(edgeEnd - edgeStart), -1) * (edgeIsLeading ? 1 : -1);
             float2 edgeMid = (edgeStart + edgeEnd)/2;
 
