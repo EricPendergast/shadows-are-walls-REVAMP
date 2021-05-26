@@ -8,19 +8,19 @@ TODOs:
 ✓7. Remove old edge manifold stuff
 ✓8. Make edge contacts not be created as often.
 ✓9. Corner contact ids
-10. Implement new multi-contact system
-11. Unbreak constraint gizmos
-11. Properly handle shadow edge ids
-10. Implement corner-box constraints
-10. Implement DataCollector for corner manifolds, and calculate contacts in ShadowCornerCalculator
-11. Implement Mass component
-12. Rename ShapeType to EdgeSource
-11. Convert certain corner manifolds into corner-box constraints
-12. Implement corner-edge constraints
-13. Convert certain corner manifolds into corner-edge constraints
-14. Fix problems with partial shadow edges
-15. Handle edge cases with wedge subtractions
-16. Clean up extra fields in ShadowEdgeConstraint
+✓10. Implement new multi-contact system
+✓11. Properly handle shadow edge ids
+12. Implement corner-box constraints
+✓13. Implement DataCollector for corner manifolds, and calculate contacts in ShadowCornerCalculator
+✓14. Implement Mass component
+15. Rename ShapeType to EdgeSource
+16. Convert certain corner manifolds into corner-box constraints
+17. Implement corner-edge constraints
+18. Convert certain corner manifolds into corner-edge constraints
+✓19. Fix problems with partial shadow edges
+20. Handle edge cases with wedge subtractions
+21. Unbreak constraint gizmos
+22. Clean up extra fields in ShadowEdgeConstraint
 
 2. Make ShadowHitting objects choose to always resolve to light areas or dark areas.
 3. Allow for overlapping shadow edges

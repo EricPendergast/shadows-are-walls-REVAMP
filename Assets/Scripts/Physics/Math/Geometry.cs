@@ -74,16 +74,37 @@ namespace Physics.Math {
             }
         }
 
-        public float2 GetVertex(int index) {
-            switch ((index % 4 + 4) % 4) {
-                case 0: return c1;
-                case 1: return c2;
-                case 2: return c3;
-                case 3: return c4;
-                default: 
+        public float2 GetEdgeDirection(int index) {
+
+            switch(index & 3 /* equivalent to index mod 4 (not remainder) */) {
+                case 0: return -width;
+                case 1: return -height;
+                case 2: return width;
+                case 3: return height;
+                default:
                     Debug.LogError("This should never happen");
-                    return float2.zero;
+                    return math.NAN;
             }
+        }
+
+        public float2 GetVertex(int index) {
+            index = index & 3;
+        
+            int heightSign = 1 - ((index >> 1) << 1);
+            int widthSign = (1 - ((index & 1) << 1))*heightSign;
+        
+            return pos + width*widthSign + height*heightSign;
+
+            // This uses fancy bitwise stuff. Original version of this function:
+            //switch (((index%4)+4)%4) {
+            //    case 0: return c1;
+            //    case 1: return c2;
+            //    case 2: return c3;
+            //    case 3: return c4;
+            //    default: 
+            //        Debug.LogError("This should never happen");
+            //        return float2.zero;
+            //}
         }
 
         public bool Contains(float2 point) {

@@ -189,6 +189,8 @@ public class ShadowEdgeCalculator {
             shadowEdgeDebugInfo.Add(new ShadowEdgeDebugInfo{endpoint = endPoint, id1 = lightEdge.id, id2 = null, mount1 = startPoint, mount2 = null});
             ///////////////
 
+            bool addedToOverlapping = false;
+
             var edge = new CornerCalculator.Edge{
                 angle = lightEdge.angle,
                 direction = lightEdge.direction,
@@ -196,25 +198,32 @@ public class ShadowEdgeCalculator {
                 lightSide = lightEdge.angle == angleCalc.MinAngle() ? (sbyte)1 : (sbyte)-1,
             };
 
-            edgeMounts.Add(edge.GetEdgeKey(), new EdgeMount {
-                castingEntity = sourceEntity,
-                castingShapeType = ShapeType.Light,
-                point = source.pos,
-                shapeCenter = source.pos,
-                id = lightEdge.id,
-            });
-
             foreach (ShapeEdge.ShadHitData shadHitObject in shadHitWorkingSet) {
                 bool intersecting = Geometry.IsIntersectingShadowEdge(
-                    shadHitRect: shadHitObject.rect,
-                    edgeStart: startPoint,
-                    edgeEnd: endPoint
+                    rect: shadHitObject.rect,
+                    lightOrigin: source.pos,
+                    shadowDirection: lightEdge.direction,
+                    shadowStart: edgeStart,
+                    shadowEnd: edgeEnd
                 );
 
                 if (intersecting) {
                     Debug.Assert(lightEdge.angle == angleCalc.MinAngle() || lightEdge.angle == angleCalc.MaxAngle());
                     boxOverlappingEdges.Add(shadHitObject.source, edge);
+                    addedToOverlapping = true;
                 }
+
+            }
+            // Only add the edge mounts if there is an object which will need
+            // them.
+            if (addedToOverlapping) {
+                edgeMounts.Add(edge.GetEdgeKey(), new EdgeMount {
+                    castingEntity = sourceEntity,
+                    castingShapeType = ShapeType.Light,
+                    point = source.pos,
+                    shapeCenter = source.pos,
+                    id = lightEdge.id,
+                });
             }
         }
     }
@@ -242,38 +251,48 @@ public class ShadowEdgeCalculator {
                 shadowEdgeDebugInfo.Add(new ShadowEdgeDebugInfo{endpoint = endPoint, id1 = opaqueEdge.id1, id2 = opaqueEdge.id2, mount1 = opaqueEdge.mount1, mount2 = opaqueEdge.mount2});
                 ///////////////
 
+                bool addedToOverlapping = false;
+
                 var edge = new CornerCalculator.Edge{
                     angle = opaqueEdge.angle,
                     direction = edgeDir,
                     lightSource = sourceIndex,
                     lightSide = (sbyte)(leading ? -1 : 1),
                 };
-                edgeMounts.Add(edge.GetEdgeKey(), new EdgeMount{
-                    castingEntity = opaqueEdge.source,
-                    castingShapeType = ShapeType.Box,
-                    point = opaqueEdge.mount1,
-                    shapeCenter = opaqueEdge.rect.pos,
-                    id = opaqueEdge.id1
-                });
-                if (opaqueEdge.mount2 is float2 mount) {
-                    edgeMounts.Add(edge.GetEdgeKey(), new EdgeMount{
-                        castingEntity = opaqueEdge.source,
-                        castingShapeType = ShapeType.Box,
-                        point = mount,
-                        shapeCenter = opaqueEdge.rect.pos,
-                        id = opaqueEdge.id2.Value
-                    });
-                }
 
                 foreach (ShapeEdge.ShadHitData shadHitObject in shadHitWorkingSet) {
                     bool intersecting = Geometry.IsIntersectingShadowEdge(
-                        shadHitRect: shadHitObject.rect,
-                        edgeStart: startPoint,
-                        edgeEnd: endPoint
+                        rect: shadHitObject.rect,
+                        lightOrigin: source.pos,
+                        shadowDirection: edgeDir,
+                        shadowStart: edgeStart,
+                        shadowEnd: edgeEnd
                     );
 
                     if (intersecting) {
                         boxOverlappingEdges.Add(shadHitObject.source, edge);
+                        addedToOverlapping = true;
+                    }
+                }
+
+                // Only add the edge mounts if there is an object which will need
+                // them.
+                if (addedToOverlapping) {
+                    edgeMounts.Add(edge.GetEdgeKey(), new EdgeMount{
+                        castingEntity = opaqueEdge.source,
+                        castingShapeType = ShapeType.Box,
+                        point = opaqueEdge.mount1,
+                        shapeCenter = opaqueEdge.rect.pos,
+                        id = opaqueEdge.id1
+                    });
+                    if (opaqueEdge.mount2 is float2 mount) {
+                        edgeMounts.Add(edge.GetEdgeKey(), new EdgeMount{
+                            castingEntity = opaqueEdge.source,
+                            castingShapeType = ShapeType.Box,
+                            point = mount,
+                            shapeCenter = opaqueEdge.rect.pos,
+                            id = opaqueEdge.id2.Value
+                        });
                     }
                 }
             }

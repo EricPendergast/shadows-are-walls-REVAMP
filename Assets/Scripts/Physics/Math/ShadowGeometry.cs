@@ -174,23 +174,68 @@ namespace Physics.Math {
             shadowEnd = math.min(shadowEnd, math.dot(intersection - lightOrigin, shadowDirection));
         }
 
-        // TODO: This can be implemented much better. Also it needs to account for partial shadow edges.
-        public static bool IsIntersectingShadowEdge(Rect shadHitRect, float2 edgeStart, float2 edgeEnd) {
-            return GetShadowEdgeIntersectData(shadHitRect, edgeStart, edgeEnd,  false, 0) != null;
-        }
+        // If the given shadow edge is partial (meaning at least one of its
+        // endpoints is inside the rect), this function moves the offending
+        // endpoints to the nearest points on the rect (along the shadow edge
+        // line). It then returns whether this modified edge is intersecting.
+        public static bool IsIntersectingShadowEdge(in Rect rect, float2 lightOrigin, float2 shadowDirection, float shadowStart, float shadowEnd) {
 
-        private static Manifold? GetShadowEdgeIntersectData(Rect shadHitRect, float2 edgeStart, float2 edgeEnd, bool edgeIsLeading, int edgeId) {
-            float2 edgeAxis = Lin.Cross(math.normalize(edgeEnd - edgeStart), -1) * (edgeIsLeading ? 1 : -1);
-            float2 edgeMid = (edgeStart + edgeEnd)/2;
+            float b0, b1;
 
-            return GetIntersectData(shadHitRect, 
-                new Rect(
-                    p: edgeMid + edgeAxis*10,
-                    w: edgeAxis * 10,
-                    h: edgeStart - edgeMid,
-                    id: edgeId
-                )
-            );
+            {
+                float2 shadowNorm = Lin.Cross(shadowDirection, 1);
+
+                var hits = new FixedList32<float>();
+
+                int SideOf(float2 vertex) {
+                    return (int)math.sign(math.dot(shadowNorm, vertex - lightOrigin));
+                }
+                float2 prevVertex = rect.GetVertex(-1);
+
+                for (int i = 0; i < 4; i++) {
+                    float2 currentVertex = rect.GetVertex(i);
+                    if (SideOf(currentVertex) != SideOf(prevVertex)) {
+                        hits.Add(Lin.IntersectionParameter(lightOrigin, shadowDirection, prevVertex, currentVertex - prevVertex));
+                    }
+                    prevVertex = currentVertex;
+                }
+
+                if (hits.Length == 0) {
+                    return false;
+                }
+                b0 = hits[0];
+                b1 = hits[0];
+                for (int i = 1; i < hits.Length; i++) {
+                    b0 = math.min(b0, hits[i]);
+                    b1 = math.max(b1, hits[i]);
+                }
+            }
+
+            {
+                if (shadowEnd <= b0 || shadowStart >= b1) {
+                    return false;
+                }
+                void SetToClosest(ref float p, float r1, float r2) {
+                    if (math.abs(p - r1) < math.abs(p - r2)) {
+                        p = r1;
+                    } else {
+                        p = r2;
+                    }
+                }
+                // At this point, shadowStart < b1 and shadowEnd > b0
+                if (shadowStart > b0) { // if shadowStart is in the box
+                    SetToClosest(ref shadowStart, b0, b1);
+                }
+                if (shadowEnd < b1) { // if shadowEnd is in the box
+                    SetToClosest(ref shadowEnd, b0, b1);
+                }
+
+                if (shadowEnd <= b0 || shadowStart >= b1) {
+                    return false;
+                }
+
+                return true;
+            }
         }
     }
 }

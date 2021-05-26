@@ -31,5 +31,28 @@ namespace Physics.Math {
         public static bool IsFinite(float2 vec) {
             return math.isfinite(vec.x) && math.isfinite(vec.y);
         }
+
+        // Gives the parameters u and v such that:
+        //     p1 + u*p1Dir = p2 + v*p2Dir
+        public static float2 IntersectionParameters(float2 p1, float2 p1Dir, float2 p2, float2 p2Dir) {
+            float2 d = p2 - p1;
+            float det = Lin.Cross(p2Dir, p1Dir);
+            
+            float u = Lin.Cross(p2Dir, d) / det;
+            float v = Lin.Cross(p1Dir, d) / det;
+
+            return new float2(u, v);
+        }
+
+        // Does the same as IntersectionParameters except it only returns the u
+        // parameter.
+        public static float IntersectionParameter(float2 p1, float2 p1Dir, float2 p2, float2 p2Dir) {
+            float2 d = p2 - p1;
+            float det = Lin.Cross(p2Dir, p1Dir);
+            
+            float u = Lin.Cross(p2Dir, d) / det;
+
+            return u;
+        }
     }
 }
