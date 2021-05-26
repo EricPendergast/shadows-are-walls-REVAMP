@@ -5,16 +5,14 @@ using Unity.Mathematics;
 using Physics.Math;
 using UnityEngine;
 
-using ContactId = Physics.Math.Geometry.ContactId;
-
 using ShadowCornerManifold = ShadowEdgeGenerationSystem.ShadowCornerManifold;
 
 public struct ShadowCornerConstraint : IConstraint {
-    // TODO: Much of these fields don't need to be stored
-    // The non opaque object
+    // The owner of the first shadow edge
     public Entity e1 {get;}
-    // The opaque object
+    // The owner of the second shadow edge
     public Entity e2 {get;}
+    // The owner of the shadow hitting object, or the third shadow edge
     public Entity e3 {get;}
     private Lambdas accum;
     public Lambdas GetAccumulatedLambdas() {
@@ -32,72 +30,123 @@ public struct ShadowCornerConstraint : IConstraint {
         Breadth
     }
 
-    public void Complete(ref ComponentDataFromEntity<Box> boxes, ref ComponentDataFromEntity<LightSource> lights) {
+    public ShadowCornerConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt) {
+        e1 = p.e1;
+        e2 = p.e2;
+        e3 = p.e3;
 
+        Float9 M_inv = new Float9(masses[e1].M_inv, masses[e2].M_inv, masses[e3].M_inv);
+        id = p.id;
+        penConstraint = new PenetrationConstraint<Float9>(p.J_n, M_inv, p.bias/dt);
+        this.M_inv = M_inv;
+
+        accum = new Lambdas();
     }
 
     public struct Partial {
         public Entity e1;
         public Entity e2;
         public Entity e3;
-        public ShapeType e1Type;
-        public ShapeType e2Type;
-        public ShapeType e3Type;
-        Float9 jacobian;
-    }
+        public int id;
 
-    public static void GetPartialConstraints(in ShadowCornerManifold m, ref NativeList<Partial> constraints) {
-        Partial partialInit;
-        partialInit.e1 = m.e1;
-        partialInit.e2 = m.e2;
-        partialInit.e3 = m.e3;
+        public Float9 J_n;
+        public float bias;
 
-        Float9 J_n = new Float9();
-
-        ResolveMode resolveMode;
-        float delta;
-        {
-            float depth = Lin.IsFinite(m.p) ?
-                math.dot(m.p - m.s, m.n) :
-                -math.INFINITY;
-        
-            float2 breadthVec = m.p1 - m.p2;
-        
-            float breadth = Lin.IsFinite(breadthVec) ? -math.length(breadthVec) : -math.INFINITY;
-        
-            if (depth >= breadth) {
-                delta = depth;
-                resolveMode = ResolveMode.Depth;
-            } else {
-                delta = breadth;
-                resolveMode = ResolveMode.Breadth;
+        private static void HandleMount(in CornerCalculator.EdgeMount mount, ref float3 J_n_part, in ShadowCornerManifold m) {
+            if (mount.castingShapeType == ShapeType.Box) {
+                float2 velMult = Lin.Cross(1, mount.point - m.x1)/math.lengthsq(mount.point - m.x1);
+                float angVelMult = math.dot(mount.point - mount.shapeCenter, mount.point - m.x1)/math.lengthsq(mount.point - m.x1);
+                J_n_part = new float3(
+                    J_n_part.z * velMult,
+                    J_n_part.z * angVelMult
+                );
             }
         }
-        Debug.Assert(Lin.IsFinite(delta));
 
-        if (resolveMode == ResolveMode.Depth) {
-            // partial of delta wrt alpha1 = (-d_2 * n) * (d_1 cross d_2) * mag(p - x1)
-            // partial of delta wrt alpha2 = (-d_1 * n) * (d_2 cross d_1) * mag(p - x2)
-            // partial of delta wrt x_3 = -n
-            // partial of delta wrt alpha3 = -(p-x_3) cross n
-            
-            //float2 d_1 = math.normalize(m. - x_1);
-            //float2 d_2 = math.normalize(m.lightSource2 - x_2);
-            //float2 p = m.lineOppositeCorner;
-            J_n = new Float9(
-                new float3(0, 0, (-math.dot(m.d2, m.n) * Lin.Cross(m.d2, m.d1) * math.length(m.p - m.x1))),
-                new float3(0, 0, (-math.dot(m.d1, m.n) * Lin.Cross(m.d1, m.d2) * math.length(m.p - m.x2))),
-                new float3(-m.n, -Lin.Cross(m.p - m.x3, m.n))
-            );
-        } else {
-            J_n = new Float9(
-                new float3(0, 0, math.dot(m.s - m.x1, m.n)/(math.lengthsq(m.d1)*math.lengthsq(m.n))),
-                new float3(0, 0, math.dot(m.s - m.x2, m.n)/(math.lengthsq(m.d2)*math.lengthsq(m.n))),
-                new float3(
-                    (Lin.Cross(m.d1, m.n) + Lin.Cross(m.d2, m.n))*m.n,
-                    Lin.Cross(m.p1 - m.x3, Lin.Cross(m.n, 1)) +
-                        Lin.Cross(m.p2 - m.x3, Lin.Cross(m.n, 1)))
-            );
+        // Use contact between three shadow edges
+        public Partial(in Prototype p, in CornerCalculator.EdgeMount em1, in CornerCalculator.EdgeMount em2, in CornerCalculator.EdgeMount em3, in ShadowCornerManifold m) {
+            e1 = em1.castingEntity;
+            e2 = em2.castingEntity;
+            e3 = em3.castingEntity;
+            id = em1.id ^ em2.id ^ em3.id ^ 406325; // Arbitrary number
+            J_n = p.J_n;
+            bias = p.bias;
+
+            HandleMount(in em1, ref J_n.v1, in m);
+            HandleMount(in em2, ref J_n.v2, in m);
+            HandleMount(in em3, ref J_n.v3, in m);
+        }
+
+        // Use contact between 2 shadow edges and a rigidbody
+        public Partial(in Prototype p, in CornerCalculator.EdgeMount em1, in CornerCalculator.EdgeMount em2, Entity e3, in ShadowCornerManifold m) {
+            e1 = em1.castingEntity;
+            e2 = em2.castingEntity;
+            this.e3 = e3;
+            id = new int2(m.contactIdOnBox, em1.id ^ em2.id).GetHashCode() ^ 98034; // Arbitrary number
+            J_n = p.J_n;
+            bias = p.bias;
+        }
+
+        public struct Prototype {
+            public float bias;
+            public Float9 J_n;
+
+            public Prototype(in ShadowCornerManifold m) {
+                ResolveMode resolveMode;
+                float delta;
+                {
+                    float depth = Lin.IsFinite(m.p) ?
+                        math.dot(m.p - m.s, m.n) :
+                        -math.INFINITY;
+                
+                    float2 breadthVec = m.p1 - m.p2;
+                
+                    //float breadth = Lin.IsFinite(breadthVec) ? -math.length(breadthVec) : -math.INFINITY;
+                    float breadth = Lin.IsFinite(breadthVec) ? Lin.Cross(breadthVec, m.n) : -math.INFINITY;
+                
+                    // Resolve whichever quantity has smaller magnitude
+                    if (math.abs(depth) <= math.abs(breadth)) {
+                        delta = depth;
+                        resolveMode = ResolveMode.Depth;
+                    } else {
+                        delta = breadth;
+                        resolveMode = ResolveMode.Breadth;
+                    }
+                }
+                Debug.Assert(Lin.IsFinite(delta));
+
+                if (resolveMode == ResolveMode.Depth) {
+                    // partial of delta wrt alpha1 = (-d_2 * n) * (d_1 cross d_2) * mag(p - x1)
+                    // partial of delta wrt alpha2 = (-d_1 * n) * (d_2 cross d_1) * mag(p - x2)
+                    // partial of delta wrt x_3 = -n
+                    // partial of delta wrt alpha3 = -(p-x_3) cross n
+                    
+                    J_n = new Float9(
+                        new float3(0, 0, (-math.dot(m.d2, m.n) * Lin.Cross(m.d2, m.d1) * math.length(m.p - m.x1))),
+                        new float3(0, 0, (-math.dot(m.d1, m.n) * Lin.Cross(m.d1, m.d2) * math.length(m.p - m.x2))),
+                        new float3(-m.n, -Lin.Cross(m.p - m.x3, m.n))
+                    );
+                } else {
+                    J_n = new Float9(
+                        new float3(0, 0, -math.dot(m.s - m.x1, m.n)/(math.lengthsq(math.dot(m.d1, m.n)))),
+                        new float3(0, 0, math.dot(m.s - m.x2, m.n)/(math.lengthsq(math.dot(m.d2, m.n)))),
+                        new float3(
+                            (Lin.Cross(m.d1, m.n) + Lin.Cross(m.d2, m.n))*m.n,
+                            Lin.Cross(m.p1 - m.x3, Lin.Cross(m.n, 1)) +
+                                Lin.Cross(m.p2 - m.x3, Lin.Cross(m.n, 1)))
+                    ).Mult(-math.sign(delta));
+                    delta = -math.abs(delta);
+                }
+
+                float beta = CollisionSystem.positionCorrection ? .1f : 0;
+                float delta_slop = -.01f;
+
+                bias = 0;
+
+                if (delta < delta_slop) {
+                    bias = beta * (delta - delta_slop);
+                }
+            }
         }
     }
 

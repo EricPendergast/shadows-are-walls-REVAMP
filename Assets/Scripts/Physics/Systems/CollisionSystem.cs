@@ -5,6 +5,7 @@ using System.Collections.Generic;
 
 using BoxBoxConstraintManager = ConstraintManager<BoxBoxConstraintHelper, StandardConstraint>;
 using ShadowEdgeConstraintManager = ConstraintManager<ShadowEdgeConstraintHelper, ShadowEdgeConstraint>;
+using ShadowCornerConstraintManager = ConstraintManager<ShadowCornerConstraintHelper, ShadowCornerConstraint>;
 
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
 [UpdateAfter(typeof(ShadowEdgeGenerationSystem))]
@@ -21,6 +22,7 @@ public class CollisionSystem : SystemBase {
 
     private BoxBoxConstraintManager boxBoxCM;
     private ShadowEdgeConstraintManager shadowEdgeCM;
+    private ShadowCornerConstraintManager shadowCornerCM;
 
     protected override void OnCreate() {
         boxesQuery = GetEntityQuery(typeof(Box));
@@ -29,11 +31,13 @@ public class CollisionSystem : SystemBase {
 
         boxBoxCM = new BoxBoxConstraintManager();
         shadowEdgeCM = new ShadowEdgeConstraintManager();
+        shadowCornerCM = new ShadowCornerConstraintManager();
     }
 
     protected override void OnDestroy() {
         boxBoxCM.Dispose();
         shadowEdgeCM.Dispose();
+        shadowCornerCM.Dispose();
     }
 
     protected override void OnUpdate() {
@@ -64,19 +68,32 @@ public class CollisionSystem : SystemBase {
             dt: dt
         );
 
+        shadowCornerCM.helper.Update(
+            vels: velocities,
+            boxes: boxes,
+            lightSources: lightSources,
+            partialConstraints: World.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetPartialCornerConstraints(),
+            masses: masses,
+            dt: dt
+        );
+
         boxBoxCM.FindConstraints();
         shadowEdgeCM.FindConstraints();
+        shadowCornerCM.FindConstraints();
 
         boxBoxCM.PreSteps(dt);
         shadowEdgeCM.PreSteps(dt);
+        shadowCornerCM.PreSteps(dt);
 
         for (int i = 0; i < 10; i++) {
             boxBoxCM.ApplyImpulses(dt);
             shadowEdgeCM.ApplyImpulses(dt);
+            shadowCornerCM.ApplyImpulses(dt);
         }
 
         boxBoxCM.PostSteps();
         shadowEdgeCM.PostSteps();
+        shadowCornerCM.PostSteps();
 
 
         boxEntities.Dispose();

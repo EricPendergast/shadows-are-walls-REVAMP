@@ -9,7 +9,6 @@ public struct LightSource : IComponentData {
     public float2 pos;
 
     public float rot;
-    public float inertia;
     public float aperture;
 
     public int id;

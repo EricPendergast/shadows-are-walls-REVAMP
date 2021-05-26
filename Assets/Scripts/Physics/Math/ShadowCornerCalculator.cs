@@ -19,17 +19,27 @@ public struct CornerCalculator {
 
     public struct Outputs {
         public NativeList<ShadowEdgeConstraint.Partial>? partialEdgeConstraints;
-        public NativeList<ShadowCornerManifold>? cornerManifolds;
+        public NativeList<ShadowCornerConstraint.Partial>? partialCornerConstraints;
 
         [BurstDiscard]
         public List<ShadowEdgeManifold> debugEdgeManifoldCollector {get; set;}
         [BurstDiscard]
+        public List<ShadowCornerManifold> debugCornerManifolds {get; set;}
+        [BurstDiscard]
         public List<System.ValueTuple<ShadowEdgeManifold, EdgeMount>> debugEdgeMounts {get; set;}
+        [BurstDiscard]
+        public List<System.ValueTuple<ShadowCornerManifold, EdgeMount, EdgeMount>> debugCornerMounts {get; set;}
 
         [BurstDiscard]
         public void DebugCollect(ShadowEdgeManifold m) {
             if (debugEdgeManifoldCollector != null) {
                 debugEdgeManifoldCollector.Add(m);
+            }
+        }
+        [BurstDiscard]
+        public void DebugCollect(ShadowCornerManifold m) {
+            if (debugCornerManifolds != null) {
+                debugCornerManifolds.Add(m);
             }
         }
 
@@ -39,15 +49,21 @@ public struct CornerCalculator {
                 debugEdgeMounts.Add(new System.ValueTuple<ShadowEdgeManifold, EdgeMount>(manifold, mount));
             }
         }
+        [BurstDiscard]
+        public void DebugCollect(ShadowCornerManifold manifold, EdgeMount mount1, EdgeMount mount2) {
+            if (debugCornerMounts != null) {
+                debugCornerMounts.Add(new System.ValueTuple<ShadowCornerManifold, EdgeMount, EdgeMount>(manifold, mount1, mount2));
+            }
+        }
 
         public void Collect(in ShadowEdgeConstraint.Partial c) {
             if (partialEdgeConstraints != null) {
                 partialEdgeConstraints.Value.Add(c);
             }
         }
-        public void Collect(in ShadowCornerManifold m) {
-            if (partialEdgeConstraints != null) {
-                cornerManifolds.Value.Add(m);
+        public void Collect(in ShadowCornerConstraint.Partial c) {
+            if (partialCornerConstraints != null) {
+                partialCornerConstraints.Value.Add(c);
             }
         }
     }
@@ -79,6 +95,10 @@ public struct CornerCalculator {
 
             public bool Equals(EdgeKey o) {
                 return lightSource == o.lightSource && angle == o.angle;
+            }
+
+            public override int GetHashCode() {
+                return lightSource ^ angle.GetHashCode();
             }
         }
 
@@ -504,11 +524,11 @@ public struct CornerCalculator {
 
             var manifold = new ShadowEdgeManifold {
                 p = corner,
-                id = new int3(
+                contactIdOn2 = new int3(
                     box.id,
                     boxEdge1,
                     boxEdge2
-                ).GetHashCode() ^ 30345, //Arbitrary number. Don't use anywhere else.
+                ).GetHashCode(),
                 x1 = lightSource,
                 d1 = e.direction,
                 e2 = boxEntity,
@@ -526,7 +546,53 @@ public struct CornerCalculator {
                 o.Collect(p);
                 o.DebugCollect(manifold, mount);
             }
-        }// else {
+        } else {
+            int lineIdx = edge1Idx;
+            int shadowEdge1Idx = edge2Idx;
+            int shadowEdge2Idx = edge3Idx;
+        
+            Edge shadowEdge1 = edges[shadowEdge1Idx];
+            Edge shadowEdge2 = edges[shadowEdge2Idx];
+
+            var m = new ShadowCornerManifold {
+                d1 = shadowEdge1.direction,
+                x1 = lights[shadowEdge1.lightSource].pos,
+
+                d2 = shadowEdge2.direction,
+                x2 = lights[shadowEdge2.lightSource].pos,
+               
+                p1 = Intersection(lineIdx, shadowEdge1Idx, treatAsRays:true),
+                p2 = Intersection(lineIdx, shadowEdge2Idx, treatAsRays:true),
+                p = Intersection(shadowEdge1Idx, shadowEdge2Idx, treatAsRays:true),
+            };
+            if (lineIdx < 0) {
+                float2 boxEdgeP1 = box.GetVertex(lineIdx);
+                float2 boxEdgeP2 = box.GetVertex(lineIdx+1);
+
+                m.contactIdOnBox = new int2(box.id, lineIdx).GetHashCode();
+        
+                // This works because rect vertices wind counterclockwise
+                m.n = Lin.Cross(math.normalize(boxEdgeP2 - boxEdgeP1), 1);
+                m.s = boxEdgeP1;
+
+                m.x3 = box.pos;
+
+                var prototype = new ShadowCornerConstraint.Partial.Prototype(m);
+
+                o.DebugCollect(m);
+                // TODO: Check if edge mounts will participate
+                foreach (EdgeMount mount1 in It.Iterate(edgeMounts, shadowEdge1.GetEdgeKey())) {
+                    foreach (EdgeMount mount2 in It.Iterate(edgeMounts, shadowEdge2.GetEdgeKey())) {
+                        var p = new ShadowCornerConstraint.Partial(in prototype, in mount1, in mount2, boxEntity, in m);
+                        o.Collect(p);
+                        o.DebugCollect(m, mount1, mount2);
+                    }
+                }
+            } else {
+                // TODO: Three shadow edges case
+            }
+
+        }
             // 1 box or shadow edge, 2 shadow edges.
             // This is handling 2 cases at once, since the cases are very similar
         //    int lineIdx = edge1Idx;

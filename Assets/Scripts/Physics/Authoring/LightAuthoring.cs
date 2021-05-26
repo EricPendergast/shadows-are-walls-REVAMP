@@ -35,7 +35,6 @@ public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
         return new LightSource {
                 pos = (Vector2)transform.position,
                 rot = transform.eulerAngles.z*Mathf.Deg2Rad,
-                inertia = inertia,
                 aperture = aperture * Mathf.Deg2Rad,
                 maxEdgeId = Random.Range(1, int.MaxValue),
                 minEdgeId = Random.Range(1, int.MaxValue),

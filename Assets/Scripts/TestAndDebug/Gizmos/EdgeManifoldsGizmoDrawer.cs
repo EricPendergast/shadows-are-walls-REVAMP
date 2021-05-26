@@ -14,11 +14,11 @@ public class EdgeManifoldsGizmoDrawer : MonoBehaviour {
             foreach (var manifold in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetEdgeManifoldsForDebug()) {
                 Gizmos.color = Color.red;
                 Gizmos.DrawRay((Vector2)manifold.p, (Vector2)manifold.n);
-                int id = Mathf.Abs(manifold.id.GetHashCode());
+                int id = Mathf.Abs(manifold.contactIdOn2.GetHashCode());
                 // Indicates there is a duplicate contact. This should never happen
                 Debug.Assert(!set.Contains(id), "Duplicate edge manifolds with id " + id);
                 float m = set.Contains(id) ? 5 : 1;
-                set.Add(manifold.id);
+                set.Add(manifold.contactIdOn2);
                 
                 Gizmos.color = new Color(
                         (id % 4591 % 256)/256.0f, 

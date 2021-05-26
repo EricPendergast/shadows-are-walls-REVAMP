@@ -4,7 +4,7 @@ using Unity.Entities;
 using Physics.Math;
 using Unity.Mathematics;
 
-public class CornerContactsGizmoDrawer : MonoBehaviour {
+public class CornerManifoldsGizmoDrawer : MonoBehaviour {
     public bool enable = true;
     void OnDrawGizmos() {
         if (Application.isPlaying && enable) {
@@ -13,7 +13,7 @@ public class CornerContactsGizmoDrawer : MonoBehaviour {
             var set = new HashSet<int>();
 
             foreach (var manifold in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetCornerManifoldsForDebug()) {
-                int id = Mathf.Abs(manifold.id.GetHashCode());
+                int id = Mathf.Abs(manifold.contactIdOnBox);
                 // Indicates there is a duplicate contact. This should never happen
                 float m = set.Contains(id) ? 5 : 1;
                 set.Add(id);

@@ -30,48 +30,15 @@ public class ShadowEdgeGenerationSystem : SystemBase {
 
         // Contact point
         public float2 p;
-        public int id;
+        // Unique id for the point of contact on the shadow hitting object.
+        public int contactIdOn2;
     }
 
     public struct ShadowCornerManifold {
-        //public Entity castingEntity1;
-        public Entity e1;
-        //public ShapeType castingEntity1Type;
-        public ShapeType e1Type;
-        //public float2 e1Mount1;
-        public float2 c1;
-        //public float2? e1Mount2;
-        public float2? c1_prime;
-        //public float2 casting1Corner;
-        //public float2 lightSource1;
         public float2 x1;
         public float2 d1;
-        //
-        //public Entity castingEntity2;
-        public Entity e2;
-        //public ShapeType castingEntity2Type;
-        public ShapeType e2Type;
-        //public float2 e2Mount1;
-        public float2 c2;
-        //public float2? e2Mount2;
-        public float2? c2_prime;
-        //public float2 casting2Corner;
-        //public float2 lightSource2;
         public float2 x2;
         public float2 d2;
-        //
-        //public Entity lineEntity;
-        //public bool lineIsShadowEdge;
-        //public ShapeType lineEntityCastingType;
-        //// Can be any point on the line
-        //public float2 linePoint;
-        //public float2 lineOppositeCorner;
-        //public float2 lineLightSource;
-        //// This can be the mount point of a shadow edge, or the center point of
-        //// a box, or the origin of a light edge
-        //public float2 lineMount1;
-        //public float2? lineMount2;
-        public Entity e3;
         public float2 x3;
         public float2 s;
 
@@ -80,14 +47,14 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         public float2 p2;
 
         public float2 n;
-        public int id;
+        // This is only used if shape number 3 is not a shadow edge
+        public int contactIdOnBox;
     }
 
     Dictionary<Entity, ShadowEdgeCalculator> lightManagers;
 
-    NativeList<ShadowCornerManifold> finalShadowCornerManifolds;
-
     NativeList<ShadowEdgeConstraint.Partial> partialEdgeConstraints;
+    NativeList<ShadowCornerConstraint.Partial> partialCornerConstraints;
 
     // TODO: This will replace some of the above stuff
     NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges;
@@ -102,7 +69,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         shadHitBoxesQuery = GetEntityQuery(typeof(Box), typeof(HitShadowsObject));
         lightManagers = new Dictionary<Entity, ShadowEdgeCalculator>();
 
-        finalShadowCornerManifolds = new NativeList<ShadowCornerManifold>(Allocator.Persistent);
+        partialCornerConstraints = new NativeList<ShadowCornerConstraint.Partial>(Allocator.Persistent);
         partialEdgeConstraints = new NativeList<ShadowEdgeConstraint.Partial>(Allocator.Persistent);
 
         boxOverlappingEdges = new NativeMultiHashMap<Entity, CornerCalculator.Edge>(0, Allocator.Persistent);
@@ -113,7 +80,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
 
     protected override void OnDestroy() {
         Clear(lightManagers);
-        finalShadowCornerManifolds.Dispose();
+        partialCornerConstraints.Dispose();
         partialEdgeConstraints.Dispose();
 
         boxOverlappingEdges.Dispose();
@@ -129,7 +96,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         var boxOverlappingEdges = this.boxOverlappingEdges;
         var edgeMounts = this.edgeMounts;
         var partialEdgeConstraints = this.partialEdgeConstraints;
-        var finalShadowCornerManifolds = this.finalShadowCornerManifolds;
+        var partialCornerConstraints = this.partialCornerConstraints;
 
         lightSources.Clear();
         lightAngleCalculators.Clear();
@@ -171,7 +138,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
 
         // Step 5: Store all non illuminated manifolds
 
-        finalShadowCornerManifolds.Clear();
+        partialCornerConstraints.Clear();
         partialEdgeConstraints.Clear();
 
         Entities.WithAll<Box, HitShadowsObject>()
@@ -187,7 +154,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
                     ref edgeMounts,
                     new CornerCalculator.Outputs{
                         partialEdgeConstraints = partialEdgeConstraints,
-                        cornerManifolds = finalShadowCornerManifolds
+                        partialCornerConstraints = partialCornerConstraints
                     }
                 );
             }).Run();
@@ -230,14 +197,6 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         return ret;
     }
 
-    public List<ShadowCornerManifold> GetCornerManifoldsForDebug() {
-        var ret = new List<ShadowCornerManifold>();
-        foreach (var item in finalShadowCornerManifolds) {
-            ret.Add(item);
-        }
-        return ret;
-    }
-
     public List<ShadowEdgeManifold> GetEdgeManifoldsForDebug() {
         var ret = new List<ShadowEdgeManifold>();
         ComputeCornersForDebug(
@@ -248,11 +207,31 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         return ret;
     }
 
+    public List<ShadowCornerManifold> GetCornerManifoldsForDebug() {
+        var ret = new List<ShadowCornerManifold>();
+        ComputeCornersForDebug(
+            new CornerCalculator.Outputs{
+                debugCornerManifolds = ret
+            }
+        );
+        return ret;
+    }
+
     public List<(ShadowEdgeManifold, CornerCalculator.EdgeMount)> GetEdgeMountsForDebug() {
         var ret = new List<(ShadowEdgeManifold, CornerCalculator.EdgeMount)>();
         ComputeCornersForDebug(
             new CornerCalculator.Outputs{
                 debugEdgeMounts = ret
+            }
+        );
+        return ret;
+    }
+
+    public List<(ShadowCornerManifold, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount)> GetCornerMountsForDebug() {
+        var ret = new List<(ShadowCornerManifold, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount)>();
+        ComputeCornersForDebug(
+            new CornerCalculator.Outputs{
+                debugCornerMounts = ret
             }
         );
         return ret;
@@ -276,6 +255,10 @@ public class ShadowEdgeGenerationSystem : SystemBase {
 
     public NativeList<ShadowEdgeConstraint.Partial> GetPartialEdgeConstraints() {
         return partialEdgeConstraints;
+    }
+
+    public NativeList<ShadowCornerConstraint.Partial> GetPartialCornerConstraints() {
+        return partialCornerConstraints;
     }
 
     //public IEnumerable<float2> GetRenderPoints(Entity lightSource) {
