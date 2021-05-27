@@ -2,7 +2,7 @@ using Unity.Entities;
 using Unity.Collections;
 
 
-// The corresponding constraing manager for this struct looks like this:
+// The corresponding constraint manager for this struct looks like this:
 //using ShadowCornerConstraintManager = ConstraintManager<ShadowCornerConstraintHelper, ShadowCornerConstraint>;
 
 public struct ShadowCornerConstraintHelper : ConstraintManagerHelper<ShadowCornerConstraint> {

@@ -148,7 +148,7 @@ public class ShadowEdgeCalculator {
             } else if (edge.type == ShapeEdge.Owner.Opaque) {
                 HandleOpaqueEdge(edge.opaqueData, ref boxOverlappingEdges, ref edgeMounts);
             } else if (edge.type == ShapeEdge.Owner.ShadHit) {
-                HandleShadHitEdge(in edge.shadHitData, ref boxOverlappingEdges, ref edgeMounts);
+                HandleShadHitEdge(in edge.shadHitData, ref boxOverlappingEdges);
             }
         }
     }
@@ -303,7 +303,7 @@ public class ShadowEdgeCalculator {
         }
     }
 
-    private void HandleShadHitEdge(in ShapeEdge.ShadHitData shadHitEdge, ref NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges, ref EdgeMountsMap edgeMounts) {
+    private void HandleShadHitEdge(in ShapeEdge.ShadHitData shadHitEdge, ref NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges) {
         bool removed = TryRemove(ref shadHitWorkingSet, shadHitEdge.source);
         if (!removed) {
             shadHitWorkingSet.Add(shadHitEdge);

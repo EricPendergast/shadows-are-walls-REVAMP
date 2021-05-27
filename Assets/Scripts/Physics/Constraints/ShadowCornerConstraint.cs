@@ -52,10 +52,11 @@ public struct ShadowCornerConstraint : IConstraint {
         public Float9 J_n;
         public float bias;
 
-        private static void HandleMount(in CornerCalculator.EdgeMount mount, ref float3 J_n_part, in ShadowCornerManifold m) {
+        private static void HandleMount(in CornerCalculator.EdgeMount mount, ref float3 J_n_part, float2 x) {
             if (mount.castingShapeType == ShapeType.Box) {
-                float2 velMult = Lin.Cross(1, mount.point - m.x1)/math.lengthsq(mount.point - m.x1);
-                float angVelMult = math.dot(mount.point - mount.shapeCenter, mount.point - m.x1)/math.lengthsq(mount.point - m.x1);
+                Debug.Log("Doing edge stuff");
+                float2 velMult = Lin.Cross(1, mount.point - x)/math.lengthsq(mount.point - x);
+                float angVelMult = math.dot(mount.point - mount.shapeCenter, mount.point - x)/math.lengthsq(mount.point - x);
                 J_n_part = new float3(
                     J_n_part.z * velMult,
                     J_n_part.z * angVelMult
@@ -72,9 +73,9 @@ public struct ShadowCornerConstraint : IConstraint {
             J_n = p.J_n;
             bias = p.bias;
 
-            HandleMount(in em1, ref J_n.v1, in m);
-            HandleMount(in em2, ref J_n.v2, in m);
-            HandleMount(in em3, ref J_n.v3, in m);
+            HandleMount(in em1, ref J_n.v1, m.x1);
+            HandleMount(in em2, ref J_n.v2, m.x2);
+            HandleMount(in em3, ref J_n.v3, m.x3);
         }
 
         // Use contact between 2 shadow edges and a rigidbody
@@ -85,6 +86,9 @@ public struct ShadowCornerConstraint : IConstraint {
             id = new int2(m.contactIdOnBox, em1.id ^ em2.id).GetHashCode() ^ 98034; // Arbitrary number
             J_n = p.J_n;
             bias = p.bias;
+
+            HandleMount(in em1, ref J_n.v1, m.x1);
+            HandleMount(in em2, ref J_n.v2, m.x2);
         }
 
         public struct Prototype {
@@ -108,9 +112,11 @@ public struct ShadowCornerConstraint : IConstraint {
                     if (math.abs(depth) <= math.abs(breadth)) {
                         delta = depth;
                         resolveMode = ResolveMode.Depth;
+                        Debug.Log("depth");
                     } else {
                         delta = breadth;
                         resolveMode = ResolveMode.Breadth;
+                        Debug.Log("breadth");
                     }
                 }
                 Debug.Assert(Lin.IsFinite(delta));
@@ -127,13 +133,29 @@ public struct ShadowCornerConstraint : IConstraint {
                         new float3(-m.n, -Lin.Cross(m.p - m.x3, m.n))
                     );
                 } else {
+
+                    float s_n_mag = math.dot(m.s - m.x3, m.n);
+                    float2 s_n = m.n * s_n_mag;
+                    float2 n_perp = Lin.Cross(m.n, -1);
+
+                    float alpha_3_part_1 =
+                        (Lin.Cross(n_perp, m.d1)*Lin.Cross(m.d1, n_perp)*s_n_mag -
+                            Lin.Cross(m.d1, m.x3 + s_n - m.x1)*Lin.Cross(m.d1, m.n))/
+                        math.lengthsq(Lin.Cross(n_perp, m.d1));
+
+                    float alpha_3_part_2 =
+                        (Lin.Cross(n_perp, m.d2)*Lin.Cross(m.d2, n_perp)*s_n_mag -
+                            Lin.Cross(m.d2, m.x3 + s_n - m.x2)*Lin.Cross(m.d2, m.n))/
+                        math.lengthsq(Lin.Cross(n_perp, m.d2));
+
                     J_n = new Float9(
                         new float3(0, 0, -math.dot(m.s - m.x1, m.n)/(math.lengthsq(math.dot(m.d1, m.n)))),
                         new float3(0, 0, math.dot(m.s - m.x2, m.n)/(math.lengthsq(math.dot(m.d2, m.n)))),
+
                         new float3(
-                            (Lin.Cross(m.d1, m.n) + Lin.Cross(m.d2, m.n))*m.n,
-                            Lin.Cross(m.p1 - m.x3, Lin.Cross(m.n, 1)) +
-                                Lin.Cross(m.p2 - m.x3, Lin.Cross(m.n, 1)))
+                            (Lin.Cross(m.d1, m.n) - Lin.Cross(m.d2, m.n))*m.n,
+                            -alpha_3_part_1 + alpha_3_part_2
+                        )
                     ).Mult(-math.sign(delta));
                     delta = -math.abs(delta);
                 }

@@ -11,6 +11,8 @@ public class EdgeMountsGizmoDrawer : MonoBehaviour {
     public bool renderEdgeMounts = true;
     public bool renderCornerMounts = true;
 
+    public bool drawManifoldS = false;
+
     void OnDrawGizmos() {
         if (Application.isPlaying && enable) {
             var world = World.DefaultGameObjectInjectionWorld;
@@ -60,8 +62,10 @@ public class EdgeMountsGizmoDrawer : MonoBehaviour {
                     DrawMount(mount1, id1);
                     DrawMount(mount2, id2);
 
-                    //Gizmos.color = Color.red;
-                    //Gizmos.DrawSphere((Vector2)manifold.s, .3f);
+                    if (drawManifoldS) {
+                        Gizmos.color = Color.red;
+                        Gizmos.DrawSphere((Vector2)manifold.s, .3f);
+                    }
                 }
             }
         }
