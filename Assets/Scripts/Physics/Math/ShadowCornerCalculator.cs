@@ -114,7 +114,7 @@ public struct CornerCalculator {
     // TODO: Might want to make this have an optional second contact
     public struct EdgeMount {
         public Entity castingEntity;
-        public ShapeType castingShapeType;
+        public EdgeSourceType castingShapeType;
         public float2 shapeCenter;
         public float2 point;
         public int id;

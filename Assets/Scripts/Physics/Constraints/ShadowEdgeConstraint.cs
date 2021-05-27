@@ -47,7 +47,7 @@ public struct ShadowEdgeConstraint : IConstraint {
             id = new int2(m.contactIdOn2, mount.id).GetHashCode();
             J_n = p.J_n;
             bias = p.bias;
-            if (mount.castingShapeType == ShapeType.Box) {
+            if (mount.castingShapeType == EdgeSourceType.Box) {
                 float2 velMult = Lin.Cross(1, mount.point - m.x1)/math.lengthsq(mount.point - m.x1);
                 float angVelMult = math.dot(mount.point - mount.shapeCenter, mount.point - m.x1)/math.lengthsq(mount.point - m.x1);
                 J_n.v1 = new float3(

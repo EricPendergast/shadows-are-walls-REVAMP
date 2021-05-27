@@ -53,8 +53,7 @@ public struct ShadowCornerConstraint : IConstraint {
         public float bias;
 
         private static void HandleMount(in CornerCalculator.EdgeMount mount, ref float3 J_n_part, float2 x) {
-            if (mount.castingShapeType == ShapeType.Box) {
-                Debug.Log("Doing edge stuff");
+            if (mount.castingShapeType == EdgeSourceType.Box) {
                 float2 velMult = Lin.Cross(1, mount.point - x)/math.lengthsq(mount.point - x);
                 float angVelMult = math.dot(mount.point - mount.shapeCenter, mount.point - x)/math.lengthsq(mount.point - x);
                 J_n_part = new float3(
@@ -112,11 +111,9 @@ public struct ShadowCornerConstraint : IConstraint {
                     if (math.abs(depth) <= math.abs(breadth)) {
                         delta = depth;
                         resolveMode = ResolveMode.Depth;
-                        Debug.Log("depth");
                     } else {
                         delta = breadth;
                         resolveMode = ResolveMode.Breadth;
-                        Debug.Log("breadth");
                     }
                 }
                 Debug.Assert(Lin.IsFinite(delta));

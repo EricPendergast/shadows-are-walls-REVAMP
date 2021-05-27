@@ -274,8 +274,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
 
 }
 
-// TODO: Rename this to EdgeSource
-public enum ShapeType : byte {
+public enum EdgeSourceType : byte {
     Box, Light
 }
 

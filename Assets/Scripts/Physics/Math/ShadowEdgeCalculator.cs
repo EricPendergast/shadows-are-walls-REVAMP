@@ -219,7 +219,7 @@ public class ShadowEdgeCalculator {
             if (addedToOverlapping) {
                 edgeMounts.Add(edge.GetEdgeKey(), new EdgeMount {
                     castingEntity = sourceEntity,
-                    castingShapeType = ShapeType.Light,
+                    castingShapeType = EdgeSourceType.Light,
                     point = source.pos,
                     shapeCenter = source.pos,
                     id = lightEdge.id,
@@ -280,7 +280,7 @@ public class ShadowEdgeCalculator {
                 if (addedToOverlapping) {
                     edgeMounts.Add(edge.GetEdgeKey(), new EdgeMount{
                         castingEntity = opaqueEdge.source,
-                        castingShapeType = ShapeType.Box,
+                        castingShapeType = EdgeSourceType.Box,
                         point = opaqueEdge.mount1,
                         shapeCenter = opaqueEdge.rect.pos,
                         id = opaqueEdge.id1
@@ -288,7 +288,7 @@ public class ShadowEdgeCalculator {
                     if (opaqueEdge.mount2 is float2 mount) {
                         edgeMounts.Add(edge.GetEdgeKey(), new EdgeMount{
                             castingEntity = opaqueEdge.source,
-                            castingShapeType = ShapeType.Box,
+                            castingShapeType = EdgeSourceType.Box,
                             point = mount,
                             shapeCenter = opaqueEdge.rect.pos,
                             id = opaqueEdge.id2.Value
