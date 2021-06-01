@@ -53,9 +53,11 @@ public struct ShadowCornerConstraint : IConstraint {
         public float bias;
 
         private static void HandleMount(in CornerCalculator.EdgeMount mount, ref float3 J_n_part, float2 x) {
+            float2 c = mount.point;
+            float2 xPrime = mount.shapeCenter;
             if (mount.castingShapeType == EdgeSourceType.Box) {
-                float2 velMult = Lin.Cross(1, mount.point - x)/math.lengthsq(mount.point - x);
-                float angVelMult = math.dot(mount.point - mount.shapeCenter, mount.point - x)/math.lengthsq(mount.point - x);
+                float2 velMult = Lin.Cross(1, c - x)/math.lengthsq(c - x);
+                float angVelMult = math.dot(c - xPrime, c - x)/math.lengthsq(c - x);
                 J_n_part = new float3(
                     J_n_part.z * velMult,
                     J_n_part.z * angVelMult
@@ -125,38 +127,74 @@ public struct ShadowCornerConstraint : IConstraint {
                     // partial of delta wrt alpha3 = -(p-x_3) cross n
                     
                     J_n = new Float9(
-                        new float3(0, 0, (-math.dot(m.d2, m.n) * Lin.Cross(m.d2, m.d1) * math.length(m.p - m.x1))),
-                        new float3(0, 0, (-math.dot(m.d1, m.n) * Lin.Cross(m.d1, m.d2) * math.length(m.p - m.x2))),
+                        new float3(0, 0, 
+                            (math.dot(m.d2, m.n) * Lin.Cross(m.d2, m.x1 - m.x2) /
+                                math.lengthsq(Lin.Cross(m.d1, m.d2)))),
+                        new float3(0, 0, 
+                            (-math.dot(m.d1, m.n) * Lin.Cross(m.d1, m.x1 - m.x2) /
+                                math.lengthsq(Lin.Cross(m.d1, m.d2)))),
                         new float3(-m.n, -Lin.Cross(m.p - m.x3, m.n))
                     );
                 } else {
+                    float2 n = m.n;
+                    float2 x1 = m.x1;
+                    float2 x2 = m.x2;
+                    float2 x3 = m.x3;
+                    float2 s = m.s;
+                    float2 d1 = m.d1;
+                    float2 d2 = m.d2;
 
-                    float s_n_mag = math.dot(m.s - m.x3, m.n);
-                    float2 s_n = m.n * s_n_mag;
-                    float2 n_perp = Lin.Cross(m.n, -1);
+                    float sigma = -1;
+                    if (delta > 0) {
+                        sigma = 1;
+                        delta = -delta;
+                    }
+                    bool a = math.dot(m.p2 - m.p1, Lin.Cross(n, sigma)) <= 0;
+                    Debug.Assert(a);
+                    if (!a) {
+                        Debug.Log("Bad");
+                    }
 
-                    float alpha_3_part_1 =
-                        (Lin.Cross(n_perp, m.d1)*Lin.Cross(m.d1, n_perp)*s_n_mag -
-                            Lin.Cross(m.d1, m.x3 + s_n - m.x1)*Lin.Cross(m.d1, m.n))/
-                        math.lengthsq(Lin.Cross(n_perp, m.d1));
+                    float sMag = math.dot(m.s - m.x3, m.n);
 
-                    float alpha_3_part_2 =
-                        (Lin.Cross(n_perp, m.d2)*Lin.Cross(m.d2, n_perp)*s_n_mag -
-                            Lin.Cross(m.d2, m.x3 + s_n - m.x2)*Lin.Cross(m.d2, m.n))/
-                        math.lengthsq(Lin.Cross(n_perp, m.d2));
+                    float dAlpha1 = sigma * (sMag + math.dot(n, x3 - x1)) /
+                        math.lengthsq(math.dot(m.d1, m.n));
+                    float dAlpha2 = -sigma * (sMag + math.dot(n, x3 - x2)) /
+                        math.lengthsq(math.dot(d2, n));
+
+                    float dAlpha3 = sigma * (
+                        -Lin.Cross(n, d1)*Lin.Cross(n*sMag - x1 + x3, d1) /
+                            math.lengthsq(math.dot(d1, n)) +
+                        Lin.Cross(n, d2)*Lin.Cross(n*sMag - x2 + x3, d2) /
+                            math.lengthsq(math.dot(d2, n))
+                    );
+
+                    float2 dX3 = sigma * n * Lin.Cross(d2, d1) / (math.dot(d1, n) * math.dot(d2, n));
 
                     J_n = new Float9(
-                        new float3(0, 0, -math.dot(m.s - m.x1, m.n)/(math.lengthsq(math.dot(m.d1, m.n)))),
-                        new float3(0, 0, math.dot(m.s - m.x2, m.n)/(math.lengthsq(math.dot(m.d2, m.n)))),
-
-                        new float3(
-                            (Lin.Cross(m.d1, m.n) - Lin.Cross(m.d2, m.n))*m.n,
-                            -alpha_3_part_1 + alpha_3_part_2
-                        )
-                    ).Mult(-math.sign(delta));
-                    delta = -math.abs(delta);
+                        new float3(0, 0, dAlpha1),
+                        new float3(0, 0, dAlpha2),
+                        new float3(dX3, dAlpha3)
+                    );
                 }
 
+                // An attempt to solve the opaque corner bug. Forces the two
+                // edges to resolve in such a way that a sphere tangent to both
+                // edges will move along the normal. This didn't work.
+                //if (Lin.IsFinite(m.p)) {
+                //    float2 b = math.normalize(-m.d1 - m.d2);
+                //    float2 k = m.p + b / math.abs(Lin.Cross(m.d1, b));
+                //    float2 omega_n = new float2(
+                //        Lin.Cross(m.d1, m.n) / math.dot(m.d1, k - m.x1),
+                //        Lin.Cross(m.d2, m.n) / math.dot(m.d2, k - m.x2)
+                //    );
+                //
+                //    if (math.lengthsq(omega_n) > .00001) {
+                //        float2 omegaNew = math.project(new float2(J_n.v1.z, J_n.v2.z), omega_n);
+                //        J_n.v1.z = omegaNew.x;
+                //        J_n.v2.z = omegaNew.y;
+                //    }
+                //}
                 float beta = CollisionSystem.positionCorrection ? .1f : 0;
                 float delta_slop = -.01f;
 

@@ -13,7 +13,8 @@ public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
     public float angularVelocity;
 
     public float mass = 1;
-    //public float inertia = .1f;
+    public bool fixPosition = false;
+    public bool fixRotation = false;
 
     public float width = 1;
     public float height = 1;
@@ -23,7 +24,10 @@ public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
     public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem) {
         float w = transform.localScale.x*width;
         float h = transform.localScale.y*height;
-        var inertia = mass*(w*w + h*h)/12;
+        var inertia = fixRotation ? Mathf.Infinity : this.mass*(w*w + h*h)/12;
+        var mass = fixPosition ? Mathf.Infinity : this.mass;
+        var gravityScale = fixPosition ? 0 : this.gravityScale;
+
         dstManager.AddComponentData(entity, 
             new Box {
                 pos = (Vector2)transform.position,

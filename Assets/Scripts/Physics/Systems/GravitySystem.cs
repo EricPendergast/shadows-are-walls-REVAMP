@@ -4,6 +4,7 @@ using Unity.Collections;
 using Unity.Mathematics;
 
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
+[UpdateAfter(typeof(PrePhysicsSystemGroup))]
 public class GravitySystem : SystemBase {
     protected override void OnUpdate() {
         float2 gravityAccel = new float2(0, -10f);

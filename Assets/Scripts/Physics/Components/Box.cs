@@ -10,7 +10,7 @@ public struct Box : IComponentData {
 
     public float mass;
     public float inertia;
-
+    
     public float width;
     public float height;
 
