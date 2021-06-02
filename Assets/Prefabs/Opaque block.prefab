@@ -50,6 +50,8 @@ MonoBehaviour:
   velocity: {x: 0, y: 0}
   angularVelocity: 0
   mass: 5
+  fixPosition: 0
+  fixRotation: 0
   width: 1
   height: 1
   gravityScale: 1

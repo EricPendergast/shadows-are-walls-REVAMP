@@ -19,6 +19,9 @@ TODOs:
 ✓22. Clean up extra fields in ShadowEdgeConstraint
 ✓23. Rename ShapeType to EdgeSource
 
+✓24. Implement a Jacobian debugger.
+25. Remove the mass fields from Box and LightSource
+
 15. Remove edge mounts past the contact point when calculating partial constraints
 20. Handle edge cases with wedge subtractions (when wedge center is inside of the island)
 17. Implement corner-shadowedge constraints

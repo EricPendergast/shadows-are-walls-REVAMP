@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 6694085602743877399}
   - component: {fileID: 6694085602743877401}
   - component: {fileID: 6694085602743877398}
+  - component: {fileID: 8514780731496454372}
   m_Layer: 0
   m_Name: GizmoDrawers
   m_TagString: Untagged
@@ -118,3 +119,17 @@ MonoBehaviour:
   renderMountsWithManifoldColor: 1
   renderEdgeMounts: 1
   renderCornerMounts: 1
+  drawManifoldS: 0
+--- !u!114 &8514780731496454372
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6694085602743877405}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 99a9080ce8995d3c9bf32dc0d257de5c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  enable: 1

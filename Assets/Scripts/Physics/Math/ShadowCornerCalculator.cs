@@ -15,6 +15,8 @@ using Utilities;
 using ShadowEdgeManifold = ShadowEdgeGenerationSystem.ShadowEdgeManifold;
 using ShadowCornerManifold = ShadowEdgeGenerationSystem.ShadowCornerManifold;
 
+using CornerMountTuple = System.ValueTuple<ShadowEdgeGenerationSystem.ShadowCornerManifold, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount, ShadowCornerConstraint.Partial>;
+
 public struct CornerCalculator {
 
     public struct Outputs {
@@ -28,7 +30,7 @@ public struct CornerCalculator {
         [BurstDiscard]
         public List<System.ValueTuple<ShadowEdgeManifold, EdgeMount>> debugEdgeMounts {get; set;}
         [BurstDiscard]
-        public List<System.ValueTuple<ShadowCornerManifold, EdgeMount, EdgeMount>> debugCornerMounts {get; set;}
+        public List<CornerMountTuple> debugCornerMounts {get; set;}
 
         [BurstDiscard]
         public void DebugCollect(ShadowEdgeManifold m) {
@@ -50,9 +52,9 @@ public struct CornerCalculator {
             }
         }
         [BurstDiscard]
-        public void DebugCollect(ShadowCornerManifold manifold, EdgeMount mount1, EdgeMount mount2) {
+        public void DebugCollect(ShadowCornerManifold manifold, EdgeMount mount1, EdgeMount mount2, ShadowCornerConstraint.Partial partial) {
             if (debugCornerMounts != null) {
-                debugCornerMounts.Add(new System.ValueTuple<ShadowCornerManifold, EdgeMount, EdgeMount>(manifold, mount1, mount2));
+                debugCornerMounts.Add(new CornerMountTuple(manifold, mount1, mount2, partial));
             }
         }
 
@@ -585,7 +587,7 @@ public struct CornerCalculator {
                     foreach (EdgeMount mount2 in It.Iterate(edgeMounts, shadowEdge2.GetEdgeKey())) {
                         var p = new ShadowCornerConstraint.Partial(in prototype, in mount1, in mount2, boxEntity, in m);
                         o.Collect(p);
-                        o.DebugCollect(m, mount1, mount2);
+                        o.DebugCollect(m, mount1, mount2, p);
                     }
                 }
             } else {

@@ -1,12 +1,9 @@
-Multi contacts tasks:
-    1. Compute edge mounts
-
-How to handle ids:
-    The id of a shadow edge contact should encompass:
-        1. The id of the casting object
-        2. The id of where the edge is mounted on the casting object
-        3. The id of the ShadowHitting object
-        4. The id of where the edge is hitting the ShadowHitting object
-
-    Notice that the shadow edge itself does not have an id.
-    (1) and (2) will be encompassed by EdgeMount.id
+Jacobian debugger:
+    How can I represent the Jacobian in an understandable way? 
+    Idea 1: Show the result of position correction
+        Have bias and t on sliders from 0 to 1
+        For each constraint,
+            constraint.bias = bias
+            Velocity vel = 0;
+            constraint.ApplyImpulse(vel);
+            draw elements at time t with position pos + vel*t

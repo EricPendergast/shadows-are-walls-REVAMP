@@ -10,6 +10,8 @@ using Utilities;
 using EdgeMountsMap = Unity.Collections.NativeMultiHashMap<CornerCalculator.Edge.EdgeKey, CornerCalculator.EdgeMount>;
 using EdgeMount = CornerCalculator.EdgeMount;
 
+using CornerMountTuple = System.ValueTuple<ShadowEdgeGenerationSystem.ShadowCornerManifold, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount, ShadowCornerConstraint.Partial>;
+
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
 [UpdateAfter(typeof(GravitySystem))]
 public class ShadowEdgeGenerationSystem : SystemBase {
@@ -227,8 +229,8 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         return ret;
     }
 
-    public List<(ShadowCornerManifold, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount)> GetCornerMountsForDebug() {
-        var ret = new List<(ShadowCornerManifold, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount)>();
+    public List<CornerMountTuple> GetCornerMountsForDebug() {
+        var ret = new List<CornerMountTuple>();
         ComputeCornersForDebug(
             new CornerCalculator.Outputs{
                 debugCornerMounts = ret

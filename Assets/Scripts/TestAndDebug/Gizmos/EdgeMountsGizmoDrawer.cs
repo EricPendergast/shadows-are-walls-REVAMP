@@ -51,7 +51,7 @@ public class EdgeMountsGizmoDrawer : MonoBehaviour {
             }
 
             if (renderCornerMounts) {
-                foreach (var (manifold, mount1, mount2) in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetCornerMountsForDebug()) {
+                foreach (var (manifold, mount1, mount2, _) in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetCornerMountsForDebug()) {
                     int id1 = Mathf.Abs(mount1.id);
                     int id2 = Mathf.Abs(mount2.id);
 

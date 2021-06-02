@@ -52,11 +52,11 @@ public struct ShadowCornerConstraint : IConstraint {
         public Float9 J_n;
         public float bias;
 
-        private static void HandleMount(in CornerCalculator.EdgeMount mount, ref float3 J_n_part, float2 x) {
+        private static void HandleMount(in CornerCalculator.EdgeMount mount, ref float3 J_n_part, float2 x, float2 d) {
             float2 c = mount.point;
             float2 xPrime = mount.shapeCenter;
             if (mount.castingShapeType == EdgeSourceType.Box) {
-                float2 velMult = Lin.Cross(1, c - x)/math.lengthsq(c - x);
+                float2 velMult = Lin.Cross(1, d) / math.dot(c - x, d);
                 float angVelMult = math.dot(c - xPrime, c - x)/math.lengthsq(c - x);
                 J_n_part = new float3(
                     J_n_part.z * velMult,
@@ -66,18 +66,18 @@ public struct ShadowCornerConstraint : IConstraint {
         }
 
         // Use contact between three shadow edges
-        public Partial(in Prototype p, in CornerCalculator.EdgeMount em1, in CornerCalculator.EdgeMount em2, in CornerCalculator.EdgeMount em3, in ShadowCornerManifold m) {
-            e1 = em1.castingEntity;
-            e2 = em2.castingEntity;
-            e3 = em3.castingEntity;
-            id = em1.id ^ em2.id ^ em3.id ^ 406325; // Arbitrary number
-            J_n = p.J_n;
-            bias = p.bias;
-
-            HandleMount(in em1, ref J_n.v1, m.x1);
-            HandleMount(in em2, ref J_n.v2, m.x2);
-            HandleMount(in em3, ref J_n.v3, m.x3);
-        }
+        //public Partial(in Prototype p, in CornerCalculator.EdgeMount em1, in CornerCalculator.EdgeMount em2, in CornerCalculator.EdgeMount em3, in ShadowCornerManifold m) {
+        //    e1 = em1.castingEntity;
+        //    e2 = em2.castingEntity;
+        //    e3 = em3.castingEntity;
+        //    id = em1.id ^ em2.id ^ em3.id ^ 406325; // Arbitrary number
+        //    J_n = p.J_n;
+        //    bias = p.bias;
+        //
+        //    HandleMount(in em1, ref J_n.v1, m.x1, m.d1);
+        //    HandleMount(in em2, ref J_n.v2, m.x2, m.d2);
+        //    HandleMount(in em3, ref J_n.v3, m.x3, m.);
+        //}
 
         // Use contact between 2 shadow edges and a rigidbody
         public Partial(in Prototype p, in CornerCalculator.EdgeMount em1, in CornerCalculator.EdgeMount em2, Entity e3, in ShadowCornerManifold m) {
@@ -88,15 +88,20 @@ public struct ShadowCornerConstraint : IConstraint {
             J_n = p.J_n;
             bias = p.bias;
 
-            HandleMount(in em1, ref J_n.v1, m.x1);
-            HandleMount(in em2, ref J_n.v2, m.x2);
+            HandleMount(in em1, ref J_n.v1, m.x1, m.d1);
+            HandleMount(in em2, ref J_n.v2, m.x2, m.d2);
         }
 
         public struct Prototype {
             public float bias;
             public Float9 J_n;
 
-            public Prototype(in ShadowCornerManifold m) {
+            public Prototype(in ShadowCornerManifold m) : 
+                this(m: in m,
+                   beta: CollisionSystem.positionCorrection ? .1f : 0,
+                   delta_slop: -.01f) {
+            }
+            public Prototype(in ShadowCornerManifold m, float beta, float delta_slop) {
                 ResolveMode resolveMode;
                 float delta;
                 {
@@ -195,9 +200,6 @@ public struct ShadowCornerConstraint : IConstraint {
                 //        J_n.v2.z = omegaNew.y;
                 //    }
                 //}
-                float beta = CollisionSystem.positionCorrection ? .1f : 0;
-                float delta_slop = -.01f;
-
                 bias = 0;
 
                 if (delta < delta_slop) {
@@ -236,13 +238,23 @@ public struct ShadowCornerConstraint : IConstraint {
     private void ApplyImpulse(Float9 impulse, ref Velocity v1, ref Velocity v2, ref Velocity v3) {
         impulse = impulse.Mult(M_inv);
 
-        v1.vel += impulse.v1.xy;
-        v1.angVel += impulse.v1.z;
+        v1 += impulse.v1;
 
-        v2.vel += impulse.v2.xy;
-        v2.angVel += impulse.v2.z;
+        v2 += impulse.v2;
 
-        v3.vel += impulse.v3.xy;
-        v3.angVel += impulse.v3.z;
+        v3 += impulse.v3;
+
+        if (e1 == e2) {
+            v1 += impulse.v2;
+            v2 += impulse.v1;
+        }
+        if (e1 == e3) {
+            v1 += impulse.v3;
+            v3 += impulse.v1;
+        }
+        if (e2 == e3) {
+            v2 += impulse.v3;
+            v3 += impulse.v2;
+        }
     }
 }
