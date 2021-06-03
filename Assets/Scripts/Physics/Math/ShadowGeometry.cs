@@ -178,7 +178,7 @@ namespace Physics.Math {
         // endpoints is inside the rect), this function moves the offending
         // endpoints to the nearest points on the rect (along the shadow edge
         // line). It then returns whether this modified edge is intersecting.
-        public static bool IsIntersectingShadowEdge(in Rect rect, float2 lightOrigin, float2 shadowDirection, float shadowStart, float shadowEnd) {
+        public static bool IsIntersectingShadowEdge(in Rect rect, float2 lightOrigin, float2 shadowDirection, float shadowStart, float shadowEnd, bool correctPartialIntersection) {
 
             float b0, b1;
 
@@ -212,6 +212,9 @@ namespace Physics.Math {
             }
 
             {
+                if (!correctPartialIntersection) {
+                    return shadowEnd > b0 && shadowStart < b1;
+                }
                 if (shadowEnd <= b0 || shadowStart >= b1) {
                     return false;
                 }

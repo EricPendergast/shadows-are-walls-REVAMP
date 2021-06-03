@@ -1,9 +1,0 @@
-Jacobian debugger:
-    How can I represent the Jacobian in an understandable way? 
-    Idea 1: Show the result of position correction
-        Have bias and t on sliders from 0 to 1
-        For each constraint,
-            constraint.bias = bias
-            Velocity vel = 0;
-            constraint.ApplyImpulse(vel);
-            draw elements at time t with position pos + vel*t

@@ -101,9 +101,6 @@ public class JacobianGizmoDrawer : MonoBehaviour {
                     }
                 }
 
-                void AddToVelocity(Entity e, Velocity vAdd) {
-                    velocities[e] = GetVelocity(e) + vAdd;
-                }
                 void SetVelocity(Entity e, Velocity v) {
                     velocities[e] = v;
                 }

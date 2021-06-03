@@ -123,7 +123,12 @@ public struct ShadowCornerConstraint : IConstraint {
                         resolveMode = ResolveMode.Breadth;
                     }
                 }
-                Debug.Assert(Lin.IsFinite(delta));
+                if (!math.isfinite(delta)) {
+                    Debug.Assert(false, "ShadowCornerConstraint has infinite penetration");
+                    J_n = new Float9(0,0,0);
+                    bias = 0;
+                    return;
+                }
 
                 if (resolveMode == ResolveMode.Depth) {
                     // partial of delta wrt alpha1 = (-d_2 * n) * (d_1 cross d_2) * mag(p - x1)

@@ -41,6 +41,12 @@ public class CollisionSystem : SystemBase {
     }
 
     protected override void OnUpdate() {
+        // Don't start doing stuff until the second frame. This is useful
+        // because when you start the game paused, the first frame is always
+        // executed before the pause occurs.
+        if (Time.ElapsedTime == 0) {
+            return;
+        }
         NativeArray<Entity> boxEntities = boxesQuery.ToEntityArray(Allocator.TempJob);
         NativeArray<Entity> hitShadBoxEntities = hitShadBoxesQuery.ToEntityArray(Allocator.TempJob);
         NativeArray<Entity> lightSourceEntities = lightSourcesQuery.ToEntityArray(Allocator.TempJob);
@@ -51,7 +57,7 @@ public class CollisionSystem : SystemBase {
         var lightSources = GetComponentDataFromEntity<LightSource>(false);
 
         float dt = Time.DeltaTime;
-
+        
         boxBoxCM.helper.Update(
             boxes: boxes,
             boxVels: velocities,

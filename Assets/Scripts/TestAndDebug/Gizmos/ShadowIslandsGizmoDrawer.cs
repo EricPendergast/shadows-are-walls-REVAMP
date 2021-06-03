@@ -6,6 +6,9 @@ using Corner = CornerCalculator.Corner;
 
 public class ShadowIslandsGizmoDrawer : MonoBehaviour {
     public bool enable = true;
+    [Range(-1, 15)]
+    public int onlyDrawIslandsWithIndex = -1;
+
     void OnDrawGizmos() {
         if (Application.isPlaying && enable) {
             var world = World.DefaultGameObjectInjectionWorld;
@@ -16,11 +19,13 @@ public class ShadowIslandsGizmoDrawer : MonoBehaviour {
                 return;
             }
             Corner islandStartCorner = corners[0];
+            int islandIndex = 0;
 
             for (int i = 0; i < corners.Count-1; i++) {
                 Corner current = corners[i];
                 if (islandStartCorner.isNull) {
                     islandStartCorner = current;
+                    islandIndex++;
                 }
                 Corner next = corners[i+1];
                 if (next.isNull) {
@@ -29,8 +34,10 @@ public class ShadowIslandsGizmoDrawer : MonoBehaviour {
                     islandStartCorner = Corner.Null;
                 }
 
-                Gizmos.color = Color.red;
-                Gizmos.DrawLine((Vector2)current.point, (Vector2)next.point);
+                if (onlyDrawIslandsWithIndex == -1 || islandIndex == onlyDrawIslandsWithIndex) {
+                    Gizmos.color = Color.red;
+                    Gizmos.DrawLine((Vector2)current.point, (Vector2)next.point);
+                }
             }
         }
     }

@@ -76,6 +76,7 @@ public struct CornerCalculator {
     }
 
     public struct Edge : System.IComparable<Edge> {
+        public bool isIlluminationTag;
         public int lightSource;
         public float angle;
         public float2 direction;
@@ -124,11 +125,11 @@ public struct CornerCalculator {
 
     public struct Corner {
         public float2 point;
-        public int nextEdge;
         public int prevEdge;
+        public int nextEdge;
         public bool isNull;
 
-        public Corner(int nextEdge, int prevEdge, float2 point) {
+        public Corner(int prevEdge, int nextEdge, float2 point) {
             this.nextEdge = nextEdge;
             this.prevEdge = prevEdge;
             this.point = point;
@@ -143,24 +144,6 @@ public struct CornerCalculator {
         }
 
         public static Corner Null => new Corner{isNull = true};
-    }
-
-    private struct Wedge {
-        public float angleNegative;
-        public float anglePositive;
-        public int negativeEdge;
-        public int positiveEdge;
-        public int lightSource;
-        public int SideOf(float angle) {
-            Debug.Assert(angleNegative < anglePositive);
-            if (angle < angleNegative) {
-                return -1;
-            } else if (angle > anglePositive) {
-                return 1;
-            } else {
-                return 0;
-            }
-        }
     }
     private NativeArray<LightSource> lights;
     private NativeArray<AngleCalculator> lightAngleCalculators;
@@ -265,138 +248,93 @@ public struct CornerCalculator {
         edges.Sort();
         for (int edgeIdx = 0; edgeIdx < edges.Length; edgeIdx++) {
             var edge = edges[edgeIdx];
+            
+            islandsAlternate.Clear();
+            ClipIslands(in islands, ref islandsAlternate, edgeIdx);
 
-            Wedge wedge;
-            if (edge.lightSide == -1) {
-                bool firstEdge = edgeIdx == 0 || edge.lightSource != edges[edgeIdx-1].lightSource;
-                // This should not happen very often. This might happen if
-                // shapes are deeply overlapping.
-                if (firstEdge) {
-                    wedge = new Wedge{
-                        angleNegative = -math.INFINITY,
-                        anglePositive = edge.angle,
-                        negativeEdge = 1337,
-                        positiveEdge = edgeIdx,
-                        lightSource = edge.lightSource
-                    };
-                } else {
-                    continue;
-                }
-            } else {
-                bool lastEdge = edgeIdx >= edges.Length - 1 || edge.lightSource != edges[edgeIdx].lightSource;
-                // This also should not happen very often. For the same reasons
-                // as above.
-                if (lastEdge) {
-                    wedge = new Wedge{
-                        angleNegative = edge.angle,
-                        anglePositive = math.INFINITY,
-                        negativeEdge = edgeIdx,
-                        positiveEdge = 1337,
-                        lightSource = edge.lightSource
-                    };
-                } else {
-                    var nextEdge = edges[edgeIdx+1];
-                    wedge = new Wedge{
-                        angleNegative = edge.angle,
-                        anglePositive = nextEdge.angle,
-                        negativeEdge = edgeIdx,
-                        positiveEdge = edgeIdx+1,
-                        lightSource = edge.lightSource
-                    };
+            bool isLastEdge = edgeIdx >= edges.Length - 1 || edge.lightSource != edges[edgeIdx+1].lightSource;
+            if (!isLastEdge) {
+                var nextEdge = edges[edgeIdx+1];
+                if (nextEdge.lightSide == -1) {
+                    // In this case, nextEdge cancels out edge. So we add its
+                    // clipped islands as well. This works because of the set
+                    // theoretical fact:
+                    //     I - (A intersect B) == (I - A) union (I - B)
+                    // Where
+                    //     I is the region enclosed in an island
+                    //     A is the illuminated half plane for 'edge'
+                    //     B is the illuminated half plane for 'nextEdge'
+                    //
+                    // ClipIslands(I, I_out, E) gives the result I_out = I_out union (I - E)
+                    ClipIslands(in islands, ref islandsAlternate, edgeIdx+1);
+                    edgeIdx++;
                 }
             }
-            
-            SplitIslands(ref islands, ref islandsAlternate, wedge);
+
             islands = islandsAlternate;
         }
     }
 
-    private void SplitIslands(ref FixedList512<Corner> islands, ref FixedList512<Corner> islandsOut, Wedge wedge) {
-        islandsOut.Clear();
+    private void ClipIslands(in FixedList512<Corner> islands, ref FixedList512<Corner> islandsOut, int clipEdgeIdx) {
         for (int i = 0; i < islands.Length; i++) {
             if (i == 0 || islands[i - 1].isNull) {
-                SplitIsland(ref islands, i, ref islandsOut, wedge);
+                ClipIsland(in islands, i, ref islandsOut, clipEdgeIdx);
             }
         }
     }
 
-    private void SplitIsland(ref FixedList512<Corner> islands, int islandStart, ref FixedList512<Corner> islandsOut, Wedge wedge) {
-        var islandNegOut = new FixedList512<Corner>();
-        var islandPosOut = new FixedList512<Corner>();
+    private void ClipIsland(in FixedList512<Corner> islands, int islandStart, ref FixedList512<Corner> islandsOut, int clipEdgeIdx) {
+        Edge edge = edges[clipEdgeIdx];
+        // If the edge is an illumination tag, then the edge illuminates
+        // everything, so we don't create any new islands.
+        if (edge.isIlluminationTag) {
+            return;
+        }
+        float2 lightPos = lights[edge.lightSource].pos;
+        var angleCalculator = lightAngleCalculators[edge.lightSource];
 
-        var angleCalculator = lightAngleCalculators[wedge.lightSource];
+        float2 lightNormal = angleCalculator.NormalTowardsLight(edge.direction, edge.lightSide);
+
+        bool IsClipped(float2 point) {
+            return math.dot(point - lightPos, lightNormal) > 0;
+        }
 
         for (int i = islandStart; true; i++) {
-            var corner = islands[i];
-            if (corner.isNull) {
+            var c1 = islands[i];
+            if (c1.isNull) {
                 break;
             }
-            var nextCorner = islands[i+1];
-            if (nextCorner.isNull) {
-                nextCorner = islands[islandStart];
+            var c2 = islands[i+1];
+            if (c2.isNull) {
+                c2 = islands[islandStart];
             }
 
-            var angle = angleCalculator.Angle(corner.point);
-            var nextAngle = angleCalculator.Angle(nextCorner.point);
+            bool clip1 = IsClipped(c1.point);
+            bool clip2 = IsClipped(c2.point);
 
-            int side = wedge.SideOf(angle);
-            int nextSide = wedge.SideOf(nextAngle);
-
-            if (side == -1) {
-                islandNegOut.Add(corner);
-            } else if (side == 1) {
-                islandPosOut.Add(corner);
-            }
-
-            if (nextSide != side) {
-                // If the edge connecting corner and nextCorner crosses the
-                // wedge's negative edge, create a corner at that intersection.
-                if (side == -1 || nextSide == -1) {
-                    int nextEdge;
-                    int prevEdge;
-                    if (nextSide == -1) {// Going to the negative side
-                        nextEdge = corner.nextEdge;
-                        prevEdge = wedge.negativeEdge;
-                    } else {// Coming from the negative side
-                        nextEdge = wedge.negativeEdge;
-                        prevEdge = corner.nextEdge;
-                    }
-                    islandNegOut.Add(new Corner(
-                        nextEdge: nextEdge,
-                        prevEdge: prevEdge,
-                        point: Intersection(nextEdge, prevEdge)
-                    ));
-                } 
-                if (side == 1 || nextSide == 1) {
-                    int nextEdge;
-                    int prevEdge;
-                    if (nextSide == 1) { // Going to the positive side
-                        nextEdge = corner.nextEdge;
-                        prevEdge = wedge.positiveEdge;
-                    } else { // Coming from the positive side
-                        nextEdge = wedge.positiveEdge;
-                        prevEdge = corner.nextEdge;
-                    }
-                    islandPosOut.Add(new Corner(
-                        nextEdge: nextEdge,
-                        prevEdge: prevEdge,
-                        point: Intersection(nextEdge, prevEdge)
-                    ));
-                }
+            if (!clip1 && clip2) {
+                islandsOut.Add(c1);
+                int prevEdge = c1.nextEdge;
+                int nextEdge = clipEdgeIdx;
+                islandsOut.Add(new Corner(
+                    prevEdge: prevEdge,
+                    nextEdge: nextEdge,
+                    point: Intersection(prevEdge, nextEdge)
+                ));
+            } else if (clip1 && !clip2) {
+                int prevEdge = clipEdgeIdx;
+                int nextEdge = c1.nextEdge;
+                islandsOut.Add(new Corner(
+                    prevEdge: prevEdge,
+                    nextEdge: nextEdge,
+                    point: Intersection(prevEdge, nextEdge)
+                ));
+            } else if (!clip1 && !clip2) {
+                islandsOut.Add(c1);
             }
         }
 
-        if (islandNegOut.Length > 0) {
-            foreach (var item in islandNegOut) {
-                islandsOut.Add(item);
-            }
-            islandsOut.Add(Corner.Null);
-        }
-
-        if (islandPosOut.Length > 0) {
-            foreach (var item in islandPosOut) {
-                islandsOut.Add(item);
-            }
+        if (islandsOut.Length > 0 && !islandsOut.ElementAt(islandsOut.Length - 1).isNull) {
             islandsOut.Add(Corner.Null);
         }
     }
