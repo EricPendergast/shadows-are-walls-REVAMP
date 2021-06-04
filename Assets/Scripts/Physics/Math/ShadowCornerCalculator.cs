@@ -382,11 +382,14 @@ public struct CornerCalculator {
             EdgeCornerIdx? worstPairIdx = null;
             float maxCost = -math.INFINITY;
 
+            float2 edgeNorm = -edgeLightAngleCalc.NormalTowardsLight(edge.direction, edge.lightSide);
+
             for (int corner2Idx = islandStart; !islands[corner2Idx].isNull; corner2Idx++) {
                 Corner corner = islands[corner2Idx];
 
-                float cost = edgeLightAngleCalc.CostOfRotationTo(edge.direction, corner.point) * -edge.lightSide;
+                //float cost = edgeLightAngleCalc.CostOfRotationTo(edge.direction, corner.point) * -edge.lightSide;
 
+                float cost = math.dot(edgeNorm, corner.point);
                 if (cost > maxCost) {
                     maxCost = cost;
                     worstPairIdx = new EdgeCornerIdx{edgeFirstCornerIdx = edgeFirstCornerIdx, cornerIdx = corner2Idx};
