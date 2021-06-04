@@ -6767,6 +6767,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: -87.15
       objectReference: {fileID: 0}
+    - target: {fileID: 1995005348454554817, guid: d6b02f7353001c8d2a9215627b1c6d22, type: 3}
+      propertyPath: fixRotation
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 1995005348454554821, guid: d6b02f7353001c8d2a9215627b1c6d22, type: 3}
       propertyPath: m_Name
       value: Opaque block

@@ -51,16 +51,20 @@ public class EdgeMountsGizmoDrawer : MonoBehaviour {
             }
 
             if (renderCornerMounts) {
-                foreach (var (manifold, mount1, mount2, _) in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetCornerMountsForDebug()) {
+                foreach (var (manifold, mount1, mount2, mount3, _) in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetCornerMountsForDebug()) {
                     int id1 = Mathf.Abs(mount1.id);
                     int id2 = Mathf.Abs(mount2.id);
+                    int id3 = mount3 != null ? Mathf.Abs(mount3.Value.id) : 0;
 
                     if (renderMountsWithManifoldColor) {
-                        id1 = id2 = Mathf.Abs(manifold.contactIdOnBox);
+                        id1 = id2 = id3 = Mathf.Abs(manifold.contactIdOnBox);
                     }
 
                     DrawMount(mount1, id1);
                     DrawMount(mount2, id2);
+                    if (mount3 != null) {
+                        DrawMount(mount3.Value, id3);
+                    }
 
                     if (drawManifoldS) {
                         Gizmos.color = Color.red;

@@ -10,7 +10,7 @@ using Utilities;
 using EdgeMountsMap = Unity.Collections.NativeMultiHashMap<CornerCalculator.Edge.EdgeKey, CornerCalculator.EdgeMount>;
 using EdgeMount = CornerCalculator.EdgeMount;
 
-using CornerMountTuple = System.ValueTuple<ShadowEdgeGenerationSystem.ShadowCornerManifold, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount, ShadowCornerConstraint.Partial>;
+using CornerMountTuple = System.ValueTuple<ShadowEdgeGenerationSystem.ShadowCornerManifold, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount?, ShadowCornerConstraint.Partial>;
 
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
 [UpdateAfter(typeof(GravitySystem))]

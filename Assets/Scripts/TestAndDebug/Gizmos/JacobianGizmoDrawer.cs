@@ -86,11 +86,16 @@ public class JacobianGizmoDrawer : MonoBehaviour {
             var velocities = new Dictionary<Entity, Velocity>();
             
             foreach (var tup in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetCornerMountsForDebug()) {
-                var (manifold, mount1, mount2, pConstraint) = tup;
+                var (manifold, mount1, mount2, mount3, pConstraint) = tup;
 
                 // Recalculating pConstraint to have bias such that a complete resolution occurs
                 var prototype = new ShadowCornerConstraint.Partial.Prototype(in manifold, beta:1, delta_slop:0);
-                pConstraint = new ShadowCornerConstraint.Partial(prototype, mount1, mount2, pConstraint.e3, manifold);
+                if (mount3 != null) {
+                    Debug.Log("JacobianGizmoDrawer does not support triple shadow edge constraints");
+                    //pConstraint = new ShadowCornerConstraint.Partial(prototype, mount1, mount2, mount3.Value, float2.zero, manifold);
+                } else {
+                    pConstraint = new ShadowCornerConstraint.Partial(prototype, mount1, mount2, pConstraint.e3, manifold);
+                }
                 var constraint = new ShadowCornerConstraint(pConstraint, masses, dt: 1);
 
                 Velocity GetVelocity(Entity e) {
