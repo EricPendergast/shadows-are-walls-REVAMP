@@ -108,6 +108,9 @@ public struct ShadowCornerConstraint : IConstraint {
                     float depth = Lin.IsFinite(m.p) ?
                         math.dot(m.p - m.s, m.n) :
                         -math.INFINITY;
+                    if (depth > 0) {
+                        depth = -math.INFINITY;
+                    }
                 
                     float2 breadthVec = m.p1 - m.p2;
                 

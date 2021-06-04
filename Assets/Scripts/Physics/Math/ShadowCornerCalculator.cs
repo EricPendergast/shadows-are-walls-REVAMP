@@ -178,6 +178,13 @@ public struct CornerCalculator {
         ComputeManifolds();
     }
 
+    public float2 GetEdgeDirectionUnnormalized(int edgeIdx) {
+        if (edgeIdx < 0) {
+            return box.GetEdgeDirection(edgeIdx);
+        } else {
+            return edges[edgeIdx].direction;
+        }
+    }
     // Negative edge index indicates it is an edge of the box
     public float2 Intersection(int edge1Idx, int edge2Idx, bool treatAsRays=false) {
         float2 s1;
@@ -408,19 +415,26 @@ public struct CornerCalculator {
             Edge e = edges[edgeCorner1.nextEdge];
             Corner c = islands[ecIdx.cornerIdx];
 
+
             AddManifold(edgeCorner1.nextEdge, c.prevEdge, c.nextEdge);
 
-            if (c.nextEdge < 0 && c.prevEdge < 0) {
-                if (edgeCorner2.nextEdge != c.prevEdge) {
-                    AddManifold(c.prevEdge, edgeCorner2.nextEdge, edgeCorner2.prevEdge);
-                }
-                if (edgeCorner1.prevEdge != c.nextEdge) {
-                    AddManifold(c.nextEdge, edgeCorner1.nextEdge, edgeCorner1.prevEdge);
-                }
+            float2 cornerPrevEdgeDir = GetEdgeDirectionUnnormalized(c.prevEdge);
+            if (math.abs(Lin.Cross(edgeCorner1.point - edgeCorner2.point, cornerPrevEdgeDir)) < .01f) {
+                AddManifold(edgeCorner1.prevEdge, edgeCorner1.nextEdge, c.prevEdge);
+                AddManifold(edgeCorner2.prevEdge, edgeCorner2.nextEdge, c.prevEdge);
+            }
+
+            float2 cornerNextEdgeDir = GetEdgeDirectionUnnormalized(c.nextEdge);
+            if (math.abs(Lin.Cross(edgeCorner1.point - edgeCorner2.point, cornerNextEdgeDir)) < .01f) {
+                AddManifold(edgeCorner1.prevEdge, edgeCorner1.nextEdge, c.nextEdge);
+                AddManifold(edgeCorner2.prevEdge, edgeCorner2.nextEdge, c.nextEdge);
             }
         }
     }
 
+    private void AddManifold(int3 edges) {
+        AddManifold(edges[0], edges[1], edges[2]);
+    }
     private void AddManifold(int edge1Idx, int edge2Idx, int edge3Idx) {
         void Swap(ref int a, ref int b) {
             var tmp = a;
@@ -437,6 +451,11 @@ public struct CornerCalculator {
         }
         if (edge1Idx >= 0) {
             Swap(ref edge1Idx, ref edge2Idx);
+        }
+
+        // If some edges are duplicates, don't create a manifold
+        if (edge1Idx == edge2Idx || edge2Idx == edge3Idx) {
+            return;
         }
 
         if (edge3Idx < 0) {
@@ -501,9 +520,9 @@ public struct CornerCalculator {
                 d2 = shadowEdge2.direction,
                 x2 = lights[shadowEdge2.lightSource].pos,
                
-                p1 = Intersection(lineIdx, shadowEdge1Idx, treatAsRays:true),
-                p2 = Intersection(lineIdx, shadowEdge2Idx, treatAsRays:true),
-                p = Intersection(shadowEdge1Idx, shadowEdge2Idx, treatAsRays:true),
+                p1 = Intersection(lineIdx, shadowEdge1Idx),
+                p2 = Intersection(lineIdx, shadowEdge2Idx),
+                p = Intersection(shadowEdge1Idx, shadowEdge2Idx),
             };
             if (lineIdx < 0) {
                 float2 boxEdgeP1 = box.GetVertex(lineIdx);

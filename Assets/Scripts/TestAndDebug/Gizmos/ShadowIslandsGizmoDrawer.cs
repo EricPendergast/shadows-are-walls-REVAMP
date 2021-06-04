@@ -1,6 +1,8 @@
+using Unity.Mathematics;
 using Unity.Entities;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEditor;
 
 using Corner = CornerCalculator.Corner;
 
@@ -8,6 +10,11 @@ public class ShadowIslandsGizmoDrawer : MonoBehaviour {
     public bool enable = true;
     [Range(-1, 15)]
     public int onlyDrawIslandsWithIndex = -1;
+
+    [Range(-5, 20)]
+    public int onlyDrawEdgesWithIndex = -5;
+    public bool drawEdgeLabels = true;
+    public Color islandsColor = Color.red;
 
     void OnDrawGizmos() {
         if (Application.isPlaying && enable) {
@@ -34,9 +41,17 @@ public class ShadowIslandsGizmoDrawer : MonoBehaviour {
                     islandStartCorner = Corner.Null;
                 }
 
-                if (onlyDrawIslandsWithIndex == -1 || islandIndex == onlyDrawIslandsWithIndex) {
-                    Gizmos.color = Color.red;
+                bool drawingIsland = onlyDrawIslandsWithIndex == -1 || islandIndex == onlyDrawIslandsWithIndex;
+                bool drawingEdge = onlyDrawEdgesWithIndex == -5 || current.nextEdge == onlyDrawEdgesWithIndex;
+
+                if (drawingIsland && drawingEdge) {
+                    Gizmos.color = islandsColor;
                     Gizmos.DrawLine((Vector2)current.point, (Vector2)next.point);
+                    if (drawEdgeLabels) {
+                        float2 midpoint = (current.point + next.point)/2;
+                        GUI.color = islandsColor;
+                        Handles.Label((Vector2)midpoint, current.nextEdge.ToString());
+                    }
                 }
             }
         }
