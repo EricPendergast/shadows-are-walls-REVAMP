@@ -551,66 +551,23 @@ public struct CornerCalculator {
                     }
                 }
             } else {
-                // TODO: Three shadow edges case
-            }
+                var shadowEdge3Idx = lineIdx;
+                Edge shadowEdge3 = edges[shadowEdge3Idx];
+                m.n = lightAngleCalculators[shadowEdge3.lightSource].NormalTowardsLight(shadowEdge3.direction, shadowEdge3.lightSide);
+                m.x3 = lights[shadowEdge3.lightSource].pos;
+                m.s = m.x3;
 
+                var prototype = new ShadowCornerConstraint.Partial.Prototype(m);
+                foreach (EdgeMount mount1 in It.Iterate(edgeMounts, shadowEdge1.GetEdgeKey())) {
+                    foreach (EdgeMount mount2 in It.Iterate(edgeMounts, shadowEdge2.GetEdgeKey())) {
+                        foreach (EdgeMount mount3 in It.Iterate(edgeMounts, shadowEdge3.GetEdgeKey())) {
+                            var p = new ShadowCornerConstraint.Partial(in prototype, in mount1, in mount2, in mount3, shadowEdge3.direction, in m);
+                            o.Collect(p);
+                            //o.DebugCollect(m, mount1, mount2, p);
+                        }
+                    }
+                }
+            }
         }
-            // 1 box or shadow edge, 2 shadow edges.
-            // This is handling 2 cases at once, since the cases are very similar
-        //    int lineIdx = edge1Idx;
-        //    int shadowEdge1Idx = edge2Idx;
-        //    int shadowEdge2Idx = edge3Idx;
-        //
-        //    Edge shadowEdge1 = edges[shadowEdge1Idx];
-        //    Edge shadowEdge2 = edges[shadowEdge2Idx];
-        //
-        //
-        //    var m = new ShadowCornerManifold {
-        //        e1 = shadowEdge1.castingEntity,
-        //        e1Type = shadowEdge1.castingShapeType,
-        //        p1 = Intersection(lineIdx, shadowEdge1Idx, treatAsRays:true),
-        //        c1 = shadowEdge1.mount1,
-        //        c1_prime = shadowEdge1.mount2,
-        //        x1 = lights[shadowEdge1.lightSource].pos,
-        //
-        //        e2 = shadowEdge2.castingEntity,
-        //        e2Type = shadowEdge2.castingShapeType,
-        //        p2 = Intersection(lineIdx, shadowEdge2Idx, treatAsRays:true),
-        //        c2 = shadowEdge2.mount1,
-        //        c2_prime = shadowEdge2.mount2,
-        //        x2 = lights[shadowEdge2.lightSource].pos,
-        //
-        //        p = Intersection(shadowEdge1Idx, shadowEdge2Idx, treatAsRays:true),
-        //    };
-        //
-        //    if (lineIdx < 0) {
-        //        float2 boxEdgeP1 = box.GetVertex(lineIdx);
-        //        float2 boxEdgeP2 = box.GetVertex(lineIdx+1);
-        //
-        //        m.e3 = boxEntity;
-        //        //m.lineIsShadowEdge = false;
-        //        // Purposely not setting lineEntityType because it is not used
-        //        // when the line is not a shadow edge.
-        //        //m.lineEntityType = null
-        //        // This works because rect vertices wind counterclockwise
-        //        m.n = Lin.Cross(math.normalize(boxEdgeP2 - boxEdgeP1), 1);
-        //        m.s = boxEdgeP1;
-        //        m.id = new int3(box.id, shadowEdge1.id, shadowEdge2.id).GetHashCode()^40235;
-        //        m.c3 = box.pos;
-        //        m.c3_prime = null;
-        //    } else {
-        //        Edge shadowEdge3 = edges[lineIdx];
-        //        m.e3 = shadowEdge3.castingEntity;
-        //        //m.lineIsShadowEdge = true;
-        //        //m.lineEntityCastingType = shadowEdge3.castingShapeType;
-        //        m.n = lightAngleCalculators[shadowEdge3.lightSource].NormalTowardsLight(shadowEdge3.direction, shadowEdge3.lightSide);
-        //        m.s = shadowEdge3.mount1;
-        //        m.id = new int3(shadowEdge1.id, shadowEdge2.id, shadowEdge3.id).GetHashCode()^506744;
-        //        m.lineMount1 = shadowEdge3.mount1;
-        //        m.lineMount2 = shadowEdge3.mount2;
-        //    }
-        //
-        //    cornerManifolds.Add(m);
-        //}
     }
 }

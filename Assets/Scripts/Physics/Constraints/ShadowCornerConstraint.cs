@@ -66,18 +66,18 @@ public struct ShadowCornerConstraint : IConstraint {
         }
 
         // Use contact between three shadow edges
-        //public Partial(in Prototype p, in CornerCalculator.EdgeMount em1, in CornerCalculator.EdgeMount em2, in CornerCalculator.EdgeMount em3, in ShadowCornerManifold m) {
-        //    e1 = em1.castingEntity;
-        //    e2 = em2.castingEntity;
-        //    e3 = em3.castingEntity;
-        //    id = em1.id ^ em2.id ^ em3.id ^ 406325; // Arbitrary number
-        //    J_n = p.J_n;
-        //    bias = p.bias;
-        //
-        //    HandleMount(in em1, ref J_n.v1, m.x1, m.d1);
-        //    HandleMount(in em2, ref J_n.v2, m.x2, m.d2);
-        //    HandleMount(in em3, ref J_n.v3, m.x3, m.);
-        //}
+        public Partial(in Prototype p, in CornerCalculator.EdgeMount em1, in CornerCalculator.EdgeMount em2, in CornerCalculator.EdgeMount em3, float2 d3, in ShadowCornerManifold m) {
+            e1 = em1.castingEntity;
+            e2 = em2.castingEntity;
+            e3 = em3.castingEntity;
+            id = em1.id ^ em2.id ^ em3.id ^ 406325; // Arbitrary number
+            J_n = p.J_n;
+            bias = p.bias;
+        
+            HandleMount(in em1, ref J_n.v1, m.x1, m.d1);
+            HandleMount(in em2, ref J_n.v2, m.x2, m.d2);
+            HandleMount(in em3, ref J_n.v3, m.x3, d3);
+        }
 
         // Use contact between 2 shadow edges and a rigidbody
         public Partial(in Prototype p, in CornerCalculator.EdgeMount em1, in CornerCalculator.EdgeMount em2, Entity e3, in ShadowCornerManifold m) {
