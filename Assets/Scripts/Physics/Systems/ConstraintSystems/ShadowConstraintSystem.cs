@@ -6,8 +6,6 @@ using Utilities;
 
 using EdgeMountsMap = Unity.Collections.NativeMultiHashMap<ShadowCornerCalculator.Edge.EdgeKey, ShadowCornerCalculator.EdgeMount>;
 
-using CornerMountTuple = System.ValueTuple<ShadowCornerManifold, ShadowCornerCalculator.EdgeMount, ShadowCornerCalculator.EdgeMount, ShadowCornerCalculator.EdgeMount?, ThreeWayPenConstraint.Partial>;
-
 [UpdateInGroup(typeof(ConstraintGenerationSystemGroup))]
 public class ShadowEdgeGenerationSystem : SystemBase {
     private EntityQuery lightSourceQuery;
@@ -205,8 +203,8 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         return ret;
     }
 
-    public List<CornerMountTuple> GetCornerMountsForDebug() {
-        var ret = new List<CornerMountTuple>();
+    public List<ShadowCornerCalculator.Outputs.CornerMountTuple> GetCornerMountsForDebug() {
+        var ret = new List<ShadowCornerCalculator.Outputs.CornerMountTuple>();
         ComputeCornersForDebug(
             new ShadowCornerCalculator.Outputs{
                 debugCornerMounts = ret

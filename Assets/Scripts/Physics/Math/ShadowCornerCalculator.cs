@@ -11,8 +11,6 @@ using Rect = Physics.Math.Rect;
 
 using Utilities;
 
-using CornerMountTuple = System.ValueTuple<ShadowCornerManifold, ShadowCornerCalculator.EdgeMount, ShadowCornerCalculator.EdgeMount, ShadowCornerCalculator.EdgeMount?, ThreeWayPenConstraint.Partial>;
-
 public struct ShadowCornerCalculator {
 
     public struct Outputs {
@@ -27,6 +25,22 @@ public struct ShadowCornerCalculator {
         public List<System.ValueTuple<ShadowEdgeManifold, EdgeMount>> debugEdgeMounts {get; set;}
         [BurstDiscard]
         public List<CornerMountTuple> debugCornerMounts {get; set;}
+
+        public struct CornerMountTuple {
+            public ShadowCornerManifold m;
+            public EdgeMount mount1;
+            public EdgeMount mount2;
+            public EdgeMount? mount3;
+            public ThreeWayPenConstraint.Partial partialConstraint;
+
+            public void Deconstruct(out ShadowCornerManifold m, out EdgeMount mount1, out EdgeMount mount2, out EdgeMount? mount3, out ThreeWayPenConstraint.Partial partialConstraint) {
+                m = this.m;
+                mount1 = this.mount1;
+                mount2 = this.mount2;
+                mount3 = this.mount3;
+                partialConstraint = this.partialConstraint;
+            }
+        }
 
         [BurstDiscard]
         public void DebugCollect(ShadowEdgeManifold m) {
@@ -50,7 +64,7 @@ public struct ShadowCornerCalculator {
         [BurstDiscard]
         public void DebugCollect(ShadowCornerManifold manifold, EdgeMount mount1, EdgeMount mount2, EdgeMount? mount3, ThreeWayPenConstraint.Partial partial) {
             if (debugCornerMounts != null) {
-                debugCornerMounts.Add(new CornerMountTuple(manifold, mount1, mount2, mount3, partial));
+                debugCornerMounts.Add(new CornerMountTuple{m=manifold, mount1=mount1, mount2=mount2, mount3=mount3, partialConstraint=partial});
             }
         }
 
@@ -368,6 +382,8 @@ public struct ShadowCornerCalculator {
         // The outer loop iterates over all the edges in the island.
         for (int edgeFirstCornerIdx = islandStart; edgeFirstCornerIdx < islandEnd; edgeFirstCornerIdx++) {
             int edgeIdx = islands[edgeFirstCornerIdx].nextEdge;
+            float2 edgeCorner1 = islands[edgeFirstCornerIdx].point;
+
             if (edgeIdx < 0) {
                 continue;
             }
@@ -385,7 +401,7 @@ public struct ShadowCornerCalculator {
 
                 //float cost = edgeLightAngleCalc.CostOfRotationTo(edge.direction, corner.point) * -edge.lightSide;
 
-                float cost = math.dot(edgeNorm, corner.point);
+                float cost = math.dot(edgeNorm, corner.point - edgeCorner1);
                 if (cost > maxCost) {
                     maxCost = cost;
                     worstPairIdx = new EdgeCornerIdx{edgeFirstCornerIdx = edgeFirstCornerIdx, cornerIdx = corner2Idx};
@@ -414,19 +430,17 @@ public struct ShadowCornerCalculator {
             Edge e = edges[edgeCorner1.nextEdge];
             Corner c = islands[ecIdx.cornerIdx];
 
-
-            AddManifold(edgeCorner1.nextEdge, c.prevEdge, c.nextEdge);
-
             float2 cornerPrevEdgeDir = GetEdgeDirectionUnnormalized(c.prevEdge);
+            float2 cornerNextEdgeDir = GetEdgeDirectionUnnormalized(c.nextEdge);
+
             if (math.abs(Lin.Cross(edgeCorner1.point - edgeCorner2.point, cornerPrevEdgeDir)) < .01f) {
                 AddManifold(edgeCorner1.prevEdge, edgeCorner1.nextEdge, c.prevEdge);
                 AddManifold(edgeCorner2.prevEdge, edgeCorner2.nextEdge, c.prevEdge);
-            }
-
-            float2 cornerNextEdgeDir = GetEdgeDirectionUnnormalized(c.nextEdge);
-            if (math.abs(Lin.Cross(edgeCorner1.point - edgeCorner2.point, cornerNextEdgeDir)) < .01f) {
+            } else if (math.abs(Lin.Cross(edgeCorner1.point - edgeCorner2.point, cornerNextEdgeDir)) < .01f) {
                 AddManifold(edgeCorner1.prevEdge, edgeCorner1.nextEdge, c.nextEdge);
                 AddManifold(edgeCorner2.prevEdge, edgeCorner2.nextEdge, c.nextEdge);
+            } else {
+                AddManifold(edgeCorner1.nextEdge, c.prevEdge, c.nextEdge);
             }
         }
     }
