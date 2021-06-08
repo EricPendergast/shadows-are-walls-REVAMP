@@ -21,10 +21,6 @@ public struct StandardConstraint : IConstraint {
     public Lambdas GetAccumulatedLambdas() {
         return accum;
     }
-    public float2 normal {get;}
-    public float2 contact {get;}
-    public float overlap;
-
 
     public int id {get;}
 
@@ -33,52 +29,61 @@ public struct StandardConstraint : IConstraint {
     PenetrationConstraint<Float6> penConstraint;
     FrictionConstraint<Float6> fricConstraint;
 
-    public StandardConstraint(Entity e1, Entity e2, Box b1, Box b2, Geometry.Manifold manifold, bool useContact1, float dt) {
-        this.e1 = e1;
-        this.e2 = e2;
-        this.normal = manifold.normal;
-        { 
-            var contact = useContact1 ? manifold.contact1 : (Geometry.Contact)manifold.contact2;
-            this.contact = contact.point;
-            this.id = contact.id.GetHashCode();
-        }
-        this.overlap = manifold.overlap;
+    public StandardConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt) {
+        e1 = p.e1;
+        e2 = p.e2;
+
+        M_inv = new Float6(masses[e1].M_inv, masses[e2].M_inv);
+        id = p.id;
+        penConstraint = new PenetrationConstraint<Float6>(p.J_n, M_inv, p.bias/dt);
+        fricConstraint = new FrictionConstraint<Float6>(p.J_t, M_inv, CollisionSystem.globalFriction);
 
         accum = new Lambdas();
+    }
 
-        M_inv = new Float6(
-            1/b1.mass, 1/b1.mass, 1/b1.inertia,
-            1/b2.mass, 1/b2.mass, 1/b2.inertia
-        );
+    public struct Partial {
+        public Entity e1;
+        public Entity e2;
+        public int id;
 
-        { // Normal precomputation
-            Float6 J_n = new Float6(
-                new float3(-normal, -Lin.Cross(contact-b1.pos, normal)), 
-                new float3(normal, Lin.Cross(contact-b2.pos, normal))
-            );
+        public Float6 J_n;
+        public Float6 J_t;
+        public float bias;
 
-            float delta = -overlap;
-            float beta = CollisionSystem.positionCorrection ? .1f : 0;
-            float delta_slop = -.01f;
+        public Partial(Entity e1, Entity e2, Box b1, Box b2, Geometry.Manifold m, bool useContact1) {
+            this.e1 = e1;
+            this.e2 = e2;
+            var contactWithId = useContact1 ? m.contact1 : (Geometry.Contact)m.contact2;
 
-            float bias = 0;
+            float2 contact = contactWithId.point;
+            id = contactWithId.id.GetHashCode();
 
-            if (delta < delta_slop) {
-                bias = (beta/dt) * (delta - delta_slop);
+            { // Normal precomputation
+                J_n = new Float6(
+                    new float3(-m.normal, -Lin.Cross(contact-b1.pos, m.normal)), 
+                    new float3(m.normal, Lin.Cross(contact-b2.pos, m.normal))
+                );
+
+                float delta = -m.overlap;
+                float beta = CollisionSystem.positionCorrection ? .1f : 0;
+                float delta_slop = -.01f;
+
+                bias = 0;
+
+                if (delta < delta_slop) {
+                    bias = beta * (delta - delta_slop);
+                }
             }
 
-            penConstraint = new PenetrationConstraint<Float6>(J_n, M_inv, bias);
-        }
 
+            { // Tangent precomputation (friction)
+                float2 tangent = Lin.Cross(m.normal, -1);
 
-        { // Tangent precomputation (friction)
-            float2 tangent = Lin.Cross(normal, -1);
+                J_t = new Float6(
+                    new float3(tangent, Lin.Cross(contact-b1.pos, tangent)), 
+                    new float3(-tangent, -Lin.Cross(contact-b2.pos, tangent)));
+            }
 
-            Float6 J_t = new Float6(
-                new float3(tangent, Lin.Cross(contact-b1.pos, tangent)), 
-                new float3(-tangent, -Lin.Cross(contact-b2.pos, tangent)));
-
-            fricConstraint = new FrictionConstraint<Float6>(J_t, M_inv, CollisionSystem.globalFriction);
         }
     }
 

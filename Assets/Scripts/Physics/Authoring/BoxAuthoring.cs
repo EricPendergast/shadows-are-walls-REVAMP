@@ -32,8 +32,6 @@ public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
             new Box {
                 pos = (Vector2)transform.position,
                 rot = transform.eulerAngles.z*Mathf.Deg2Rad,
-                mass = mass,
-                inertia = inertia,
                 width = w,
                 height = h,
                 id = Random.Range(1, int.MaxValue)

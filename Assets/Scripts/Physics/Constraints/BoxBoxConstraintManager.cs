@@ -14,17 +14,20 @@ using Physics.Math;
 public struct BoxBoxConstraintHelper : ConstraintManagerHelper<StandardConstraint> {
     private ComponentDataFromEntity<Box> boxes;
     private ComponentDataFromEntity<Velocity> boxVels;
+    private ComponentDataFromEntity<Mass> masses;
     private NativeArray<Entity> boxEntities;
     private float dt;
 
     public void Update(
         ComponentDataFromEntity<Box> boxes,
         ComponentDataFromEntity<Velocity> boxVels,
+        ComponentDataFromEntity<Mass> masses,
         NativeArray<Entity> boxEntities,
         float dt) {
 
         this.boxes = boxes;
         this.boxVels = boxVels;
+        this.masses = masses;
         this.boxEntities = boxEntities;
         this.dt = dt;
     }
@@ -41,17 +44,18 @@ public struct BoxBoxConstraintHelper : ConstraintManagerHelper<StandardConstrain
         Box box1 = boxes[e1];
         Box box2 = boxes[e2];
 
-        if (box1.mass == math.INFINITY && box2.mass == math.INFINITY) {
+        if (masses[e1].mass == math.INFINITY && masses[e2].mass == math.INFINITY) {
             return;
         }
 
-        constraints.Add(new StandardConstraint(
+        var partial = new StandardConstraint.Partial(
             e1, e2,
             box1, box2,
             manifold,
-            useContact1,
-            dt
-        ));
+            useContact1
+        );
+
+        constraints.Add(new StandardConstraint(partial, masses, dt));
     }
 
     public void ApplyImpulse(ref StandardConstraint constraint, float dt) {

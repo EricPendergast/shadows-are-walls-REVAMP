@@ -61,6 +61,7 @@ public class CollisionSystem : SystemBase {
         boxBoxCM.helper.Update(
             boxes: boxes,
             boxVels: velocities,
+            masses: masses,
             boxEntities: boxEntities,
             dt: dt
         );
