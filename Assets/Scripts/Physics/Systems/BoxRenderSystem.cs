@@ -4,7 +4,7 @@ using Unity.Mathematics;
 
 // Syncs the physics state with the rendering state.
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
-[UpdateAfter(typeof(ShadowEdgeGenerationSystem))]
+[UpdateAfter(typeof(CollisionSystem))]
 [UpdateBefore(typeof(VelocityIntegrationSystem))]
 public class BoxRenderSystem : SystemBase {
     protected override void OnUpdate() {

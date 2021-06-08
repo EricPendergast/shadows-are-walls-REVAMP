@@ -11,7 +11,7 @@ using Utilities;
 
 // Syncs the physics state with the rendering state.
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
-[UpdateAfter(typeof(ShadowEdgeGenerationSystem))]
+[UpdateAfter(typeof(CollisionSystem))]
 [UpdateBefore(typeof(VelocityIntegrationSystem))]
 public class LightRenderSystem : SystemBase {
     protected override void OnUpdate() {

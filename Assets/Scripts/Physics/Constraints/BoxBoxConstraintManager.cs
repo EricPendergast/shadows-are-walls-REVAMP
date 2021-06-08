@@ -11,51 +11,18 @@ using Physics.Math;
 //      using BoxBoxConstraintManager = 
 //          ConstraintManager<BoxBoxConstraintHelper, StandardConstraint>;
 
+// TODO: Remove this class
 public struct BoxBoxConstraintHelper : ConstraintManagerHelper<StandardConstraint> {
-    private ComponentDataFromEntity<Box> boxes;
+    private NativeList<StandardConstraint> constraints;
     private ComponentDataFromEntity<Velocity> boxVels;
-    private ComponentDataFromEntity<Mass> masses;
-    private NativeArray<Entity> boxEntities;
-    private float dt;
 
     public void Update(
-        ComponentDataFromEntity<Box> boxes,
-        ComponentDataFromEntity<Velocity> boxVels,
-        ComponentDataFromEntity<Mass> masses,
-        NativeArray<Entity> boxEntities,
-        float dt) {
+            NativeList<StandardConstraint> constraints,
+            ComponentDataFromEntity<Velocity> boxVels
+        ) {
 
-        this.boxes = boxes;
+        this.constraints = constraints;
         this.boxVels = boxVels;
-        this.masses = masses;
-        this.boxEntities = boxEntities;
-        this.dt = dt;
-    }
-
-
-    private Geometry.Manifold? GetManifold(Entity box1, Entity box2) {
-        return Geometry.GetIntersectData(
-            boxes[box1].ToRect(),
-            boxes[box2].ToRect()
-        );
-    }
-
-    private void AddConstraint(ref NativeList<StandardConstraint> constraints, Entity e1, Entity e2, Geometry.Manifold manifold, bool useContact1) {
-        Box box1 = boxes[e1];
-        Box box2 = boxes[e2];
-
-        if (masses[e1].mass == math.INFINITY && masses[e2].mass == math.INFINITY) {
-            return;
-        }
-
-        var partial = new StandardConstraint.Partial(
-            e1, e2,
-            box1, box2,
-            manifold,
-            useContact1
-        );
-
-        constraints.Add(new StandardConstraint(partial, masses, dt));
     }
 
     public void ApplyImpulse(ref StandardConstraint constraint, float dt) {
@@ -79,25 +46,8 @@ public struct BoxBoxConstraintHelper : ConstraintManagerHelper<StandardConstrain
     }
 
     public void FillWithConstraints(NativeList<StandardConstraint> constraints) {
-        for (int i = 0; i < boxEntities.Length; i++ ) {
-            for (int j = i+1; j < boxEntities.Length; j++ ) {
-                Entity box1 = boxEntities[i];
-                Entity box2 = boxEntities[j];
-
-                var manifoldNullable = GetManifold(box1, box2);
-
-                if (manifoldNullable is Geometry.Manifold manifold) {
-
-
-                    AddConstraint(ref constraints, box1, box2, manifold, true);
-
-                    if (manifold.contact2 is Geometry.Contact contact) {
-
-                        AddConstraint(ref constraints, box1, box2, manifold, false);
-                        Debug.Assert(!manifold.contact1.id.Equals(contact.id), "Duplicate contact ids within the same manifold");
-                    }
-                }
-            }
+        foreach (var constraint in this.constraints) {
+            constraints.Add(constraint);
         }
     }
 }

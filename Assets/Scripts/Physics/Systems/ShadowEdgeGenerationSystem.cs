@@ -12,8 +12,7 @@ using EdgeMount = CornerCalculator.EdgeMount;
 
 using CornerMountTuple = System.ValueTuple<ShadowEdgeGenerationSystem.ShadowCornerManifold, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount?, ShadowCornerConstraint.Partial>;
 
-[UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
-[UpdateAfter(typeof(GravitySystem))]
+[UpdateInGroup(typeof(ConstraintGenerationSystemGroup))]
 public class ShadowEdgeGenerationSystem : SystemBase {
     private EntityQuery lightSourceQuery;
     private EntityQuery opaqueBoxesQuery;
