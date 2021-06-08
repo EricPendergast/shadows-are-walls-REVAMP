@@ -19,7 +19,6 @@ public interface IConstraint {
 public interface ConstraintManagerHelper<C> where C : struct, IConstraint {
      void ApplyImpulse(ref C constraint, float dt);
      void PreStep(ref C constraint, float dt, Lambdas lambdas);
-     void FillWithConstraints(NativeList<C> constraints);
 }
 
 public class ConstraintManager<H, C> 
@@ -34,12 +33,6 @@ public class ConstraintManager<H, C>
         constraints = new NativeList<C>(0, Allocator.Persistent);
         helper = default(H);
         warmStart = new WarmStartManager();
-    }
-
-    public void FindConstraints() {
-        constraints.Clear();
-
-        helper.FillWithConstraints(constraints);
     }
 
     public void PreSteps(float dt) {
@@ -67,6 +60,11 @@ public class ConstraintManager<H, C>
 
     public void PostSteps() {
         warmStart.SaveLambdas(constraints);
+        constraints.Clear();
+    }
+
+    public NativeList<C> GetConstraintsInput() {
+        return constraints;
     }
 
     //public IEnumerable<CollisionSystem.DebugContactInfo> GetContactsForDebug() {

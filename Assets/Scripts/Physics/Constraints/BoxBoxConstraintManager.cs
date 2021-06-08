@@ -11,17 +11,13 @@ using Physics.Math;
 //      using BoxBoxConstraintManager = 
 //          ConstraintManager<BoxBoxConstraintHelper, StandardConstraint>;
 
-// TODO: Remove this class
 public struct BoxBoxConstraintHelper : ConstraintManagerHelper<StandardConstraint> {
-    private NativeList<StandardConstraint> constraints;
     private ComponentDataFromEntity<Velocity> boxVels;
 
     public void Update(
-            NativeList<StandardConstraint> constraints,
             ComponentDataFromEntity<Velocity> boxVels
         ) {
 
-        this.constraints = constraints;
         this.boxVels = boxVels;
     }
 
@@ -43,12 +39,6 @@ public struct BoxBoxConstraintHelper : ConstraintManagerHelper<StandardConstrain
 
         boxVels[constraint.e1] = v1;
         boxVels[constraint.e2] = v2;
-    }
-
-    public void FillWithConstraints(NativeList<StandardConstraint> constraints) {
-        foreach (var constraint in this.constraints) {
-            constraints.Add(constraint);
-        }
     }
 }
 

@@ -24,8 +24,6 @@ public class CollisionSystem : SystemBase {
     private ShadowEdgeConstraintManager shadowEdgeCM;
     private ShadowCornerConstraintManager shadowCornerCM;
 
-    private NativeList<StandardConstraint> standardConstraints;
-
     protected override void OnCreate() {
         boxesQuery = GetEntityQuery(typeof(Box));
         hitShadBoxesQuery = GetEntityQuery(typeof(Box), typeof(HitShadowsObject));
@@ -34,16 +32,12 @@ public class CollisionSystem : SystemBase {
         boxBoxCM = new BoxBoxConstraintManager();
         shadowEdgeCM = new ShadowEdgeConstraintManager();
         shadowCornerCM = new ShadowCornerConstraintManager();
-
-        standardConstraints = new NativeList<StandardConstraint>(Allocator.Persistent);
     }
 
     protected override void OnDestroy() {
         boxBoxCM.Dispose();
         shadowEdgeCM.Dispose();
         shadowCornerCM.Dispose();
-
-        standardConstraints.Dispose();
     }
 
     protected override void OnUpdate() {
@@ -53,42 +47,22 @@ public class CollisionSystem : SystemBase {
         if (Time.ElapsedTime == 0) {
             return;
         }
-        NativeArray<Entity> hitShadBoxEntities = hitShadBoxesQuery.ToEntityArray(Allocator.TempJob);
-        NativeArray<Entity> lightSourceEntities = lightSourcesQuery.ToEntityArray(Allocator.TempJob);
 
-        var boxes = GetComponentDataFromEntity<Box>(false);
         var velocities = GetComponentDataFromEntity<Velocity>(false);
-        var masses = GetComponentDataFromEntity<Mass>(false);
-        var lightSources = GetComponentDataFromEntity<LightSource>(false);
 
         float dt = Time.DeltaTime;
         
         boxBoxCM.helper.Update(
-            boxVels: velocities,
-            constraints: standardConstraints
+            boxVels: velocities
         );
 
         shadowEdgeCM.helper.Update(
-            vels: velocities,
-            boxes: boxes,
-            lightSources: lightSources,
-            partialConstraints: World.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetPartialEdgeConstraints(),
-            masses: masses,
-            dt: dt
+            vels: velocities
         );
 
         shadowCornerCM.helper.Update(
-            vels: velocities,
-            boxes: boxes,
-            lightSources: lightSources,
-            partialConstraints: World.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetPartialCornerConstraints(),
-            masses: masses,
-            dt: dt
+            vels: velocities
         );
-
-        boxBoxCM.FindConstraints();
-        shadowEdgeCM.FindConstraints();
-        shadowCornerCM.FindConstraints();
 
         boxBoxCM.PreSteps(dt);
         shadowEdgeCM.PreSteps(dt);
@@ -103,16 +77,18 @@ public class CollisionSystem : SystemBase {
         boxBoxCM.PostSteps();
         shadowEdgeCM.PostSteps();
         shadowCornerCM.PostSteps();
-
-
-        hitShadBoxEntities.Dispose();
-        lightSourceEntities.Dispose();
-
-        standardConstraints.Clear();
     }
 
     public NativeList<StandardConstraint> GetStandardConstraintsInput() {
-        return standardConstraints;
+        return boxBoxCM.GetConstraintsInput();
+    }
+
+    public NativeList<ShadowEdgeConstraint> GetShadowEdgeConstraintsInput() {
+        return shadowEdgeCM.GetConstraintsInput();
+    }
+
+    public NativeList<ShadowCornerConstraint> GetShadowCornerConstraintsInput() {
+        return shadowCornerCM.GetConstraintsInput();
     }
 
     public struct DebugContactInfo {

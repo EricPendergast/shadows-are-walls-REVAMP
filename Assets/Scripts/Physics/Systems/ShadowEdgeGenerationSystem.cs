@@ -160,6 +160,24 @@ public class ShadowEdgeGenerationSystem : SystemBase {
                 );
             }).Run();
 
+        {
+            var masses = GetComponentDataFromEntity<Mass>();
+
+            var edgeConstraintsOut = World.GetOrCreateSystem<CollisionSystem>().GetShadowEdgeConstraintsInput();
+
+            float dt = Time.DeltaTime;
+
+            foreach (var pec in partialEdgeConstraints) {
+                edgeConstraintsOut.Add(new ShadowEdgeConstraint(pec, masses, dt));
+            }
+
+            var cornerConstraintsOut = World.GetOrCreateSystem<CollisionSystem>().GetShadowCornerConstraintsInput();
+
+            foreach (var pcc in partialCornerConstraints) {
+                cornerConstraintsOut.Add(new ShadowCornerConstraint(pcc, masses, dt));
+            }
+        }
+
         lightSourceEntities.Dispose();
         opaqueBoxes.Dispose();
         opaqueBoxEntities.Dispose();
@@ -253,18 +271,6 @@ public class ShadowEdgeGenerationSystem : SystemBase {
                 );
             }).Run();
     }
-
-    public NativeList<ShadowEdgeConstraint.Partial> GetPartialEdgeConstraints() {
-        return partialEdgeConstraints;
-    }
-
-    public NativeList<ShadowCornerConstraint.Partial> GetPartialCornerConstraints() {
-        return partialCornerConstraints;
-    }
-
-    //public IEnumerable<float2> GetRenderPoints(Entity lightSource) {
-    //    return lightManagers[lightSource].GetRenderPoints();
-    //}
 
     private void Clear(Dictionary<Entity, ShadowEdgeCalculator> lightManagers) {
         foreach (var lightManager in lightManagers.Values) {
