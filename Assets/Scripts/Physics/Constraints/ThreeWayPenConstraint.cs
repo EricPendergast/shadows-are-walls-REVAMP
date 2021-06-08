@@ -67,7 +67,7 @@ public struct ThreeWayPenConstraint : IConstraint {
         public Float9 J_n;
         public float bias;
 
-        private static void HandleMount(in CornerCalculator.EdgeMount mount, ref float3 J_n_part, float2 x, float2 d) {
+        private static void HandleMount(in ShadowCornerCalculator.EdgeMount mount, ref float3 J_n_part, float2 x, float2 d) {
             float2 c = mount.point;
             float2 xPrime = mount.shapeCenter;
             if (mount.castingShapeType == EdgeSourceType.Box) {
@@ -81,7 +81,7 @@ public struct ThreeWayPenConstraint : IConstraint {
         }
 
         // Use contact between three shadow edges
-        public Partial(in Prototype p, in CornerCalculator.EdgeMount em1, in CornerCalculator.EdgeMount em2, in CornerCalculator.EdgeMount em3, float2 d3, in ShadowCornerManifold m) {
+        public Partial(in Prototype p, in ShadowCornerCalculator.EdgeMount em1, in ShadowCornerCalculator.EdgeMount em2, in ShadowCornerCalculator.EdgeMount em3, float2 d3, in ShadowCornerManifold m) {
             e1 = em1.castingEntity;
             e2 = em2.castingEntity;
             e3 = em3.castingEntity;
@@ -95,7 +95,7 @@ public struct ThreeWayPenConstraint : IConstraint {
         }
 
         // Use contact between 2 shadow edges and a rigidbody
-        public Partial(in Prototype p, in CornerCalculator.EdgeMount em1, in CornerCalculator.EdgeMount em2, Entity e3, in ShadowCornerManifold m) {
+        public Partial(in Prototype p, in ShadowCornerCalculator.EdgeMount em1, in ShadowCornerCalculator.EdgeMount em2, Entity e3, in ShadowCornerManifold m) {
             e1 = em1.castingEntity;
             e2 = em2.castingEntity;
             this.e3 = e3;

@@ -6,15 +6,14 @@ using Unity.Collections;
 using Unity.Mathematics;
 
 using Physics.Math;
-using UnityEngine;
 
 using Rect = Physics.Math.Rect;
 
 using Utilities;
 
-using CornerMountTuple = System.ValueTuple<ShadowCornerManifold, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount?, ThreeWayPenConstraint.Partial>;
+using CornerMountTuple = System.ValueTuple<ShadowCornerManifold, ShadowCornerCalculator.EdgeMount, ShadowCornerCalculator.EdgeMount, ShadowCornerCalculator.EdgeMount?, ThreeWayPenConstraint.Partial>;
 
-public struct CornerCalculator {
+public struct ShadowCornerCalculator {
 
     public struct Outputs {
         public NativeList<TwoWayPenConstraint.Partial>? partialEdgeConstraints;
@@ -156,7 +155,7 @@ public struct CornerCalculator {
 
     private Outputs o;
 
-    public CornerCalculator(Box box, Entity boxEntity, NativeArray<LightSource> lights, NativeArray<AngleCalculator> lightAngleCalculators, MultiHashMapIterator<Entity, Edge> edges, ref NativeMultiHashMap<Edge.EdgeKey, EdgeMount> edgeMounts, in Outputs o) {
+    public ShadowCornerCalculator(Box box, Entity boxEntity, NativeArray<LightSource> lights, NativeArray<AngleCalculator> lightAngleCalculators, MultiHashMapIterator<Entity, Edge> edges, ref NativeMultiHashMap<Edge.EdgeKey, EdgeMount> edgeMounts, in Outputs o) {
         this.box = box.ToRect();
         this.boxEntity = boxEntity;
         this.lights = lights;

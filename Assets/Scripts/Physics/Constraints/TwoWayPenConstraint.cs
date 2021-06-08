@@ -56,7 +56,7 @@ public struct TwoWayPenConstraint : IConstraint {
         public float bias;
 
 
-        public Partial(in Prototype p, in CornerCalculator.EdgeMount mount, in ShadowEdgeManifold m) {
+        public Partial(in Prototype p, in ShadowCornerCalculator.EdgeMount mount, in ShadowEdgeManifold m) {
             e1 = mount.castingEntity;
             e2 = m.e2;
             id = new int2(m.contactIdOn2, mount.id).GetHashCode();

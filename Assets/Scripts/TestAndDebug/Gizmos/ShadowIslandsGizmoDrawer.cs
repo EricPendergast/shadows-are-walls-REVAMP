@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 
-using Corner = CornerCalculator.Corner;
+using Corner = ShadowCornerCalculator.Corner;
 
 public class ShadowIslandsGizmoDrawer : MonoBehaviour {
     public bool enable = true;

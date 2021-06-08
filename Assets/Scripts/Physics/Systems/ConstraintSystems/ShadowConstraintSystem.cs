@@ -4,9 +4,9 @@ using System.Collections.Generic;
 
 using Utilities;
 
-using EdgeMountsMap = Unity.Collections.NativeMultiHashMap<CornerCalculator.Edge.EdgeKey, CornerCalculator.EdgeMount>;
+using EdgeMountsMap = Unity.Collections.NativeMultiHashMap<ShadowCornerCalculator.Edge.EdgeKey, ShadowCornerCalculator.EdgeMount>;
 
-using CornerMountTuple = System.ValueTuple<ShadowCornerManifold, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount?, ThreeWayPenConstraint.Partial>;
+using CornerMountTuple = System.ValueTuple<ShadowCornerManifold, ShadowCornerCalculator.EdgeMount, ShadowCornerCalculator.EdgeMount, ShadowCornerCalculator.EdgeMount?, ThreeWayPenConstraint.Partial>;
 
 [UpdateInGroup(typeof(ConstraintGenerationSystemGroup))]
 public class ShadowEdgeGenerationSystem : SystemBase {
@@ -19,7 +19,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
     NativeList<TwoWayPenConstraint.Partial> partialEdgeConstraints;
     NativeList<ThreeWayPenConstraint.Partial> partialCornerConstraints;
 
-    NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges;
+    NativeMultiHashMap<Entity, ShadowCornerCalculator.Edge> boxOverlappingEdges;
     EdgeMountsMap edgeMounts;
 
     NativeList<LightSource> lightSources;
@@ -34,7 +34,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         partialCornerConstraints = new NativeList<ThreeWayPenConstraint.Partial>(Allocator.Persistent);
         partialEdgeConstraints = new NativeList<TwoWayPenConstraint.Partial>(Allocator.Persistent);
 
-        boxOverlappingEdges = new NativeMultiHashMap<Entity, CornerCalculator.Edge>(0, Allocator.Persistent);
+        boxOverlappingEdges = new NativeMultiHashMap<Entity, ShadowCornerCalculator.Edge>(0, Allocator.Persistent);
         edgeMounts = new EdgeMountsMap(0, Allocator.Persistent);
         lightSources = new NativeList<LightSource>(Allocator.Persistent);
         lightAngleCalculators = new NativeList<AngleCalculator>(Allocator.Persistent);
@@ -105,14 +105,14 @@ public class ShadowEdgeGenerationSystem : SystemBase {
             .WithReadOnly(boxOverlappingEdges)
             .WithReadOnly(edgeMounts)
             .ForEach((in Box box, in Entity entity) => {
-                var cc = new CornerCalculator(
+                var cc = new ShadowCornerCalculator(
                     box,
                     entity,
                     lightSources,
                     lightAngleCalculators,
                     It.Iterate(boxOverlappingEdges, entity),
                     ref edgeMounts,
-                    new CornerCalculator.Outputs{
+                    new ShadowCornerCalculator.Outputs{
                         partialEdgeConstraints = partialEdgeConstraints,
                         partialCornerConstraints = partialCornerConstraints
                     }
@@ -152,20 +152,20 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         }
     }
 
-    public List<CornerCalculator.Corner> GetShadowIslandsForDebug() {
-        var ret = new List<CornerCalculator.Corner>();
+    public List<ShadowCornerCalculator.Corner> GetShadowIslandsForDebug() {
+        var ret = new List<ShadowCornerCalculator.Corner>();
         // TODO: Put islands in CornerCalculator.Outputs
         Entities.WithAll<Box, HitShadowsObject>()
             .WithoutBurst()
             .ForEach((in Box box, in Entity entity) => {
-                var cc = new CornerCalculator(
+                var cc = new ShadowCornerCalculator(
                     box,
                     entity,
                     lightSources,
                     lightAngleCalculators,
                     It.Iterate(boxOverlappingEdges, entity),
                     ref edgeMounts,
-                    new CornerCalculator.Outputs{}
+                    new ShadowCornerCalculator.Outputs{}
                 );
 
                 foreach (var item in cc.GetIslandsForDebug()) {
@@ -178,7 +178,7 @@ public class ShadowEdgeGenerationSystem : SystemBase {
     public List<ShadowEdgeManifold> GetEdgeManifoldsForDebug() {
         var ret = new List<ShadowEdgeManifold>();
         ComputeCornersForDebug(
-            new CornerCalculator.Outputs{
+            new ShadowCornerCalculator.Outputs{
                 debugEdgeManifoldCollector = ret
             }
         );
@@ -188,17 +188,17 @@ public class ShadowEdgeGenerationSystem : SystemBase {
     public List<ShadowCornerManifold> GetCornerManifoldsForDebug() {
         var ret = new List<ShadowCornerManifold>();
         ComputeCornersForDebug(
-            new CornerCalculator.Outputs{
+            new ShadowCornerCalculator.Outputs{
                 debugCornerManifolds = ret
             }
         );
         return ret;
     }
 
-    public List<(ShadowEdgeManifold, CornerCalculator.EdgeMount)> GetEdgeMountsForDebug() {
-        var ret = new List<(ShadowEdgeManifold, CornerCalculator.EdgeMount)>();
+    public List<(ShadowEdgeManifold, ShadowCornerCalculator.EdgeMount)> GetEdgeMountsForDebug() {
+        var ret = new List<(ShadowEdgeManifold, ShadowCornerCalculator.EdgeMount)>();
         ComputeCornersForDebug(
-            new CornerCalculator.Outputs{
+            new ShadowCornerCalculator.Outputs{
                 debugEdgeMounts = ret
             }
         );
@@ -208,18 +208,18 @@ public class ShadowEdgeGenerationSystem : SystemBase {
     public List<CornerMountTuple> GetCornerMountsForDebug() {
         var ret = new List<CornerMountTuple>();
         ComputeCornersForDebug(
-            new CornerCalculator.Outputs{
+            new ShadowCornerCalculator.Outputs{
                 debugCornerMounts = ret
             }
         );
         return ret;
     }
 
-    private void ComputeCornersForDebug(CornerCalculator.Outputs outputs) {
+    private void ComputeCornersForDebug(ShadowCornerCalculator.Outputs outputs) {
         Entities.WithAll<Box, HitShadowsObject>()
             .WithoutBurst()
             .ForEach((in Box box, in Entity entity) => {
-                new CornerCalculator(
+                new ShadowCornerCalculator(
                     box,
                     entity,
                     lightSources,

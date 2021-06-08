@@ -19,7 +19,7 @@ public class EdgeMountsGizmoDrawer : MonoBehaviour {
 
             var mountCount = new Dictionary<float2, int>();
 
-            int RegisterMount(CornerCalculator.EdgeMount mount) {
+            int RegisterMount(ShadowCornerCalculator.EdgeMount mount) {
                 int thisMountCount;
                 if (mountCount.ContainsKey(mount.point)) {
                     thisMountCount = mountCount[mount.point]+1;
@@ -31,7 +31,7 @@ public class EdgeMountsGizmoDrawer : MonoBehaviour {
                 return thisMountCount;
             }
 
-            void DrawMount(CornerCalculator.EdgeMount mount, int id) {
+            void DrawMount(ShadowCornerCalculator.EdgeMount mount, int id) {
                 int thisMountCount = RegisterMount(mount);
                 
                 Gizmos.color = new Color(
