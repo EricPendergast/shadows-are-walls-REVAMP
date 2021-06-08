@@ -1,16 +1,12 @@
 using Unity.Entities;
 using Unity.Collections;
-using Unity.Mathematics;
 using System.Collections.Generic;
-
-using Physics.Math;
 
 using Utilities;
 
 using EdgeMountsMap = Unity.Collections.NativeMultiHashMap<CornerCalculator.Edge.EdgeKey, CornerCalculator.EdgeMount>;
-using EdgeMount = CornerCalculator.EdgeMount;
 
-using CornerMountTuple = System.ValueTuple<ShadowEdgeGenerationSystem.ShadowCornerManifold, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount?, ShadowCornerConstraint.Partial>;
+using CornerMountTuple = System.ValueTuple<ShadowCornerManifold, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount?, ThreeWayPenConstraint.Partial>;
 
 [UpdateInGroup(typeof(ConstraintGenerationSystemGroup))]
 public class ShadowEdgeGenerationSystem : SystemBase {
@@ -18,44 +14,10 @@ public class ShadowEdgeGenerationSystem : SystemBase {
     private EntityQuery opaqueBoxesQuery;
     private EntityQuery shadHitBoxesQuery;
 
-    public struct ShadowEdgeManifold {
-        public float delta;
-        public float2 n;
-        // The opaque object
-        //public Entity e1;
-        public float2 x1;
-        public float2 d1;
-        // The shadow hitting object
-        public Entity e2;
-        public float2 x2;
-
-        // Contact point
-        public float2 p;
-        // Unique id for the point of contact on the shadow hitting object.
-        public int contactIdOn2;
-    }
-
-    public struct ShadowCornerManifold {
-        public float2 x1;
-        public float2 d1;
-        public float2 x2;
-        public float2 d2;
-        public float2 x3;
-        public float2 s;
-
-        public float2 p;
-        public float2 p1;
-        public float2 p2;
-
-        public float2 n;
-        // This is only used if shape number 3 is not a shadow edge
-        public int contactIdOnBox;
-    }
-
     Dictionary<Entity, ShadowEdgeCalculator> lightManagers;
 
-    NativeList<ShadowEdgeConstraint.Partial> partialEdgeConstraints;
-    NativeList<ShadowCornerConstraint.Partial> partialCornerConstraints;
+    NativeList<TwoWayPenConstraint.Partial> partialEdgeConstraints;
+    NativeList<ThreeWayPenConstraint.Partial> partialCornerConstraints;
 
     // TODO: This will replace some of the above stuff
     NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges;
@@ -70,8 +32,8 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         shadHitBoxesQuery = GetEntityQuery(typeof(Box), typeof(HitShadowsObject));
         lightManagers = new Dictionary<Entity, ShadowEdgeCalculator>();
 
-        partialCornerConstraints = new NativeList<ShadowCornerConstraint.Partial>(Allocator.Persistent);
-        partialEdgeConstraints = new NativeList<ShadowEdgeConstraint.Partial>(Allocator.Persistent);
+        partialCornerConstraints = new NativeList<ThreeWayPenConstraint.Partial>(Allocator.Persistent);
+        partialEdgeConstraints = new NativeList<TwoWayPenConstraint.Partial>(Allocator.Persistent);
 
         boxOverlappingEdges = new NativeMultiHashMap<Entity, CornerCalculator.Edge>(0, Allocator.Persistent);
         edgeMounts = new EdgeMountsMap(0, Allocator.Persistent);
@@ -163,18 +125,18 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         {
             var masses = GetComponentDataFromEntity<Mass>();
 
-            var edgeConstraintsOut = World.GetOrCreateSystem<CollisionSystem>().GetShadowEdgeConstraintsInput();
+            var edgeConstraintsOut = World.GetOrCreateSystem<CollisionSystem>().GetTwoWayPenConstraintsInput();
 
             float dt = Time.DeltaTime;
 
             foreach (var pec in partialEdgeConstraints) {
-                edgeConstraintsOut.Add(new ShadowEdgeConstraint(pec, masses, dt));
+                edgeConstraintsOut.Add(new TwoWayPenConstraint(pec, masses, dt));
             }
 
-            var cornerConstraintsOut = World.GetOrCreateSystem<CollisionSystem>().GetShadowCornerConstraintsInput();
+            var cornerConstraintsOut = World.GetOrCreateSystem<CollisionSystem>().GetThreeWayPenConstraintsInput();
 
             foreach (var pcc in partialCornerConstraints) {
-                cornerConstraintsOut.Add(new ShadowCornerConstraint(pcc, masses, dt));
+                cornerConstraintsOut.Add(new ThreeWayPenConstraint(pcc, masses, dt));
             }
         }
 
@@ -278,7 +240,6 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         }
         lightManagers.Clear();
     }
-
 }
 
 public enum EdgeSourceType : byte {

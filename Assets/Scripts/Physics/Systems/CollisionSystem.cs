@@ -1,11 +1,10 @@
 using Unity.Entities;
 using Unity.Collections;
 using Unity.Mathematics;
-using System.Collections.Generic;
 
-using BoxBoxConstraintManager = ConstraintManager<BoxBoxConstraintHelper, StandardConstraint>;
-using ShadowEdgeConstraintManager = ConstraintManager<ShadowEdgeConstraintHelper, ShadowEdgeConstraint>;
-using ShadowCornerConstraintManager = ConstraintManager<ShadowCornerConstraintHelper, ShadowCornerConstraint>;
+using TwoWayPenFricCM = ConstraintManager<TwoWayPenFricConstraintHelper, TwoWayPenFricConstraint>;
+using TwoWayPenCM = ConstraintManager<TwoWayPenConstraintHelper, TwoWayPenConstraint>;
+using ThreeWayPenCM = ConstraintManager<ThreeWayPenConstraintHelper, ThreeWayPenConstraint>;
 
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
 [UpdateAfter(typeof(ConstraintGenerationSystemGroup))]
@@ -20,24 +19,24 @@ public class CollisionSystem : SystemBase {
     // In the future, this will be configurable on a per object basis
     public static float globalFriction = .5f;
 
-    private BoxBoxConstraintManager boxBoxCM;
-    private ShadowEdgeConstraintManager shadowEdgeCM;
-    private ShadowCornerConstraintManager shadowCornerCM;
+    private TwoWayPenFricCM twoWayPenFricCM;
+    private TwoWayPenCM twoWayPenCM;
+    private ThreeWayPenCM threeWayPenCM;
 
     protected override void OnCreate() {
         boxesQuery = GetEntityQuery(typeof(Box));
         hitShadBoxesQuery = GetEntityQuery(typeof(Box), typeof(HitShadowsObject));
         lightSourcesQuery = GetEntityQuery(typeof(LightSource));
 
-        boxBoxCM = new BoxBoxConstraintManager();
-        shadowEdgeCM = new ShadowEdgeConstraintManager();
-        shadowCornerCM = new ShadowCornerConstraintManager();
+        twoWayPenFricCM = new TwoWayPenFricCM();
+        twoWayPenCM = new TwoWayPenCM();
+        threeWayPenCM = new ThreeWayPenCM();
     }
 
     protected override void OnDestroy() {
-        boxBoxCM.Dispose();
-        shadowEdgeCM.Dispose();
-        shadowCornerCM.Dispose();
+        twoWayPenFricCM.Dispose();
+        twoWayPenCM.Dispose();
+        threeWayPenCM.Dispose();
     }
 
     protected override void OnUpdate() {
@@ -52,43 +51,43 @@ public class CollisionSystem : SystemBase {
 
         float dt = Time.DeltaTime;
         
-        boxBoxCM.helper.Update(
-            boxVels: velocities
-        );
-
-        shadowEdgeCM.helper.Update(
+        twoWayPenFricCM.helper.Update(
             vels: velocities
         );
 
-        shadowCornerCM.helper.Update(
+        twoWayPenCM.helper.Update(
             vels: velocities
         );
 
-        boxBoxCM.PreSteps(dt);
-        shadowEdgeCM.PreSteps(dt);
-        shadowCornerCM.PreSteps(dt);
+        threeWayPenCM.helper.Update(
+            vels: velocities
+        );
+
+        twoWayPenFricCM.PreSteps(dt);
+        twoWayPenCM.PreSteps(dt);
+        threeWayPenCM.PreSteps(dt);
 
         for (int i = 0; i < 10; i++) {
-            boxBoxCM.ApplyImpulses(dt);
-            shadowEdgeCM.ApplyImpulses(dt);
-            shadowCornerCM.ApplyImpulses(dt);
+            twoWayPenFricCM.ApplyImpulses(dt);
+            twoWayPenCM.ApplyImpulses(dt);
+            threeWayPenCM.ApplyImpulses(dt);
         }
 
-        boxBoxCM.PostSteps();
-        shadowEdgeCM.PostSteps();
-        shadowCornerCM.PostSteps();
+        twoWayPenFricCM.PostSteps();
+        twoWayPenCM.PostSteps();
+        threeWayPenCM.PostSteps();
     }
 
-    public NativeList<StandardConstraint> GetStandardConstraintsInput() {
-        return boxBoxCM.GetConstraintsInput();
+    public NativeList<TwoWayPenFricConstraint> GetStandardConstraintsInput() {
+        return twoWayPenFricCM.GetConstraintsInput();
     }
 
-    public NativeList<ShadowEdgeConstraint> GetShadowEdgeConstraintsInput() {
-        return shadowEdgeCM.GetConstraintsInput();
+    public NativeList<TwoWayPenConstraint> GetTwoWayPenConstraintsInput() {
+        return twoWayPenCM.GetConstraintsInput();
     }
 
-    public NativeList<ShadowCornerConstraint> GetShadowCornerConstraintsInput() {
-        return shadowCornerCM.GetConstraintsInput();
+    public NativeList<ThreeWayPenConstraint> GetThreeWayPenConstraintsInput() {
+        return threeWayPenCM.GetConstraintsInput();
     }
 
     public struct DebugContactInfo {

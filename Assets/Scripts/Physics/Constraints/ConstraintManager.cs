@@ -1,13 +1,5 @@
-using Unity.Entities;
 using Unity.Collections;
-using Unity.Mathematics;
-using System.Collections.Generic;
-
 using UnityEngine;
-
-using Physics.Math;
-
-using ContactId = Physics.Math.Geometry.ContactId;
 
 public interface IConstraint {
     public int id {get;}

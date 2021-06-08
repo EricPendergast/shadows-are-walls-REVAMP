@@ -5,9 +5,24 @@ using Unity.Mathematics;
 using Physics.Math;
 using UnityEngine;
 
-using ShadowCornerManifold = ShadowEdgeGenerationSystem.ShadowCornerManifold;
+public struct ShadowCornerManifold {
+    public float2 x1;
+    public float2 d1;
+    public float2 x2;
+    public float2 d2;
+    public float2 x3;
+    public float2 s;
 
-public struct ShadowCornerConstraint : IConstraint {
+    public float2 p;
+    public float2 p1;
+    public float2 p2;
+
+    public float2 n;
+    // This is only used if shape number 3 is not a shadow edge
+    public int contactIdOnBox;
+}
+
+public struct ThreeWayPenConstraint : IConstraint {
     // The owner of the first shadow edge
     public Entity e1 {get;}
     // The owner of the second shadow edge
@@ -30,7 +45,7 @@ public struct ShadowCornerConstraint : IConstraint {
         Breadth
     }
 
-    public ShadowCornerConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt) {
+    public ThreeWayPenConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt) {
         e1 = p.e1;
         e2 = p.e2;
         e3 = p.e3;
@@ -134,11 +149,6 @@ public struct ShadowCornerConstraint : IConstraint {
                 }
 
                 if (resolveMode == ResolveMode.Depth) {
-                    // partial of delta wrt alpha1 = (-d_2 * n) * (d_1 cross d_2) * mag(p - x1)
-                    // partial of delta wrt alpha2 = (-d_1 * n) * (d_2 cross d_1) * mag(p - x2)
-                    // partial of delta wrt x_3 = -n
-                    // partial of delta wrt alpha3 = -(p-x_3) cross n
-                    
                     J_n = new Float9(
                         new float3(0, 0, 
                             (math.dot(m.d2, m.n) * Lin.Cross(m.d2, m.x1 - m.x2) /
@@ -162,11 +172,8 @@ public struct ShadowCornerConstraint : IConstraint {
                         sigma = 1;
                         delta = -delta;
                     }
-                    bool a = math.dot(m.p2 - m.p1, Lin.Cross(n, sigma)) <= 0;
-                    Debug.Assert(a);
-                    if (!a) {
-                        Debug.Log("Bad");
-                    }
+
+                    Debug.Assert(math.dot(m.p2 - m.p1, Lin.Cross(n, sigma)) <= 0);
 
                     float sMag = math.dot(m.s - m.x3, m.n);
 
@@ -191,23 +198,6 @@ public struct ShadowCornerConstraint : IConstraint {
                     );
                 }
 
-                // An attempt to solve the opaque corner bug. Forces the two
-                // edges to resolve in such a way that a sphere tangent to both
-                // edges will move along the normal. This didn't work.
-                //if (Lin.IsFinite(m.p)) {
-                //    float2 b = math.normalize(-m.d1 - m.d2);
-                //    float2 k = m.p + b / math.abs(Lin.Cross(m.d1, b));
-                //    float2 omega_n = new float2(
-                //        Lin.Cross(m.d1, m.n) / math.dot(m.d1, k - m.x1),
-                //        Lin.Cross(m.d2, m.n) / math.dot(m.d2, k - m.x2)
-                //    );
-                //
-                //    if (math.lengthsq(omega_n) > .00001) {
-                //        float2 omegaNew = math.project(new float2(J_n.v1.z, J_n.v2.z), omega_n);
-                //        J_n.v1.z = omegaNew.x;
-                //        J_n.v2.z = omegaNew.y;
-                //    }
-                //}
                 bias = 0;
 
                 if (delta < delta_slop) {

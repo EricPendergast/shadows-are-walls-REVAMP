@@ -49,7 +49,7 @@ public class DirectConstraintSystem : SystemBase {
         boxEntities.Dispose();
     }
 
-    private void AddConstraint(ref NativeList<StandardConstraint> constraints, Entity e1, Entity e2, Geometry.Manifold manifold, bool useContact1) {
+    private void AddConstraint(ref NativeList<TwoWayPenFricConstraint> constraints, Entity e1, Entity e2, Geometry.Manifold manifold, bool useContact1) {
         Box box1 = boxes[e1];
         Box box2 = boxes[e2];
 
@@ -57,14 +57,14 @@ public class DirectConstraintSystem : SystemBase {
             return;
         }
 
-        var partial = new StandardConstraint.Partial(
+        var partial = new TwoWayPenFricConstraint.Partial(
             e1, e2,
             box1, box2,
             manifold,
             useContact1
         );
 
-        constraints.Add(new StandardConstraint(partial, masses, dt));
+        constraints.Add(new TwoWayPenFricConstraint(partial, masses, dt));
     }
 
     private Geometry.Manifold? GetManifold(Entity box1, Entity box2) {

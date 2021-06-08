@@ -1,13 +1,13 @@
 using Unity.Entities;
 
-public struct ShadowEdgeConstraintHelper : ConstraintManagerHelper<ShadowEdgeConstraint> {
+public struct TwoWayPenConstraintHelper : ConstraintManagerHelper<TwoWayPenConstraint> {
     private ComponentDataFromEntity<Velocity> vels;
 
     public void Update(ComponentDataFromEntity<Velocity> vels) {
         this.vels = vels;
     }
 
-    public void ApplyImpulse(ref ShadowEdgeConstraint constraint, float dt) {
+    public void ApplyImpulse(ref TwoWayPenConstraint constraint, float dt) {
         var v1 = vels[constraint.e1];
         var v2 = vels[constraint.e2];
 
@@ -17,7 +17,7 @@ public struct ShadowEdgeConstraintHelper : ConstraintManagerHelper<ShadowEdgeCon
         vels[constraint.e2] = v2;
     }
 
-    public void PreStep(ref ShadowEdgeConstraint constraint, float dt, Lambdas lambdas) {
+    public void PreStep(ref TwoWayPenConstraint constraint, float dt, Lambdas lambdas) {
         var v1 = vels[constraint.e1];
         var v2 = vels[constraint.e2];
 

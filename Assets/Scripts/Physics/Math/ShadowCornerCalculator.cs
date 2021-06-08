@@ -12,16 +12,13 @@ using Rect = Physics.Math.Rect;
 
 using Utilities;
 
-using ShadowEdgeManifold = ShadowEdgeGenerationSystem.ShadowEdgeManifold;
-using ShadowCornerManifold = ShadowEdgeGenerationSystem.ShadowCornerManifold;
-
-using CornerMountTuple = System.ValueTuple<ShadowEdgeGenerationSystem.ShadowCornerManifold, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount?, ShadowCornerConstraint.Partial>;
+using CornerMountTuple = System.ValueTuple<ShadowCornerManifold, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount, CornerCalculator.EdgeMount?, ThreeWayPenConstraint.Partial>;
 
 public struct CornerCalculator {
 
     public struct Outputs {
-        public NativeList<ShadowEdgeConstraint.Partial>? partialEdgeConstraints;
-        public NativeList<ShadowCornerConstraint.Partial>? partialCornerConstraints;
+        public NativeList<TwoWayPenConstraint.Partial>? partialEdgeConstraints;
+        public NativeList<ThreeWayPenConstraint.Partial>? partialCornerConstraints;
 
         [BurstDiscard]
         public List<ShadowEdgeManifold> debugEdgeManifoldCollector {get; set;}
@@ -52,18 +49,18 @@ public struct CornerCalculator {
             }
         }
         [BurstDiscard]
-        public void DebugCollect(ShadowCornerManifold manifold, EdgeMount mount1, EdgeMount mount2, EdgeMount? mount3, ShadowCornerConstraint.Partial partial) {
+        public void DebugCollect(ShadowCornerManifold manifold, EdgeMount mount1, EdgeMount mount2, EdgeMount? mount3, ThreeWayPenConstraint.Partial partial) {
             if (debugCornerMounts != null) {
                 debugCornerMounts.Add(new CornerMountTuple(manifold, mount1, mount2, mount3, partial));
             }
         }
 
-        public void Collect(in ShadowEdgeConstraint.Partial c) {
+        public void Collect(in TwoWayPenConstraint.Partial c) {
             if (partialEdgeConstraints != null) {
                 partialEdgeConstraints.Value.Add(c);
             }
         }
-        public void Collect(in ShadowCornerConstraint.Partial c) {
+        public void Collect(in ThreeWayPenConstraint.Partial c) {
             if (partialCornerConstraints != null) {
                 partialCornerConstraints.Value.Add(c);
             }
@@ -501,10 +498,10 @@ public struct CornerCalculator {
 
             o.DebugCollect(manifold);
         
-            var prototype = new ShadowEdgeConstraint.Partial.Prototype(manifold);
+            var prototype = new TwoWayPenConstraint.Partial.Prototype(manifold);
 
             foreach (EdgeMount mount in It.Iterate(edgeMounts, e.GetEdgeKey())) {
-                var p = new ShadowEdgeConstraint.Partial(in prototype, in mount, in manifold);
+                var p = new TwoWayPenConstraint.Partial(in prototype, in mount, in manifold);
                 o.Collect(p);
                 o.DebugCollect(manifold, mount);
             }
@@ -539,13 +536,13 @@ public struct CornerCalculator {
 
                 m.x3 = box.pos;
 
-                var prototype = new ShadowCornerConstraint.Partial.Prototype(m);
+                var prototype = new ThreeWayPenConstraint.Partial.Prototype(m);
 
                 o.DebugCollect(m);
                 // TODO: Check if edge mounts will participate
                 foreach (EdgeMount mount1 in It.Iterate(edgeMounts, shadowEdge1.GetEdgeKey())) {
                     foreach (EdgeMount mount2 in It.Iterate(edgeMounts, shadowEdge2.GetEdgeKey())) {
-                        var p = new ShadowCornerConstraint.Partial(in prototype, in mount1, in mount2, boxEntity, in m);
+                        var p = new ThreeWayPenConstraint.Partial(in prototype, in mount1, in mount2, boxEntity, in m);
                         o.Collect(p);
                         o.DebugCollect(m, mount1, mount2, null, p);
                     }
@@ -558,11 +555,11 @@ public struct CornerCalculator {
                 m.s = m.x3;
 
                 o.DebugCollect(m);
-                var prototype = new ShadowCornerConstraint.Partial.Prototype(m);
+                var prototype = new ThreeWayPenConstraint.Partial.Prototype(m);
                 foreach (EdgeMount mount1 in It.Iterate(edgeMounts, shadowEdge1.GetEdgeKey())) {
                     foreach (EdgeMount mount2 in It.Iterate(edgeMounts, shadowEdge2.GetEdgeKey())) {
                         foreach (EdgeMount mount3 in It.Iterate(edgeMounts, shadowEdge3.GetEdgeKey())) {
-                            var p = new ShadowCornerConstraint.Partial(in prototype, in mount1, in mount2, in mount3, shadowEdge3.direction, in m);
+                            var p = new ThreeWayPenConstraint.Partial(in prototype, in mount1, in mount2, in mount3, shadowEdge3.direction, in m);
                             o.Collect(p);
                             o.DebugCollect(m, mount1, mount2, mount3, p);
                         }

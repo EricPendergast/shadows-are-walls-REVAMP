@@ -10,7 +10,6 @@ using System.Runtime.InteropServices;
 
 using Rect = Physics.Math.Rect;
 
-using ShadowEdgeManifold = ShadowEdgeGenerationSystem.ShadowEdgeManifold;
 using EdgeMountsMap = Unity.Collections.NativeMultiHashMap<CornerCalculator.Edge.EdgeKey, CornerCalculator.EdgeMount>;
 using EdgeMount = CornerCalculator.EdgeMount;
 

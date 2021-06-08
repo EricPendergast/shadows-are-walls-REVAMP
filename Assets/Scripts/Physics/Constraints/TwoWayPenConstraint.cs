@@ -3,9 +3,24 @@ using Unity.Mathematics;
 
 using Physics.Math;
 
-using ShadowEdgeManifold = ShadowEdgeGenerationSystem.ShadowEdgeManifold;
+public struct ShadowEdgeManifold {
+    public float delta;
+    public float2 n;
+    // The opaque object
+    //public Entity e1;
+    public float2 x1;
+    public float2 d1;
+    // The shadow hitting object
+    public Entity e2;
+    public float2 x2;
 
-public struct ShadowEdgeConstraint : IConstraint {
+    // Contact point
+    public float2 p;
+    // Unique id for the point of contact on the shadow hitting object.
+    public int contactIdOn2;
+}
+
+public struct TwoWayPenConstraint : IConstraint {
     // The opaque object
     public Entity e1;
     // The shadow hitting object
@@ -21,7 +36,7 @@ public struct ShadowEdgeConstraint : IConstraint {
 
     PenetrationConstraint<Float6> penConstraint;
 
-    public ShadowEdgeConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt) {
+    public TwoWayPenConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt) {
         e1 = p.e1;
         e2 = p.e2;
 

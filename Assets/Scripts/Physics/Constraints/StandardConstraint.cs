@@ -14,7 +14,7 @@ public struct Lambdas {
 // Constraint for penetration and friction. With the correct
 // jacobian, should work for normal rigidbodies (like box, circle,
 // etc). May or may not work for crazier rigidbodies.
-public struct StandardConstraint : IConstraint {
+public struct TwoWayPenFricConstraint : IConstraint {
     public Entity e1 {get;}
     public Entity e2 {get;}
     private Lambdas accum;
@@ -29,7 +29,7 @@ public struct StandardConstraint : IConstraint {
     PenetrationConstraint<Float6> penConstraint;
     FrictionConstraint<Float6> fricConstraint;
 
-    public StandardConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt) {
+    public TwoWayPenFricConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt) {
         e1 = p.e1;
         e2 = p.e2;
 
