@@ -19,7 +19,6 @@ public class ShadowEdgeGenerationSystem : SystemBase {
     NativeList<TwoWayPenConstraint.Partial> partialEdgeConstraints;
     NativeList<ThreeWayPenConstraint.Partial> partialCornerConstraints;
 
-    // TODO: This will replace some of the above stuff
     NativeMultiHashMap<Entity, CornerCalculator.Edge> boxOverlappingEdges;
     EdgeMountsMap edgeMounts;
 
@@ -75,8 +74,6 @@ public class ShadowEdgeGenerationSystem : SystemBase {
 
         var shadHitBoxes = shadHitBoxesQuery.ToComponentDataArray<Box>(Allocator.TempJob);
         var shadHitBoxEntities = shadHitBoxesQuery.ToEntityArray(Allocator.TempJob);
-
-        var boxes = GetComponentDataFromEntity<Box>(true);
 
         // Step 1: Initialization
         // Can be optimized
