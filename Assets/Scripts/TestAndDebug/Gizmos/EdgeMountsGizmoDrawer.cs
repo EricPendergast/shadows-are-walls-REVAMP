@@ -44,7 +44,7 @@ public class EdgeMountsGizmoDrawer : MonoBehaviour {
 
 
             if (renderEdgeMounts) {
-                foreach (var (manifold, mount) in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetEdgeMountsForDebug()) {
+                foreach (var (manifold, mount, _) in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetEdgeMountsForDebug()) {
                     int id = renderMountsWithManifoldColor ? Mathf.Abs(manifold.contactIdOn2) : Mathf.Abs(mount.id);
                     DrawMount(mount, id);
                 }

@@ -193,8 +193,8 @@ public class ShadowEdgeGenerationSystem : SystemBase {
         return ret;
     }
 
-    public List<(ShadowEdgeManifold, ShadowCornerCalculator.EdgeMount)> GetEdgeMountsForDebug() {
-        var ret = new List<(ShadowEdgeManifold, ShadowCornerCalculator.EdgeMount)>();
+    public List<ShadowCornerCalculator.Outputs.EdgeMountTuple> GetEdgeMountsForDebug() {
+        var ret = new List<ShadowCornerCalculator.Outputs.EdgeMountTuple>();
         ComputeCornersForDebug(
             new ShadowCornerCalculator.Outputs{
                 debugEdgeMounts = ret

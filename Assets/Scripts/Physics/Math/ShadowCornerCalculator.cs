@@ -22,7 +22,7 @@ public struct ShadowCornerCalculator {
         [BurstDiscard]
         public List<ShadowCornerManifold> debugCornerManifolds {get; set;}
         [BurstDiscard]
-        public List<System.ValueTuple<ShadowEdgeManifold, EdgeMount>> debugEdgeMounts {get; set;}
+        public List<EdgeMountTuple> debugEdgeMounts {get; set;}
         [BurstDiscard]
         public List<CornerMountTuple> debugCornerMounts {get; set;}
 
@@ -42,6 +42,18 @@ public struct ShadowCornerCalculator {
             }
         }
 
+        public struct EdgeMountTuple {
+            public ShadowEdgeManifold m;
+            public EdgeMount mount;
+            public TwoWayPenConstraint.Partial partialConstraint;
+
+            public void Deconstruct(out ShadowEdgeManifold m, out EdgeMount mount, out TwoWayPenConstraint.Partial partialConstraint) {
+                m = this.m;
+                mount = this.mount;
+                partialConstraint = this.partialConstraint;
+            }
+        }
+
         [BurstDiscard]
         public void DebugCollect(ShadowEdgeManifold m) {
             if (debugEdgeManifoldCollector != null) {
@@ -56,9 +68,9 @@ public struct ShadowCornerCalculator {
         }
 
         [BurstDiscard]
-        public void DebugCollect(ShadowEdgeManifold manifold, EdgeMount mount) {
+        public void DebugCollect(ShadowEdgeManifold manifold, EdgeMount mount, TwoWayPenConstraint.Partial partial) {
             if (debugEdgeMounts != null) {
-                debugEdgeMounts.Add(new System.ValueTuple<ShadowEdgeManifold, EdgeMount>(manifold, mount));
+                debugEdgeMounts.Add(new EdgeMountTuple{m=manifold, mount=mount, partialConstraint=partial});
             }
         }
         [BurstDiscard]
@@ -433,15 +445,20 @@ public struct ShadowCornerCalculator {
             float2 cornerPrevEdgeDir = GetEdgeDirectionUnnormalized(c.prevEdge);
             float2 cornerNextEdgeDir = GetEdgeDirectionUnnormalized(c.nextEdge);
 
-            if (math.abs(Lin.Cross(edgeCorner1.point - edgeCorner2.point, cornerPrevEdgeDir)) < .01f) {
-                AddManifold(edgeCorner1.prevEdge, edgeCorner1.nextEdge, c.prevEdge);
-                AddManifold(edgeCorner2.prevEdge, edgeCorner2.nextEdge, c.prevEdge);
-            } else if (math.abs(Lin.Cross(edgeCorner1.point - edgeCorner2.point, cornerNextEdgeDir)) < .01f) {
-                AddManifold(edgeCorner1.prevEdge, edgeCorner1.nextEdge, c.nextEdge);
-                AddManifold(edgeCorner2.prevEdge, edgeCorner2.nextEdge, c.nextEdge);
-            } else {
-                AddManifold(edgeCorner1.nextEdge, c.prevEdge, c.nextEdge);
+            float2 edgeVec = edgeCorner1.point - edgeCorner2.point;
+
+            if (math.lengthsq(edgeVec) > .1f*.1f) {
+                if (math.abs(Lin.Cross(edgeVec, cornerPrevEdgeDir)) < .01f) {
+                    AddManifold(edgeCorner1.prevEdge, edgeCorner1.nextEdge, c.prevEdge);
+                    AddManifold(edgeCorner2.prevEdge, edgeCorner2.nextEdge, c.prevEdge);
+                    return;
+                } else if (math.abs(Lin.Cross(edgeVec, cornerNextEdgeDir)) < .01f) {
+                    AddManifold(edgeCorner1.prevEdge, edgeCorner1.nextEdge, c.nextEdge);
+                    AddManifold(edgeCorner2.prevEdge, edgeCorner2.nextEdge, c.nextEdge);
+                    return;
+                }
             }
+            AddManifold(edgeCorner1.nextEdge, c.prevEdge, c.nextEdge);
         }
     }
 
@@ -516,7 +533,7 @@ public struct ShadowCornerCalculator {
             foreach (EdgeMount mount in It.Iterate(edgeMounts, e.GetEdgeKey())) {
                 var p = new TwoWayPenConstraint.Partial(in prototype, in mount, in manifold);
                 o.Collect(p);
-                o.DebugCollect(manifold, mount);
+                o.DebugCollect(manifold, mount, p);
             }
         } else {
             int lineIdx = edge1Idx;

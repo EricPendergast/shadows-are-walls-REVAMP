@@ -5,6 +5,7 @@ using Physics.Math;
 
 public class EdgeManifoldsGizmoDrawer : MonoBehaviour {
     public bool enable = true;
+    public float drawRadius = .05f;
     void OnDrawGizmos() {
         if (Application.isPlaying && enable) {
             var world = World.DefaultGameObjectInjectionWorld;
@@ -24,7 +25,7 @@ public class EdgeManifoldsGizmoDrawer : MonoBehaviour {
                         (id % 4591 % 256)/256.0f, 
                         (id % 5347 % 256)/265.0f,
                         (id % 3797 % 256)/265.0f);
-                Gizmos.DrawSphere((Vector2)manifold.p, .05f*m);
+                Gizmos.DrawSphere((Vector2)manifold.p, drawRadius*m);
             }
         }
     }

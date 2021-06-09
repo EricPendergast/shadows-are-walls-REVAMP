@@ -40,12 +40,6 @@ public class CollisionSystem : SystemBase {
     }
 
     protected override void OnUpdate() {
-        // Don't start doing stuff until the second frame. This is useful
-        // because when you start the game paused, the first frame is always
-        // executed before the pause occurs.
-        if (Time.ElapsedTime == 0) {
-            return;
-        }
 
         var velocities = GetComponentDataFromEntity<Velocity>(false);
 
@@ -67,10 +61,16 @@ public class CollisionSystem : SystemBase {
         twoWayPenCM.PreSteps(dt);
         threeWayPenCM.PreSteps(dt);
 
-        for (int i = 0; i < 10; i++) {
-            twoWayPenFricCM.ApplyImpulses(dt);
-            twoWayPenCM.ApplyImpulses(dt);
-            threeWayPenCM.ApplyImpulses(dt);
+
+        // Do a dry run on the first frame. This is useful because when you
+        // start the game paused, the first frame is always executed before the
+        // pause occurs.
+        if (Time.ElapsedTime != 0) {
+            for (int i = 0; i < 10; i++) {
+                twoWayPenFricCM.ApplyImpulses(dt);
+                twoWayPenCM.ApplyImpulses(dt);
+                threeWayPenCM.ApplyImpulses(dt);
+            }
         }
 
         twoWayPenFricCM.PostSteps();

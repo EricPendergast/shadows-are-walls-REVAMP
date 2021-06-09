@@ -6,6 +6,7 @@ using Unity.Mathematics;
 
 public class CornerManifoldsGizmoDrawer : MonoBehaviour {
     public bool enable = true;
+    public float drawRadius = .05f;
     void OnDrawGizmos() {
         if (Application.isPlaying && enable) {
             var world = World.DefaultGameObjectInjectionWorld;
@@ -24,8 +25,7 @@ public class CornerManifoldsGizmoDrawer : MonoBehaviour {
                         (id % 3797 % 256)/265.0f);
 
                 void DrawPoint(Vector2 point) {
-                    float radius = .05f;
-                    Gizmos.DrawSphere(point, radius);
+                    Gizmos.DrawSphere(point, drawRadius);
                     Gizmos.DrawRay(point, (Vector2)manifold.n);
                 }
 
