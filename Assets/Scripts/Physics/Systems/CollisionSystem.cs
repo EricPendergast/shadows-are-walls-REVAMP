@@ -5,6 +5,7 @@ using Unity.Mathematics;
 using TwoWayPenFricCM = ConstraintManager<TwoWayPenFricConstraint, LambdaNT>;
 using TwoWayPenCM = ConstraintManager<TwoWayPenConstraint, float>;
 using ThreeWayPenCM = ConstraintManager<ThreeWayPenConstraint, float>;
+using TwoWayTwoDOFCM = ConstraintManager<TwoWayTwoDOFConstraint, Unity.Mathematics.float2>;
 
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
 [UpdateAfter(typeof(ConstraintGenerationSystemGroup))]
@@ -18,10 +19,12 @@ public class CollisionSystem : SystemBase {
     public static bool positionCorrection = true;
     // In the future, this will be configurable on a per object basis
     public static float globalFriction = .5f;
+    public static float globalSoftness = 0;
 
     private TwoWayPenFricCM twoWayPenFricCM;
     private TwoWayPenCM twoWayPenCM;
     private ThreeWayPenCM threeWayPenCM;
+    private TwoWayTwoDOFCM twoWayTwoDOFCM;
 
     protected override void OnCreate() {
         boxesQuery = GetEntityQuery(typeof(Box));
@@ -31,12 +34,14 @@ public class CollisionSystem : SystemBase {
         twoWayPenFricCM = new TwoWayPenFricCM();
         twoWayPenCM = new TwoWayPenCM();
         threeWayPenCM = new ThreeWayPenCM();
+        twoWayTwoDOFCM = new TwoWayTwoDOFCM();
     }
 
     protected override void OnDestroy() {
         twoWayPenFricCM.Dispose();
         twoWayPenCM.Dispose();
         threeWayPenCM.Dispose();
+        twoWayTwoDOFCM.Dispose();
     }
 
     protected override void OnUpdate() {
@@ -48,6 +53,7 @@ public class CollisionSystem : SystemBase {
         twoWayPenFricCM.PreSteps(dt, ref vels);
         twoWayPenCM.PreSteps(dt, ref vels);
         threeWayPenCM.PreSteps(dt, ref vels);
+        twoWayTwoDOFCM.PreSteps(dt, ref vels);
 
 
         // Do a dry run on the first frame. This is useful because when you
@@ -58,12 +64,14 @@ public class CollisionSystem : SystemBase {
                 twoWayPenFricCM.ApplyImpulses(dt);
                 twoWayPenCM.ApplyImpulses(dt);
                 threeWayPenCM.ApplyImpulses(dt);
+                twoWayTwoDOFCM.ApplyImpulses(dt);
             }
         }
 
         twoWayPenFricCM.PostSteps();
         twoWayPenCM.PostSteps();
         threeWayPenCM.PostSteps();
+        twoWayTwoDOFCM.PostSteps();
     }
 
     public NativeList<TwoWayPenFricConstraint> GetStandardConstraintsInput() {
@@ -76,6 +84,10 @@ public class CollisionSystem : SystemBase {
 
     public NativeList<ThreeWayPenConstraint> GetThreeWayPenConstraintsInput() {
         return threeWayPenCM.GetConstraintsInput();
+    }
+
+    public NativeList<TwoWayTwoDOFConstraint> GetTwoWayTwoDOFConstraintsInput() {
+        return twoWayTwoDOFCM.GetConstraintsInput();
     }
 
     public struct DebugContactInfo {

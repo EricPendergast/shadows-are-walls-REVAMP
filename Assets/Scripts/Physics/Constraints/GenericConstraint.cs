@@ -6,6 +6,43 @@ using Physics.Math;
 
 using ContactId = Physics.Math.Geometry.ContactId;
 
+// A constraint that restricts two degrees of freedom
+public readonly struct TwoDOFConstraint<T> where T : FloatX<T> {
+    public readonly T J1;
+    public readonly T J2;
+
+    public readonly float2 m_c;
+
+    public readonly float2 bias;
+
+    public readonly float softness;
+
+    public TwoDOFConstraint(T J1, T J2, T M_inv, float2 bias, float softness) {
+        this.J1 = J1;
+        this.J2 = J2;
+
+        this.bias = bias;
+        this.softness = softness;
+
+        m_c = 1 / new float2(J1.Mult(M_inv).Dot(J1) + softness, J2.Mult(M_inv).Dot(J2) + softness);
+    }
+
+    public T GetImpulse(float2 lambda) {
+        return J1.Mult(lambda.x).Add(J2.Mult(lambda.y));
+    }
+
+    public T GetImpulse(T v, ref float2 accumulatedLambda) {
+        float2 lambda = new float2(
+            -m_c.x * (J1.Dot(v) + softness*accumulatedLambda.x + bias.x),
+            -m_c.y * (J2.Dot(v) + softness*accumulatedLambda.y + bias.y)
+        );
+        accumulatedLambda += lambda;
+
+        return GetImpulse(lambda);
+    }
+
+}
+
 public readonly struct PenetrationConstraint<T> where T : FloatX<T> {
     public readonly T J;
     public readonly float m_c;
