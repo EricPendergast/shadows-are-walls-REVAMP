@@ -22,16 +22,16 @@ public struct ShadowCornerManifold {
     public int contactIdOnBox;
 }
 
-public struct ThreeWayPenConstraint : IConstraint {
+public struct ThreeWayPenConstraint : IConstraint<float> {
     // The owner of the first shadow edge
     public Entity e1 {get;}
     // The owner of the second shadow edge
     public Entity e2 {get;}
     // The owner of the shadow hitting object, or the third shadow edge
     public Entity e3 {get;}
-    private Lambdas accum;
-    public Lambdas GetAccumulatedLambdas() {
-        return accum;
+    private float lambdaAccum;
+    public float GetAccumulatedLambda() {
+        return lambdaAccum;
     }
 
     public int id {get;}
@@ -55,7 +55,7 @@ public struct ThreeWayPenConstraint : IConstraint {
         penConstraint = new PenetrationConstraint<Float9>(p.J_n, M_inv, p.bias/dt);
         this.M_inv = M_inv;
 
-        accum = new Lambdas();
+        lambdaAccum = new float();
     }
 
     public struct Partial {
@@ -207,20 +207,40 @@ public struct ThreeWayPenConstraint : IConstraint {
         }
     }
 
-    public void PreStep(ref Velocity v1, ref Velocity v2, ref Velocity v3, float dt, Lambdas prevLambdas) {
-        accum = prevLambdas;
+    public void PreStep(ComponentDataFromEntity<Velocity> vels, float dt, float prevLambda) {
+        lambdaAccum = prevLambda;
+
+        var v1 = vels[e1];
+        var v2 = vels[e2];
+        var v3 = vels[e3];
 
         if (CollisionSystem.accumulateImpulses) {
-            Float9 P_n = penConstraint.GetImpulse(accum.n);
+            Float9 P_n = penConstraint.GetImpulse(lambdaAccum);
 
             ApplyImpulse(P_n, ref v1, ref v2, ref v3);
         }
+
+        vels[e1] = v1;
+        vels[e2] = v2;
+        vels[e3] = v3;
     }
 
-    public void ApplyImpulse(ref Velocity v1, ref Velocity v2, ref Velocity v3, float dt) {
+    public void ApplyImpulses(ComponentDataFromEntity<Velocity> vels, float dt) {
+        var v1 = vels[e1];
+        var v2 = vels[e2];
+        var v3 = vels[e3];
+
+        ApplyImpulses(ref v1, ref v2, ref v3, dt);
+
+        vels[e1] = v1;
+        vels[e2] = v2;
+        vels[e3] = v3;
+    }
+
+    public void ApplyImpulses(ref Velocity v1, ref Velocity v2, ref Velocity v3, float dt) {
         Float9 v = GetV(ref v1, ref v2, ref v3);
 
-        Float9 P = penConstraint.GetImpulse(v, ref accum.n);
+        Float9 P = penConstraint.GetImpulse(v, ref lambdaAccum);
 
         ApplyImpulse(P, ref v1, ref v2, ref v3);
     }

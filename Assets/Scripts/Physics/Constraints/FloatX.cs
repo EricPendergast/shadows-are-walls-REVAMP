@@ -1,6 +1,6 @@
 using Unity.Mathematics;
 
-public interface FloatX<T> {
+public interface FloatX<T> where T : FloatX<T> {
     public T Add(T other);
     public float Dot(T other);
     public T Mult(T other);

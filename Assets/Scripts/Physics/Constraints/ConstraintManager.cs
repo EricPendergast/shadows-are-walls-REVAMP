@@ -1,37 +1,34 @@
+using Unity.Entities;
 using Unity.Collections;
 using UnityEngine;
 
-public interface IConstraint {
+public interface IConstraint<LambdaType> where LambdaType : struct {
     public int id {get;}
-    //public float2 normal {get;}
-    //public float2 contact {get;}
-    public Lambdas GetAccumulatedLambdas();
+    public LambdaType GetAccumulatedLambda();
+
+    public void PreStep(ComponentDataFromEntity<Velocity> vels, float dt, LambdaType lambdaInit);
+    public void ApplyImpulses(ComponentDataFromEntity<Velocity> vels, float dt);
 }
 
-public interface ConstraintManagerHelper<C> where C : struct, IConstraint {
-     void ApplyImpulse(ref C constraint, float dt);
-     void PreStep(ref C constraint, float dt, Lambdas lambdas);
-}
+public class ConstraintManager<ConstraintType, LambdaType> 
+        where ConstraintType : struct, IConstraint<LambdaType>
+        where LambdaType : struct {
 
-public class ConstraintManager<H, C> 
-        where C : struct, IConstraint
-        where H : struct, ConstraintManagerHelper<C> {
-
-    private NativeList<C> constraints;
+    private NativeList<ConstraintType> constraints;
     private WarmStartManager warmStart;
-    public H helper;
+    private ComponentDataFromEntity<Velocity> vels;
 
     public ConstraintManager() {
-        constraints = new NativeList<C>(0, Allocator.Persistent);
-        helper = default(H);
+        constraints = new NativeList<ConstraintType>(0, Allocator.Persistent);
         warmStart = new WarmStartManager();
     }
 
-    public void PreSteps(float dt) {
+    public void PreSteps(float dt, ref ComponentDataFromEntity<Velocity> vels) {
+        this.vels = vels;
         for (int j = 0; j < constraints.Length; j++) {
             var c = constraints[j];
 
-            helper.PreStep(ref c, dt, warmStart.GetLambdas(c.id));
+            c.PreStep(vels, dt, warmStart.GetLambda(c.id));
 
             // TODO: Non readonly structs are EVIL
             constraints[j] = c;
@@ -39,11 +36,10 @@ public class ConstraintManager<H, C>
     }
 
     public void ApplyImpulses(float dt) {
-
         for (int j = 0; j < constraints.Length; j++) {
             var c = constraints[j];
 
-            helper.ApplyImpulse(ref c, dt);
+            c.ApplyImpulses(vels, dt);
 
             // TODO: Non readonly structs are EVIL
             constraints[j] = c;
@@ -55,7 +51,7 @@ public class ConstraintManager<H, C>
         constraints.Clear();
     }
 
-    public NativeList<C> GetConstraintsInput() {
+    public NativeList<ConstraintType> GetConstraintsInput() {
         return constraints;
     }
 
@@ -73,27 +69,27 @@ public class ConstraintManager<H, C>
     public class WarmStartManager {
         // Maps from contact id to the accumulated lambda of that contact last
         // frame. Used for warm starting.
-        private NativeHashMap<int, Lambdas> prevLambdas;
+        private NativeHashMap<int, LambdaType> prevLambdas;
 
         public WarmStartManager() {
-            prevLambdas = new NativeHashMap<int, Lambdas>(0, Allocator.Persistent);
+            prevLambdas = new NativeHashMap<int, LambdaType>(0, Allocator.Persistent);
         }
 
-        public Lambdas GetLambdas(int id) {
-            Lambdas lambdas;
+        public LambdaType GetLambda(int id) {
+            LambdaType lambda;
             if (CollisionSystem.warmStarting && prevLambdas.TryGetValue(id, out var l)) {
-                lambdas = l;
+                lambda = l;
             } else {
-                lambdas = new Lambdas();
+                lambda = new LambdaType();
             }
-            return lambdas;
+            return lambda;
         }
 
-        public void SaveLambdas(NativeArray<C> constraints) {
+        public void SaveLambdas(NativeArray<ConstraintType> constraints) {
             prevLambdas.Clear();
             foreach (var constraint in constraints) {
                 Debug.Assert(!prevLambdas.ContainsKey(constraint.id), "Duplicate contact id: " + constraint.id.ToString());
-                prevLambdas[constraint.id] = constraint.GetAccumulatedLambdas();
+                prevLambdas[constraint.id] = constraint.GetAccumulatedLambda();
             }
         }
 

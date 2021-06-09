@@ -2,9 +2,9 @@ using Unity.Entities;
 using Unity.Collections;
 using Unity.Mathematics;
 
-using TwoWayPenFricCM = ConstraintManager<TwoWayPenFricConstraintHelper, TwoWayPenFricConstraint>;
-using TwoWayPenCM = ConstraintManager<TwoWayPenConstraintHelper, TwoWayPenConstraint>;
-using ThreeWayPenCM = ConstraintManager<ThreeWayPenConstraintHelper, ThreeWayPenConstraint>;
+using TwoWayPenFricCM = ConstraintManager<TwoWayPenFricConstraint, LambdaNT>;
+using TwoWayPenCM = ConstraintManager<TwoWayPenConstraint, float>;
+using ThreeWayPenCM = ConstraintManager<ThreeWayPenConstraint, float>;
 
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
 [UpdateAfter(typeof(ConstraintGenerationSystemGroup))]
@@ -41,25 +41,13 @@ public class CollisionSystem : SystemBase {
 
     protected override void OnUpdate() {
 
-        var velocities = GetComponentDataFromEntity<Velocity>(false);
+        var vels = GetComponentDataFromEntity<Velocity>(false);
 
         float dt = Time.DeltaTime;
         
-        twoWayPenFricCM.helper.Update(
-            vels: velocities
-        );
-
-        twoWayPenCM.helper.Update(
-            vels: velocities
-        );
-
-        threeWayPenCM.helper.Update(
-            vels: velocities
-        );
-
-        twoWayPenFricCM.PreSteps(dt);
-        twoWayPenCM.PreSteps(dt);
-        threeWayPenCM.PreSteps(dt);
+        twoWayPenFricCM.PreSteps(dt, ref vels);
+        twoWayPenCM.PreSteps(dt, ref vels);
+        threeWayPenCM.PreSteps(dt, ref vels);
 
 
         // Do a dry run on the first frame. This is useful because when you

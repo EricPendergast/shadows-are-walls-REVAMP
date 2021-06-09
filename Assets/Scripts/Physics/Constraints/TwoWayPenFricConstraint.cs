@@ -5,21 +5,15 @@ using Physics.Math;
 
 using ContactId = Physics.Math.Geometry.ContactId;
 
-// TODO: Put this in StandardConstraint
-public struct Lambdas {
-    public float n;
-    public float t;
-}
-
 // Constraint for penetration and friction. With the correct
 // jacobian, should work for normal rigidbodies (like box, circle,
 // etc). May or may not work for crazier rigidbodies.
-public struct TwoWayPenFricConstraint : IConstraint {
+public struct TwoWayPenFricConstraint : IConstraint<LambdaNT> {
     public Entity e1 {get;}
     public Entity e2 {get;}
-    private Lambdas accum;
-    public Lambdas GetAccumulatedLambdas() {
-        return accum;
+    private LambdaNT lambdaAccum;
+    public LambdaNT GetAccumulatedLambda() {
+        return lambdaAccum;
     }
 
     public int id {get;}
@@ -38,7 +32,7 @@ public struct TwoWayPenFricConstraint : IConstraint {
         penConstraint = new PenetrationConstraint<Float6>(p.J_n, M_inv, p.bias/dt);
         fricConstraint = new FrictionConstraint<Float6>(p.J_t, M_inv, CollisionSystem.globalFriction);
 
-        accum = new Lambdas();
+        lambdaAccum = new LambdaNT();
     }
 
     public struct Partial {
@@ -87,22 +81,32 @@ public struct TwoWayPenFricConstraint : IConstraint {
         }
     }
 
-    public void PreStep(ref Velocity v1, ref Velocity v2, float dt, Lambdas prevLambdas) {
-        accum = prevLambdas;
+    public void PreStep(ComponentDataFromEntity<Velocity> vels, float dt, LambdaNT prevLambdas) {
+
+        lambdaAccum = prevLambdas;
+
+        Velocity v1 = vels[e1];
+        Velocity v2 = vels[e2];
 
         if (CollisionSystem.accumulateImpulses) {
-            Float6 P_n = penConstraint.GetImpulse(accum.n);
-            Float6 P_t = fricConstraint.GetImpulse(accum.t);
+            Float6 P_n = penConstraint.GetImpulse(lambdaAccum.n);
+            Float6 P_t = fricConstraint.GetImpulse(lambdaAccum.t);
 
             ApplyImpulse(P_n.Add(P_t), ref v1, ref v2);
         }
+
+        vels[e1] = v1;
+        vels[e2] = v2;
     }
 
-    public void ApplyImpulse(ref Velocity v1, ref Velocity v2, float dt) {
+    public void ApplyImpulses(ComponentDataFromEntity<Velocity> vels, float dt) {
+        Velocity v1 = vels[e1];
+        Velocity v2 = vels[e2];
+
         {
             Float6 v = GetV(ref v1, ref v2);
 
-            Float6 P = fricConstraint.GetImpulse(v, ref accum.t, ref accum.n);
+            Float6 P = fricConstraint.GetImpulse(v, ref lambdaAccum.t, ref lambdaAccum.n);
 
             ApplyImpulse(P, ref v1, ref v2);
         }
@@ -110,11 +114,13 @@ public struct TwoWayPenFricConstraint : IConstraint {
         {
             Float6 v = GetV(ref v1, ref v2);
 
-            Float6 P = penConstraint.GetImpulse(v, ref accum.n);
+            Float6 P = penConstraint.GetImpulse(v, ref lambdaAccum.n);
 
             ApplyImpulse(P, ref v1, ref v2);
         }
 
+        vels[e1] = v1;
+        vels[e2] = v2;
     }
 
     private static Float6 GetV(ref Velocity v1, ref Velocity v2) {

@@ -20,14 +20,14 @@ public struct ShadowEdgeManifold {
     public int contactIdOn2;
 }
 
-public struct TwoWayPenConstraint : IConstraint {
+public struct TwoWayPenConstraint : IConstraint<float> {
     // The opaque object
     public Entity e1;
     // The shadow hitting object
     public Entity e2;
-    private Lambdas accum;
-    public Lambdas GetAccumulatedLambdas() {
-        return accum;
+    private float lambdaAccum;
+    public float GetAccumulatedLambda() {
+        return lambdaAccum;
     }
 
     public int id {get; set;}
@@ -45,7 +45,7 @@ public struct TwoWayPenConstraint : IConstraint {
         penConstraint = new PenetrationConstraint<Float6>(p.J_n, M_inv, p.bias/dt);
         this.M_inv = M_inv;
 
-        accum = new Lambdas();
+        lambdaAccum = new float();
     }
     public struct Partial {
         public Entity e1;
@@ -105,22 +105,34 @@ public struct TwoWayPenConstraint : IConstraint {
         }
     }
 
-    public void PreStep(ref Velocity v1, ref Velocity v2, float dt, Lambdas prevLambdas) {
-        accum = prevLambdas;
+    public void PreStep(ComponentDataFromEntity<Velocity> vels, float dt, float prevLambda) {
+        lambdaAccum = prevLambda;
+
+        var v1 = vels[e1];
+        var v2 = vels[e2];
 
         if (CollisionSystem.accumulateImpulses) {
-            Float6 P_n = penConstraint.GetImpulse(accum.n);
+            Float6 P_n = penConstraint.GetImpulse(lambdaAccum);
 
             ApplyImpulse(P_n, ref v1, ref v2);
         }
+
+        vels[e1] = v1;
+        vels[e2] = v2;
     }
 
-    public void ApplyImpulse(ref Velocity v1, ref Velocity v2, float dt) {
+    public void ApplyImpulses(ComponentDataFromEntity<Velocity> vels, float dt) {
+        var v1 = vels[e1];
+        var v2 = vels[e2];
+
         Float6 v = GetV(ref v1, ref v2);
 
-        Float6 P = penConstraint.GetImpulse(v, ref accum.n);
+        Float6 P = penConstraint.GetImpulse(v, ref lambdaAccum);
 
         ApplyImpulse(P, ref v1, ref v2);
+
+        vels[e1] = v1;
+        vels[e2] = v2;
     }
 
     private static Float6 GetV(ref Velocity v1, ref Velocity v2) {

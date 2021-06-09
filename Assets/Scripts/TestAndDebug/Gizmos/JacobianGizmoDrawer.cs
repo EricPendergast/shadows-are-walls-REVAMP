@@ -121,7 +121,7 @@ public class JacobianGizmoDrawer : MonoBehaviour {
                     v2 = GetVelocity(constraint.e2);
                     v3 = GetVelocity(constraint.e3);
 
-                    constraint.ApplyImpulse(ref v1, ref v2, ref v3, dt: 1);
+                    constraint.ApplyImpulses(ref v1, ref v2, ref v3, dt: 1);
 
                     velocities.Clear();
                     SetVelocity(constraint.e1, v1);
