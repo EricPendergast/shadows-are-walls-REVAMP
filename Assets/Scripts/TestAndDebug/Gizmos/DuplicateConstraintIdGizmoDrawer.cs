@@ -24,7 +24,7 @@ public class DuplicateConstraintIdGizmoDrawer : MonoBehaviour {
 
         var world = World.DefaultGameObjectInjectionWorld;
 
-        foreach (var cornerMountTuple in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetCornerMountsForDebug()) {
+        foreach (var cornerMountTuple in world.GetOrCreateSystem<ShadowConstraintSystem>().GetCornerMountsForDebug()) {
             dict.Add(cornerMountTuple.partialConstraint.id, cornerMountTuple);
         }
 
@@ -60,7 +60,7 @@ public class DuplicateConstraintIdGizmoDrawer : MonoBehaviour {
 
         var world = World.DefaultGameObjectInjectionWorld;
 
-        foreach (var edgeMountTuple in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetEdgeMountsForDebug()) {
+        foreach (var edgeMountTuple in world.GetOrCreateSystem<ShadowConstraintSystem>().GetEdgeMountsForDebug()) {
             dict.Add(edgeMountTuple.partialConstraint.id, edgeMountTuple);
         }
 

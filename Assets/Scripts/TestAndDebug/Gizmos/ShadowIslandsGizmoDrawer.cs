@@ -21,7 +21,7 @@ public class ShadowIslandsGizmoDrawer : MonoBehaviour {
             var world = World.DefaultGameObjectInjectionWorld;
 
 
-            List<Corner> corners = world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetShadowIslandsForDebug();
+            List<Corner> corners = world.GetOrCreateSystem<ShadowConstraintSystem>().GetShadowIslandsForDebug();
             if (corners.Count == 0) {
                 return;
             }

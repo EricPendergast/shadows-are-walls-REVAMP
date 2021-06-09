@@ -44,14 +44,14 @@ public class EdgeMountsGizmoDrawer : MonoBehaviour {
 
 
             if (renderEdgeMounts) {
-                foreach (var (manifold, mount, _) in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetEdgeMountsForDebug()) {
+                foreach (var (manifold, mount, _) in world.GetOrCreateSystem<ShadowConstraintSystem>().GetEdgeMountsForDebug()) {
                     int id = renderMountsWithManifoldColor ? Mathf.Abs(manifold.contactIdOn2) : Mathf.Abs(mount.id);
                     DrawMount(mount, id);
                 }
             }
 
             if (renderCornerMounts) {
-                foreach (var (manifold, mount1, mount2, mount3, _) in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetCornerMountsForDebug()) {
+                foreach (var (manifold, mount1, mount2, mount3, _) in world.GetOrCreateSystem<ShadowConstraintSystem>().GetCornerMountsForDebug()) {
                     int id1 = Mathf.Abs(mount1.id);
                     int id2 = Mathf.Abs(mount2.id);
                     int id3 = mount3 != null ? Mathf.Abs(mount3.Value.id) : 0;

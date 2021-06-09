@@ -13,7 +13,7 @@ public class CornerManifoldsGizmoDrawer : MonoBehaviour {
 
             var set = new HashSet<int>();
 
-            foreach (var manifold in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetCornerManifoldsForDebug()) {
+            foreach (var manifold in world.GetOrCreateSystem<ShadowConstraintSystem>().GetCornerManifoldsForDebug()) {
                 int id = Mathf.Abs(manifold.contactIdOnBox);
                 // Indicates there is a duplicate contact. This should never happen
                 float m = set.Contains(id) ? 5 : 1;

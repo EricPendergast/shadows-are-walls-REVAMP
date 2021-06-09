@@ -12,7 +12,7 @@ public class EdgeManifoldsGizmoDrawer : MonoBehaviour {
 
             var set = new HashSet<int>();
 
-            foreach (var manifold in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetEdgeManifoldsForDebug()) {
+            foreach (var manifold in world.GetOrCreateSystem<ShadowConstraintSystem>().GetEdgeManifoldsForDebug()) {
                 Gizmos.color = Color.red;
                 Gizmos.DrawRay((Vector2)manifold.p, (Vector2)manifold.n);
                 int id = Mathf.Abs(manifold.contactIdOn2.GetHashCode());

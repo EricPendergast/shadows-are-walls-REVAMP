@@ -11,7 +11,7 @@ public class ShadowEdgesGizmoDrawer : MonoBehaviour {
 
             var ids = new HashSet<int>();
 
-            foreach (var shadowEdge in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetShadowEdgesForDebug()) {
+            foreach (var shadowEdge in world.GetOrCreateSystem<ShadowConstraintSystem>().GetShadowEdgesForDebug()) {
                 void CheckId(int id) {
                     if (ids.Contains(id)) {
                         Debug.LogError("Duplicate shadow edges with id: " + id);

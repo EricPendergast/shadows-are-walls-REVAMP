@@ -85,7 +85,7 @@ public class JacobianGizmoDrawer : MonoBehaviour {
 
             var velocities = new Dictionary<Entity, Velocity>();
             
-            foreach (var tup in world.GetOrCreateSystem<ShadowEdgeGenerationSystem>().GetCornerMountsForDebug()) {
+            foreach (var tup in world.GetOrCreateSystem<ShadowConstraintSystem>().GetCornerMountsForDebug()) {
                 var (manifold, mount1, mount2, mount3, pConstraint) = tup;
 
                 // Recalculating pConstraint to have bias such that a complete resolution occurs
