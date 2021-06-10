@@ -3,6 +3,8 @@ using Unity.Mathematics;
 
 using Physics.Math;
 
+using Lambda = Unity.Mathematics.float2;
+
 public struct RevoluteJointManifold {
     public Entity e1;
     public Entity e2;
@@ -14,14 +16,15 @@ public struct RevoluteJointManifold {
     public float beta;
 }
 
-public struct TwoWayTwoDOFConstraint : IConstraint<float2> {
+
+public struct TwoWayTwoDOFConstraint : IConstraint<Lambda> {
     private Entity e1;
     private Entity e2;
 
     public int id {get;}
-    private float2 lambdaAccum;
+    private Lambda lambdaAccum;
 
-    public float2 GetAccumulatedLambda() {
+    public Lambda GetAccumulatedLambda() {
         return lambdaAccum;
     }
 
@@ -34,14 +37,20 @@ public struct TwoWayTwoDOFConstraint : IConstraint<float2> {
         e2 = m.e2;
         id = m.id;
 
-        float2 dCdOmega1 = Lin.Cross(m.r1, 1);
-        float2 dCdOmega2 = -Lin.Cross(m.r2, 1);
+        float2 normX = new float2(1, 0);
+        float2 normY = new float2(0, 1);
 
         M_inv = new Float6(masses[e1].M_inv, masses[e2].M_inv);
 
         constraint = new TwoDOFConstraint<Float6>(
-            J1: new Float6(-1, 0, dCdOmega1.x, 1, 0, dCdOmega2.x),
-            J2: new Float6(0, -1, dCdOmega1.y, 0, 1, dCdOmega2.y),
+            J1: new Float6(
+                new float3(-normX, -Lin.Cross(m.r1, normX)),
+                new float3(normX, Lin.Cross(m.r2, normX))
+            ),
+            J2: new Float6(
+                new float3(-normY, -Lin.Cross(m.r1, normY)),
+                new float3(normY, Lin.Cross(m.r2, normY))
+            ),
             M_inv: M_inv,
             bias: m.delta * m.beta / dt,
             softness: m.softness
@@ -50,7 +59,7 @@ public struct TwoWayTwoDOFConstraint : IConstraint<float2> {
         lambdaAccum = float2.zero;
     }
 
-    public void PreStep(ComponentDataFromEntity<Velocity> vels, float dt, float2 prevLambda) {
+    public void PreStep(ComponentDataFromEntity<Velocity> vels, float dt, Lambda prevLambda) {
         lambdaAccum = prevLambda;
 
         var v1 = vels[e1];

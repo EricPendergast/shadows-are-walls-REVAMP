@@ -6,6 +6,7 @@ using UnityEngine;
 
 using Physics.Math;
 
+[AlwaysUpdateSystem]
 [UpdateInGroup(typeof(SimulationSystemGroup))]
 public class MouseDragSystem : SystemBase {
     float2? mousePrevPos;
@@ -80,8 +81,8 @@ public class MouseDragSystem : SystemBase {
         em.SetComponentData(mouseEntity, mouseComponent);
         em.SetComponentData(mouseEntity, mouseVelocity);
 
-        //if (mouseComponent.grabData is MouseComponent.EntityGrabData gd) {
-        //    Debug.Log("Grabbed " + gd.entity);
+        //if (mouseComponent.grabData is MouseComponent.EntityGrabData g) {
+        //    Debug.Log("Grabbed " + g.entity);
         //} else {
         //    Debug.Log("Not grabbing");
         //}
