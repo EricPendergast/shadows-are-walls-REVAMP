@@ -12,6 +12,7 @@ public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
 
     public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem) {
         dstManager.AddComponentData(entity, GetLightSource());
+        dstManager.AddComponentData(entity, GetLightPosition());
 
         dstManager.AddComponentData(entity, 
             new Velocity {
@@ -31,10 +32,15 @@ public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
         );
     }
 
+    public Position GetLightPosition() {
+        return new Position {
+            pos = (Vector2)transform.position,
+            rot = transform.eulerAngles.z*Mathf.Deg2Rad,
+        };
+    }
+
     public LightSource GetLightSource() {
         return new LightSource {
-                pos = (Vector2)transform.position,
-                rot = transform.eulerAngles.z*Mathf.Deg2Rad,
                 aperture = aperture * Mathf.Deg2Rad,
                 maxEdgeId = Random.Range(1, int.MaxValue),
                 minEdgeId = Random.Range(1, int.MaxValue),

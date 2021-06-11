@@ -16,8 +16,9 @@ using EdgeMount = ShadowCornerCalculator.EdgeMount;
 using FloatPair = System.ValueTuple<float, float>;
 
 public class ShadowEdgeCalculator {
-    private LightSource source;
     private AngleCalculator angleCalc;
+    private float2 sourcePos {get => angleCalc.SourcePos;}
+    private LightSource lightSource;
     private Entity sourceEntity;
     private int sourceIndex;
     private NativeList<ShapeEdge> shapeEdges;
@@ -108,10 +109,10 @@ public class ShadowEdgeCalculator {
         }
     }
 
-    public ShadowEdgeCalculator(in LightSource source, in Entity sourceEntity, int sourceIndex) {
-        this.source = source;
+    public ShadowEdgeCalculator(in LightSource source, in Entity sourceEntity, in AngleCalculator angleCalc, int sourceIndex) {
+        this.lightSource = source;
         this.sourceEntity = sourceEntity;
-        angleCalc = new AngleCalculator(source);
+        this.angleCalc = angleCalc;
 
         shapeEdges = new NativeList<ShapeEdge>(Allocator.TempJob);
         opaqueWorkingSet = new NativeList<ShapeEdge.OpaqueData>(Allocator.TempJob);
@@ -130,15 +131,15 @@ public class ShadowEdgeCalculator {
 
     // TODO: Rename to something better. (This does not compute the manifolds anymore)
     public void ComputeManifolds(
-            NativeArray<Box> opaqueBoxes, NativeArray<Entity> opaqueBoxEntities, 
-            NativeArray<Box> shadHitBoxes, NativeArray<Entity> shadHitBoxEntities,
+            NativeArray<Box> opaqueBoxes, NativeArray<Position> opaquePositions, NativeArray<Entity> opaqueBoxEntities, 
+            NativeArray<Box> shadHitBoxes, NativeArray<Position> shadHitPositions, NativeArray<Entity> shadHitBoxEntities,
             ref NativeMultiHashMap<Entity, ShadowCornerCalculator.Edge> boxOverlappingEdges,
             ref EdgeMountsMap edgeMounts) {
 
         // FOR DEBUG
         shadowEdgeDebugInfo.Clear();
 
-        StoreShapeEdges(opaqueBoxes, opaqueBoxEntities, shadHitBoxes, shadHitBoxEntities);
+        StoreShapeEdges(opaqueBoxes, opaquePositions, opaqueBoxEntities, shadHitBoxes, shadHitPositions, shadHitBoxEntities);
         shapeEdges.Sort();
 
         foreach (ShapeEdge edge in shapeEdges) {
@@ -160,7 +161,7 @@ public class ShadowEdgeCalculator {
             
 
             Geometry.ShadowSubtract(
-                lightOrigin: source.pos,
+                lightOrigin: sourcePos,
                 shadowDirection: edgeDir,
                 shadowStart: edgeStart,
                 shadowEnd: ref edgeEnd,
@@ -181,8 +182,8 @@ public class ShadowEdgeCalculator {
         );
 
         if (edgeEnd > edgeStart) {
-            float2 startPoint = source.pos + edgeDir*edgeStart;
-            float2 endPoint = source.pos + edgeDir*edgeEnd;
+            float2 startPoint = sourcePos + edgeDir*edgeStart;
+            float2 endPoint = sourcePos + edgeDir*edgeEnd;
 
             // FOR DEBUG //
             shadowEdgeDebugInfo.Add(new ShadowEdgeDebugInfo{endpoint = endPoint, id1 = lightEdge.id, id2 = null, mount1 = startPoint, mount2 = null});
@@ -200,7 +201,7 @@ public class ShadowEdgeCalculator {
             foreach (ShapeEdge.ShadHitData shadHitObject in shadHitWorkingSet) {
                 bool intersecting = Geometry.IsIntersectingShadowEdge(
                     rect: shadHitObject.rect,
-                    lightOrigin: source.pos,
+                    lightOrigin: sourcePos,
                     shadowDirection: lightEdge.direction,
                     shadowStart: edgeStart,
                     shadowEnd: edgeEnd,
@@ -220,8 +221,8 @@ public class ShadowEdgeCalculator {
                 edgeMounts.Add(edge.GetEdgeKey(), new EdgeMount {
                     castingEntity = sourceEntity,
                     castingShapeType = EdgeSourceType.Light,
-                    point = source.pos,
-                    shapeCenter = source.pos,
+                    point = sourcePos,
+                    shapeCenter = sourcePos,
                     id = lightEdge.id,
                 });
             }
@@ -233,9 +234,9 @@ public class ShadowEdgeCalculator {
         bool leading = !removed;
 
         if (math.isfinite(opaqueEdge.angle)) {
-            float edgeStart = math.distance(source.pos, opaqueEdge.mount1);
+            float edgeStart = math.distance(sourcePos, opaqueEdge.mount1);
             float edgeEnd = 100;
-            float2 edgeDir = (opaqueEdge.mount1 - source.pos)/edgeStart;
+            float2 edgeDir = (opaqueEdge.mount1 - sourcePos)/edgeStart;
 
             SubtractWorkingSetFromEdge(
                 edgeDir: edgeDir,
@@ -244,8 +245,8 @@ public class ShadowEdgeCalculator {
             );
 
             if (edgeEnd > edgeStart) {
-                float2 startPoint = source.pos + edgeDir*edgeStart;
-                float2 endPoint = source.pos + edgeDir*edgeEnd;
+                float2 startPoint = sourcePos + edgeDir*edgeStart;
+                float2 endPoint = sourcePos + edgeDir*edgeEnd;
 
                 // FOR DEBUG //
                 shadowEdgeDebugInfo.Add(new ShadowEdgeDebugInfo{endpoint = endPoint, id1 = opaqueEdge.id1, id2 = opaqueEdge.id2, mount1 = opaqueEdge.mount1, mount2 = opaqueEdge.mount2});
@@ -263,7 +264,7 @@ public class ShadowEdgeCalculator {
                 foreach (ShapeEdge.ShadHitData shadHitObject in shadHitWorkingSet) {
                     bool intersecting = Geometry.IsIntersectingShadowEdge(
                         rect: shadHitObject.rect,
-                        lightOrigin: source.pos,
+                        lightOrigin: sourcePos,
                         shadowDirection: edgeDir,
                         shadowStart: edgeStart,
                         shadowEnd: edgeEnd,
@@ -314,9 +315,9 @@ public class ShadowEdgeCalculator {
         if (math.isfinite(shadHitEdge.angle)) {
             bool leading = !removed;
 
-            float edgeStart = math.distance(source.pos, shadHitEdge.mount);
+            float edgeStart = math.distance(sourcePos, shadHitEdge.mount);
             float edgeEnd = 100;
-            float2 edgeDir = (shadHitEdge.mount - source.pos)/edgeStart;
+            float2 edgeDir = (shadHitEdge.mount - sourcePos)/edgeStart;
 
             SubtractWorkingSetFromEdge(
                 edgeDir: edgeDir,
@@ -348,23 +349,23 @@ public class ShadowEdgeCalculator {
                 edgeMounts.Add(edge.GetEdgeKey(), new ShadowCornerCalculator.EdgeMount{
                     castingEntity = sourceEntity,
                     castingShapeType = EdgeSourceType.Light,
-                    id =  new int2(source.id, edge.lightSide).GetHashCode(),
-                    point = source.pos,
-                    shapeCenter = source.pos
+                    id =  new int2(lightSource.id, edge.lightSide).GetHashCode(),
+                    point = sourcePos,
+                    shapeCenter = sourcePos
                 });
             }
         }
     }
 
     public void StoreShapeEdges(
-            NativeArray<Box> opaqueBoxes, NativeArray<Entity> opaqueBoxEntities, 
-            NativeArray<Box> shadHitBoxes, NativeArray<Entity> shadHitBoxEntities) {
+            NativeArray<Box> opaqueBoxes, NativeArray<Position> opaquePositions, NativeArray<Entity> opaqueBoxEntities, 
+            NativeArray<Box> shadHitBoxes, NativeArray<Position> shadHitPositions, NativeArray<Entity> shadHitBoxEntities) {
         Debug.Assert(opaqueBoxes.Length == opaqueBoxEntities.Length);
         Debug.Assert(shadHitBoxes.Length == shadHitBoxEntities.Length);
         
         for (int i = 0; i < opaqueBoxes.Length; i++) {
-            Rect rect = opaqueBoxes[i].ToRect();
-            Geometry.CalculateShadowGeometry(rect, source.pos, .005f, out var sg1, out var sg2);
+            Rect rect = opaqueBoxes[i].ToRect(opaquePositions[i]);
+            Geometry.CalculateShadowGeometry(rect, sourcePos, .005f, out var sg1, out var sg2);
 
             var fp = angleCalc.Angles(sg1.contact1, sg2.contact1);
             float a1 = fp.Item1;
@@ -394,8 +395,8 @@ public class ShadowEdgeCalculator {
         }
 
         for (int i = 0; i < shadHitBoxes.Length; i++) {
-            Rect rect = shadHitBoxes[i].ToRect();
-            if (rect.Contains(source.pos)) {
+            Rect rect = shadHitBoxes[i].ToRect(shadHitPositions[i]);
+            if (rect.Contains(sourcePos)) {
                 Entity shadHitEntity = shadHitBoxEntities[i];
                 shapeEdges.Add(new ShapeEdge.ShadHitData{
                     angle = -math.INFINITY, 
@@ -413,7 +414,7 @@ public class ShadowEdgeCalculator {
                 });
                 continue;
             }
-            Geometry.CalculateShadowGeometry(rect, source.pos, .005f, out var sg1, out var sg2);
+            Geometry.CalculateShadowGeometry(rect, sourcePos, .005f, out var sg1, out var sg2);
 
             var fp = angleCalc.Angles(sg1.contact1, sg2.contact1);
             float a1 = fp.Item1;
@@ -437,13 +438,13 @@ public class ShadowEdgeCalculator {
 
         shapeEdges.Add(new ShapeEdge.LightData{
             angle = angleCalc.MinAngle(), 
-            direction = source.GetLeadingEdgeNorm(),
-            id = source.minEdgeId
+            direction = angleCalc.MinDirection(),
+            id = lightSource.minEdgeId
         });
         shapeEdges.Add(new ShapeEdge.LightData{
             angle = angleCalc.MaxAngle(),
-            direction = source.GetTrailingEdgeNorm(),
-            id = source.maxEdgeId
+            direction = angleCalc.MaxDirection(),
+            id = lightSource.maxEdgeId
         });
     }
 
@@ -494,6 +495,12 @@ public struct AngleCalculator {
     private float2 leadingLightEdge;
     private float2 trailingLightEdge;
 
+    public AngleCalculator(LightSource source, Position pos) : 
+        this(
+            pos.pos,
+            source.GetLeadingEdgeNorm(pos.rot),
+            source.GetTrailingEdgeNorm(pos.rot)) {}
+
     public AngleCalculator(float2 sourcePos, float2 edgeDir1, float2 edgeDir2) {
         this.sourcePos = sourcePos;
         if (Lin.Cross(edgeDir1, edgeDir2) > 0) {
@@ -505,12 +512,7 @@ public struct AngleCalculator {
         }
     }
 
-    public AngleCalculator(LightSource source) {
-        this.sourcePos = source.pos;
-        this.leadingLightEdge = source.GetLeadingEdgeNorm();
-        this.trailingLightEdge = source.GetTrailingEdgeNorm();
-        Debug.Assert(Lin.Cross(leadingLightEdge, trailingLightEdge) > 0);
-    }
+    public float2 SourcePos {get => sourcePos;}
 
     public FloatPair Angles(float2 p1, float2 p2) {
         float a1 = Angle(p1);

@@ -1,31 +1,22 @@
 using System.Collections.Generic;
 
 using Unity.Entities;
-using Unity.Burst;
-using Unity.Collections;
 using Unity.Mathematics;
-
-using UnityEngine;
-
-using Physics.Math;
 
 [UpdateInGroup(typeof(ConstraintGenerationSystemGroup))]
 public class RevoluteJointSystem : SystemBase {
 
     protected override void OnUpdate() {
         float dt = Time.DeltaTime;
-        var boxes = GetComponentDataFromEntity<Box>();
-        // TODO: I only need position, but position is baked into several
-        // types. So its messy.
-        var mouses = GetComponentDataFromEntity<MouseComponent>();
-        var masses = GetComponentDataFromEntity<Mass>();
 
+        var masses = GetComponentDataFromEntity<Mass>();
+        var positions = GetComponentDataFromEntity<Position>();
 
         var constraints = World.GetOrCreateSystem<CollisionSystem>().GetTwoWayTwoDOFConstraintsInput();
 
         Entities.ForEach((Entity jointEntity, in RevoluteJoint joint) => {
             constraints.Add(new TwoWayTwoDOFConstraint(
-                GetManifold(jointEntity, joint, mouses, boxes),
+                GetManifold(jointEntity, joint, positions),
                 masses,
                 dt
             ));
@@ -36,39 +27,25 @@ public class RevoluteJointSystem : SystemBase {
     public List<RevoluteJointManifold> GetManifoldsForDebug() {
         var ret = new List<RevoluteJointManifold>();
 
-        var boxes = GetComponentDataFromEntity<Box>();
-        var mouses = GetComponentDataFromEntity<MouseComponent>();
+        var positions = GetComponentDataFromEntity<Position>();
 
         Entities
             .WithoutBurst()
             .ForEach((Entity jointEntity, in RevoluteJoint joint) => {
-            ret.Add(GetManifold(jointEntity, joint, mouses, boxes));
+            ret.Add(GetManifold(jointEntity, joint, positions));
         }).Run();
 
         return ret;
     }
 
-    private static RevoluteJointManifold GetManifold(Entity jointEntity, RevoluteJoint joint, ComponentDataFromEntity<MouseComponent> mouses, ComponentDataFromEntity<Box> boxes) {
-        float2 GetPos(Entity e) {
-            if (mouses.HasComponent(e)) {
-                return mouses[e].pos;
-            } else {
-                return boxes[e].pos;
-            }
-        }
+    private static RevoluteJointManifold GetManifold(Entity jointEntity, RevoluteJoint joint, ComponentDataFromEntity<Position> positions) {
+        var pos1 = positions[joint.e1];
+        var pos2 = positions[joint.e2];
 
-        float2 LocalToWorld(Entity e, float2 v) {
-            if (mouses.HasComponent(e)) {
-                return v;
-            } else {
-                return boxes[e].LocalVecToWorld(v);
-            }
-        }
-
-        float2 x1 = GetPos(joint.e1);
-        float2 x2 = GetPos(joint.e2);
-        float2 r1 = LocalToWorld(joint.e1, joint.r1);
-        float2 r2 = LocalToWorld(joint.e2, joint.r2);
+        float2 x1 = pos1.pos;
+        float2 x2 = pos2.pos;
+        float2 r1 = pos1.LocalDirectionToGlobal(joint.r1);
+        float2 r2 = pos2.LocalDirectionToGlobal(joint.r2);
 
         return new RevoluteJointManifold{
             e1 = joint.e1,

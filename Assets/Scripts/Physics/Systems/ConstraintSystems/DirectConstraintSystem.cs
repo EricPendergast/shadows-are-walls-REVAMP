@@ -10,6 +10,7 @@ using Physics.Math;
 public class DirectConstraintSystem : SystemBase {
     EntityQuery boxesQuery;
     ComponentDataFromEntity<Box> boxes;
+    ComponentDataFromEntity<Position> positions;
     ComponentDataFromEntity<Mass> masses;
     float dt;
 
@@ -22,6 +23,7 @@ public class DirectConstraintSystem : SystemBase {
         dt = Time.DeltaTime;
         boxes = GetComponentDataFromEntity<Box>();
         masses = GetComponentDataFromEntity<Mass>();
+        positions = GetComponentDataFromEntity<Position>();
 
         var constraints = World.GetOrCreateSystem<CollisionSystem>().GetStandardConstraintsInput();
 
@@ -59,7 +61,7 @@ public class DirectConstraintSystem : SystemBase {
 
         var partial = new TwoWayPenFricConstraint.Partial(
             e1, e2,
-            box1, box2,
+            positions[e1], positions[e2],
             manifold,
             useContact1
         );
@@ -69,8 +71,8 @@ public class DirectConstraintSystem : SystemBase {
 
     private Geometry.Manifold? GetManifold(Entity box1, Entity box2) {
         return Geometry.GetIntersectData(
-            boxes[box1].ToRect(),
-            boxes[box2].ToRect()
+            boxes[box1].ToRect(positions[box1]),
+            boxes[box2].ToRect(positions[box2])
         );
     }
 }

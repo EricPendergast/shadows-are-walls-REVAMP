@@ -181,8 +181,8 @@ public struct ShadowCornerCalculator {
 
     private Outputs o;
 
-    public ShadowCornerCalculator(Box box, Entity boxEntity, NativeArray<LightSource> lights, NativeArray<AngleCalculator> lightAngleCalculators, MultiHashMapIterator<Entity, Edge> edges, ref NativeMultiHashMap<Edge.EdgeKey, EdgeMount> edgeMounts, in Outputs o) {
-        this.box = box.ToRect();
+    public ShadowCornerCalculator(Box box, Position boxPos, Entity boxEntity, NativeArray<LightSource> lights, NativeArray<AngleCalculator> lightAngleCalculators, MultiHashMapIterator<Entity, Edge> edges, ref NativeMultiHashMap<Edge.EdgeKey, EdgeMount> edgeMounts, in Outputs o) {
+        this.box = box.ToRect(boxPos);
         this.boxEntity = boxEntity;
         this.lights = lights;
         this.edges = new FixedList512<Edge>();
@@ -200,6 +200,10 @@ public struct ShadowCornerCalculator {
         ComputeManifolds();
     }
 
+    public float2 GetLightPos(int lightIdx) {
+        return lightAngleCalculators[lightIdx].SourcePos;
+    }
+
     public float2 GetEdgeDirectionUnnormalized(int edgeIdx) {
         if (edgeIdx < 0) {
             return box.GetEdgeDirection(edgeIdx);
@@ -213,7 +217,7 @@ public struct ShadowCornerCalculator {
         float2 r1;
         if (edge1Idx >= 0) {
             Edge edge1 = edges[edge1Idx];
-            s1 = lights[edge1.lightSource].pos;
+            s1 = GetLightPos(edge1.lightSource);
             r1 = edge1.direction;
         } else {
             s1 = box.GetVertex(edge1Idx);
@@ -230,7 +234,7 @@ public struct ShadowCornerCalculator {
         float2 r2;
         if (edge2Idx >= 0) {
             Edge edge2 = edges[edge2Idx];
-            s2 = lights[edge2.lightSource].pos;
+            s2 = GetLightPos(edge2.lightSource);
             r2 = edge2.direction;
         } else {
             s2 = box.GetVertex(edge2Idx);
@@ -319,7 +323,7 @@ public struct ShadowCornerCalculator {
         if (edge.isIlluminationTag) {
             return;
         }
-        float2 lightPos = lights[edge.lightSource].pos;
+        float2 lightPos = GetLightPos(edge.lightSource);
         var angleCalculator = lightAngleCalculators[edge.lightSource];
 
         float2 lightNormal = angleCalculator.NormalTowardsLight(edge.direction, edge.lightSide);
@@ -401,7 +405,7 @@ public struct ShadowCornerCalculator {
             }
             Edge edge = edges[edgeIdx];
             var edgeLightAngleCalc = this.lightAngleCalculators[edge.lightSource];
-            float2 edgeLightPos = this.lights[edge.lightSource].pos;
+            float2 edgeLightPos = GetLightPos(edge.lightSource);
 
             EdgeCornerIdx? worstPairIdx = null;
             float maxCost = -math.INFINITY;
@@ -507,7 +511,7 @@ public struct ShadowCornerCalculator {
             Edge e = edges[shadowEdge];
 
             float2 normal = -lightAngleCalculators[e.lightSource].NormalTowardsLight(e.direction, e.lightSide);
-            float2 lightSource = lights[e.lightSource].pos;
+            float2 lightSource = GetLightPos(e.lightSource);
         
             float delta = -math.dot(corner - lightSource, normal);
 
@@ -545,10 +549,10 @@ public struct ShadowCornerCalculator {
 
             var m = new ShadowCornerManifold {
                 d1 = shadowEdge1.direction,
-                x1 = lights[shadowEdge1.lightSource].pos,
+                x1 = GetLightPos(shadowEdge1.lightSource),
 
                 d2 = shadowEdge2.direction,
-                x2 = lights[shadowEdge2.lightSource].pos,
+                x2 = GetLightPos(shadowEdge2.lightSource),
                
                 p1 = Intersection(lineIdx, shadowEdge1Idx),
                 p2 = Intersection(lineIdx, shadowEdge2Idx),
@@ -581,7 +585,7 @@ public struct ShadowCornerCalculator {
                 var shadowEdge3Idx = lineIdx;
                 Edge shadowEdge3 = edges[shadowEdge3Idx];
                 m.n = lightAngleCalculators[shadowEdge3.lightSource].NormalTowardsLight(shadowEdge3.direction, shadowEdge3.lightSide);
-                m.x3 = lights[shadowEdge3.lightSource].pos;
+                m.x3 = GetLightPos(shadowEdge3.lightSource);
                 m.s = m.x3;
 
                 o.DebugCollect(m);

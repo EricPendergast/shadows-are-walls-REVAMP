@@ -30,11 +30,15 @@ public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
 
         dstManager.AddComponentData(entity, 
             new Box {
-                pos = (Vector2)transform.position,
-                rot = transform.eulerAngles.z*Mathf.Deg2Rad,
                 width = w,
                 height = h,
                 id = Random.Range(1, int.MaxValue)
+            });
+
+        dstManager.AddComponentData(entity,
+            new Position {
+                pos = (Vector2)transform.position,
+                rot = transform.eulerAngles.z*Mathf.Deg2Rad,
             });
 
         dstManager.AddComponentData(entity, 

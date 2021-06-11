@@ -1,10 +1,7 @@
 using Unity.Entities;
-using Unity.Transforms;
 using Unity.Mathematics;
 using UnityEngine.InputSystem;
 using UnityEngine;
-
-using Physics.Math;
 
 [AlwaysUpdateSystem]
 [UpdateInGroup(typeof(SimulationSystemGroup))]
@@ -25,6 +22,9 @@ public class MouseDragSystem : SystemBase {
         em.AddComponentData(mouseEntity, 
             new Velocity()
         );
+        em.AddComponentData(mouseEntity, 
+            new Position()
+        );
     }
 
     protected override void OnUpdate() {
@@ -37,23 +37,24 @@ public class MouseDragSystem : SystemBase {
 
         var mouseComponent = em.GetComponentData<MouseComponent>(mouseEntity);
         var mouseVelocity = em.GetComponentData<Velocity>(mouseEntity);
+        var mousePosition = em.GetComponentData<Position>(mouseEntity);
 
         {
             float2 currentMousePos = (Vector2)Camera.main.ScreenToWorldPoint(mouse.position.ReadValue());
             mouseVelocity.angVel = 0;
-            mouseVelocity.vel = (currentMousePos - mouseComponent.pos)/Time.DeltaTime;
-            mouseComponent.pos = currentMousePos;
+            mouseVelocity.vel = (currentMousePos - mousePosition.pos)/Time.DeltaTime;
+            mousePosition.pos = currentMousePos;
         }
 
         if (mouse.leftButton.wasPressedThisFrame) {
             mouseComponent.grabData = null;
             Entities
                 .WithoutBurst()
-                .ForEach((Entity e, ref Velocity v, ref Mass mass, ref Box box) => {
-                if (box.ToRect().Contains(mouseComponent.pos)) {
+                .ForEach((Entity e, in Velocity v, in Mass mass, in Box box, in Position pos) => {
+                if (box.ToRect(pos).Contains(mousePosition.pos)) {
                     mouseComponent.grabData = new MouseComponent.EntityGrabData{
                         entity = e,
-                        grabOffset = box.WorldVecToLocal(mouseComponent.pos - box.pos)
+                        grabOffset = pos.GlobalToLocal(mousePosition.pos)
                     };
                 }
 
@@ -80,6 +81,7 @@ public class MouseDragSystem : SystemBase {
 
         em.SetComponentData(mouseEntity, mouseComponent);
         em.SetComponentData(mouseEntity, mouseVelocity);
+        em.SetComponentData(mouseEntity, mousePosition);
 
         //if (mouseComponent.grabData is MouseComponent.EntityGrabData g) {
         //    Debug.Log("Grabbed " + g.entity);

@@ -24,9 +24,9 @@ public class ShadowConstraintSystem : SystemBase {
     NativeList<AngleCalculator> lightAngleCalculators;
 
     protected override void OnCreate() {
-        lightSourceQuery = GetEntityQuery(typeof(LightSource));
-        opaqueBoxesQuery = GetEntityQuery(typeof(Box), typeof(OpaqueObject));
-        shadHitBoxesQuery = GetEntityQuery(typeof(Box), typeof(HitShadowsObject));
+        lightSourceQuery = GetEntityQuery(typeof(LightSource), typeof(Position));
+        opaqueBoxesQuery = GetEntityQuery(typeof(Box), typeof(Position), typeof(OpaqueObject));
+        shadHitBoxesQuery = GetEntityQuery(typeof(Box), typeof(Position), typeof(HitShadowsObject));
         lightManagers = new Dictionary<Entity, ShadowEdgeCalculator>();
 
         partialCornerConstraints = new NativeList<ThreeWayPenConstraint.Partial>(Allocator.Persistent);
@@ -60,24 +60,26 @@ public class ShadowConstraintSystem : SystemBase {
 
         lightSources.Clear();
         lightAngleCalculators.Clear();
-        Entities.ForEach((in LightSource lightSource) => {
+        Entities.ForEach((in LightSource lightSource, in Position pos) => {
             lightSources.Add(lightSource);
-            lightAngleCalculators.Add(new AngleCalculator(lightSource));
+            lightAngleCalculators.Add(new AngleCalculator(lightSource, pos));
         }).Run();
 
         var lightSourceEntities = lightSourceQuery.ToEntityArray(Allocator.TempJob);
 
         var opaqueBoxes = opaqueBoxesQuery.ToComponentDataArray<Box>(Allocator.TempJob);
+        var opaquePositions = opaqueBoxesQuery.ToComponentDataArray<Position>(Allocator.TempJob);
         var opaqueBoxEntities = opaqueBoxesQuery.ToEntityArray(Allocator.TempJob);
 
         var shadHitBoxes = shadHitBoxesQuery.ToComponentDataArray<Box>(Allocator.TempJob);
+        var shadHitPositions = shadHitBoxesQuery.ToComponentDataArray<Position>(Allocator.TempJob);
         var shadHitBoxEntities = shadHitBoxesQuery.ToEntityArray(Allocator.TempJob);
 
         // Step 1: Initialization
         // Can be optimized
         Clear(lightManagers);
         for (int i = 0; i < lightSources.Length; i++) {
-            lightManagers[lightSourceEntities[i]] = new ShadowEdgeCalculator(lightSources[i], lightSourceEntities[i], i);
+            lightManagers[lightSourceEntities[i]] = new ShadowEdgeCalculator(lightSources[i], lightSourceEntities[i], lightAngleCalculators[i], i);
         }
 
 
@@ -88,8 +90,8 @@ public class ShadowConstraintSystem : SystemBase {
             // Compute the sorted shadow list
             // 2.a, 2.b, 2.c
             lm.ComputeManifolds(
-                opaqueBoxes, opaqueBoxEntities,
-                shadHitBoxes, shadHitBoxEntities,
+                opaqueBoxes, opaquePositions, opaqueBoxEntities,
+                shadHitBoxes, shadHitPositions, shadHitBoxEntities,
                 ref boxOverlappingEdges,
                 ref edgeMounts);
         }
@@ -99,12 +101,13 @@ public class ShadowConstraintSystem : SystemBase {
         partialCornerConstraints.Clear();
         partialEdgeConstraints.Clear();
 
-        Entities.WithAll<Box, HitShadowsObject>()
+        Entities.WithAll<HitShadowsObject>()
             .WithReadOnly(boxOverlappingEdges)
             .WithReadOnly(edgeMounts)
-            .ForEach((in Box box, in Entity entity) => {
+            .ForEach((in Box box, in Position pos, in Entity entity) => {
                 var cc = new ShadowCornerCalculator(
                     box,
+                    pos,
                     entity,
                     lightSources,
                     lightAngleCalculators,
@@ -155,9 +158,10 @@ public class ShadowConstraintSystem : SystemBase {
         // TODO: Put islands in CornerCalculator.Outputs
         Entities.WithAll<Box, HitShadowsObject>()
             .WithoutBurst()
-            .ForEach((in Box box, in Entity entity) => {
+            .ForEach((in Box box, in Position pos, in Entity entity) => {
                 var cc = new ShadowCornerCalculator(
                     box,
+                    pos,
                     entity,
                     lightSources,
                     lightAngleCalculators,
@@ -216,9 +220,10 @@ public class ShadowConstraintSystem : SystemBase {
     private void ComputeCornersForDebug(ShadowCornerCalculator.Outputs outputs) {
         Entities.WithAll<Box, HitShadowsObject>()
             .WithoutBurst()
-            .ForEach((in Box box, in Entity entity) => {
+            .ForEach((in Box box, in Position pos, in Entity entity) => {
                 new ShadowCornerCalculator(
                     box,
+                    pos,
                     entity,
                     lightSources,
                     lightAngleCalculators,

@@ -89,7 +89,7 @@ public readonly struct PenetrationConstraint<T> where T : FloatX<T> {
     
         this.bias = bias;
     
-        m_c = 1 / (J.Mult(M_inv).Dot(J));
+        m_c = 1 / (J.Mult(M_inv).Dot(J) + CollisionSystem.globalSoftness);
     }
 
     public T GetImpulse(float lambda) {
@@ -103,7 +103,7 @@ public readonly struct PenetrationConstraint<T> where T : FloatX<T> {
     }
     
     public float GetLambda(T v, ref float accumulatedLambda) {
-        float lambda = -m_c * (J.Dot(v) + bias);
+        float lambda = -m_c * (J.Dot(v) + CollisionSystem.globalSoftness*accumulatedLambda + bias);
         ClampLambda(ref lambda, ref accumulatedLambda);
         return lambda;
     }

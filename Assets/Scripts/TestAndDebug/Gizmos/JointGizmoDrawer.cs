@@ -17,20 +17,14 @@ public class JointGizmoDrawer : MonoBehaviour {
             var mouses = jointSystem.GetComponentDataFromEntity<MouseComponent>();
             var boxes = jointSystem.GetComponentDataFromEntity<Box>();
 
-            float2 GetPos(Entity e) {
-                if (mouses.HasComponent(e)) {
-                    return mouses[e].pos;
-                } else {
-                    return boxes[e].pos;
-                }
-            }
+            var positions = jointSystem.GetComponentDataFromEntity<Position>();
 
 
             foreach (var joint in jointSystem.GetManifoldsForDebug()) {
-                var x1 = (Vector2)GetPos(joint.e1);
-                var x2 = (Vector2)GetPos(joint.e2);
-                var m1 = x1 + (Vector2)joint.r1;
-                var m2 = x2 + (Vector2)joint.r2;
+                Vector2 x1 = positions[joint.e1].pos;
+                Vector2 x2 = positions[joint.e2].pos;
+                Vector2 m1 = x1 + (Vector2)joint.r1;
+                Vector2 m2 = x2 + (Vector2)joint.r2;
 
                 Gizmos.color = color;
                 Gizmos.DrawLine(x1, m1);

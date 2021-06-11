@@ -41,8 +41,9 @@ public class JacobianGizmoDrawer : MonoBehaviour {
     private static void DrawWireframeLightEdgeGizmo(World w, Entity e, float2 edgeDir, float2 source, float rotOffset) {
         var em = w.EntityManager;
         var ls = em.GetComponentData<LightSource>(e);
+        var pos = em.GetComponentData<Position>(e);
 
-        Gizmos.DrawRay((Vector2)ls.pos, (Vector2)Lin.Rotate(edgeDir, rotOffset)*50);
+        Gizmos.DrawRay((Vector2)pos.pos, (Vector2)Lin.Rotate(edgeDir, rotOffset)*50);
     }
 
     private static void DrawWireframeOpaqueEdgeGizmo(World w, Entity e, float2 source, float2 mount, float2 posOffset, float rotOffset) {
@@ -52,8 +53,9 @@ public class JacobianGizmoDrawer : MonoBehaviour {
         DrawWireframeBoxGizmo(w, e, posOffset, rotOffset);
 
         var box = em.GetComponentData<Box>(e);
+        var pos = em.GetComponentData<Position>(e);
 
-        mount = Lin.Rotate(mount - box.pos, rotOffset) + box.pos + posOffset;
+        mount = Lin.Rotate(mount - pos.pos, rotOffset) + pos.pos + posOffset;
 
         var dir = math.normalize(mount - source);
 
@@ -66,9 +68,10 @@ public class JacobianGizmoDrawer : MonoBehaviour {
 
     private static void DrawWireframeBoxGizmo(World w, Entity e, float2 posOffset, float angOffset) {
         Box box = w.EntityManager.GetComponentData<Box>(e);
-        box.pos += posOffset;
-        box.rot += angOffset;
-        var rect = box.ToRect();
+        Position pos = w.EntityManager.GetComponentData<Position>(e);
+        pos.pos += posOffset;
+        pos.rot += angOffset;
+        var rect = box.ToRect(pos);
         Gizmos.DrawLine((Vector2)rect.c1, (Vector2)rect.c2);
         Gizmos.DrawLine((Vector2)rect.c2, (Vector2)rect.c3);
         Gizmos.DrawLine((Vector2)rect.c3, (Vector2)rect.c4);

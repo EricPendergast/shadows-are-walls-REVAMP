@@ -44,7 +44,7 @@ public struct TwoWayPenFricConstraint : IConstraint<LambdaNT> {
         public Float6 J_t;
         public float bias;
 
-        public Partial(Entity e1, Entity e2, Box b1, Box b2, Geometry.Manifold m, bool useContact1) {
+        public Partial(Entity e1, Entity e2, Position pos1, Position pos2, Geometry.Manifold m, bool useContact1) {
             this.e1 = e1;
             this.e2 = e2;
             var contactWithId = useContact1 ? m.contact1 : (Geometry.Contact)m.contact2;
@@ -54,8 +54,8 @@ public struct TwoWayPenFricConstraint : IConstraint<LambdaNT> {
 
             { // Normal precomputation
                 J_n = new Float6(
-                    new float3(-m.normal, -Lin.Cross(contact-b1.pos, m.normal)), 
-                    new float3(m.normal, Lin.Cross(contact-b2.pos, m.normal))
+                    new float3(-m.normal, -Lin.Cross(contact-pos1.pos, m.normal)), 
+                    new float3(m.normal, Lin.Cross(contact-pos2.pos, m.normal))
                 );
 
                 float delta = -m.overlap;
@@ -74,8 +74,8 @@ public struct TwoWayPenFricConstraint : IConstraint<LambdaNT> {
                 float2 tangent = Lin.Cross(m.normal, -1);
 
                 J_t = new Float6(
-                    new float3(tangent, Lin.Cross(contact-b1.pos, tangent)), 
-                    new float3(-tangent, -Lin.Cross(contact-b2.pos, tangent)));
+                    new float3(tangent, Lin.Cross(contact-pos1.pos, tangent)), 
+                    new float3(-tangent, -Lin.Cross(contact-pos2.pos, tangent)));
             }
 
         }

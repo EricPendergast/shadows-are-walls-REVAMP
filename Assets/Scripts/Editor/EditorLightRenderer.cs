@@ -9,7 +9,8 @@ public class EditorLightRenderer : MonoBehaviour {
             
             foreach (LightAuthoring l in Object.FindObjectsOfType<LightAuthoring>()) {
                 var lightSource = l.GetLightSource();
-                ShadowRenderPassFeature.lights.Add(lightSource.GetLightMatrix());
+                var lightPos = l.GetLightPosition();
+                ShadowRenderPassFeature.lights.Add(lightSource.GetLightMatrix(lightPos));
             }
         }
     }
