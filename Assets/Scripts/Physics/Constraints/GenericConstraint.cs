@@ -43,6 +43,41 @@ public readonly struct TwoDOFConstraint<T> where T : FloatX<T> {
 
 }
 
+public readonly struct OneDOFConstraint<T> where T : FloatX<T> {
+    public readonly T J;
+
+    public readonly float m_c;
+
+    public readonly float bias;
+
+    public readonly float softness;
+
+    public OneDOFConstraint(T J, T M_inv, float bias, float softness) {
+        this.J = J;
+    
+        this.bias = bias;
+        this.softness = softness;
+    
+        m_c = 1 / (J.Mult(M_inv).Dot(J) + softness);
+    }
+
+    public T GetImpulse(float lambda) {
+        return J.Mult(lambda);
+    }
+    
+    public T GetImpulse(T v, ref float accumulatedLambda) {
+        float lambda = GetLambda(v, ref accumulatedLambda);
+    
+        return J.Mult(lambda);
+    }
+    
+    public float GetLambda(T v, ref float accumulatedLambda) {
+        float lambda = -m_c * (J.Dot(v) + softness*accumulatedLambda + bias);
+        accumulatedLambda += lambda;
+        return lambda;
+    }
+}
+
 public readonly struct PenetrationConstraint<T> where T : FloatX<T> {
     public readonly T J;
     public readonly float m_c;

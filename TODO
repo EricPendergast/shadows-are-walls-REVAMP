@@ -1,30 +1,9 @@
 TODOs:
+1. Add a Position component
 
-✓1. Make ShadowHitting objects always resolve to light areas
-✓2. Calculate shadow islands
-✓3. Handle case where an object is fully illuminated by a light (make it not generate any shadow islands)
-✓5. Convert certain corner manifolds into edge constraints
-✓6. Handle light edges
-✓7. Remove old edge manifold stuff
-✓8. Make edge contacts not be created as often.
-✓9. Corner contact ids
-✓10. Implement new multi-contact system
-✓11. Properly handle shadow edge ids
-✓12. Implement corner-box constraints
-✓13. Implement DataCollector for corner manifolds, and calculate contacts in ShadowCornerCalculator
-✓14. Implement Mass component
-✓16. Convert certain corner manifolds into corner-box constraints
-✓18. Convert certain corner manifolds into corner-edge constraints
-✓19. Fix problems with partial shadow edges
-✓22. Clean up extra fields in ShadowEdgeConstraint
-✓23. Rename ShapeType to EdgeSource
-✓24. Implement a Jacobian debugger.
-✓20. Handle edge cases with wedge subtractions (when wedge center is inside of the island)
-✓17. Implement corner-shadowedge constraints
-25. Remove the mass fields from Box and LightSource
 
-15. Remove edge mounts past the contact point when calculating partial constraints
-
+Later TODOs:
+1. Remove edge mounts past the contact point when calculating partial constraints
 2. Make ShadowHitting objects choose to always resolve to light areas or dark areas.
 3. Allow for overlapping shadow edges
-21. Unbreak constraint gizmos
+4. Unbreak constraint gizmos
