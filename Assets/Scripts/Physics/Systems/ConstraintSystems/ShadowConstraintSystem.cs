@@ -140,8 +140,10 @@ public class ShadowConstraintSystem : SystemBase {
 
         lightSourceEntities.Dispose();
         opaqueBoxes.Dispose();
+        opaquePositions.Dispose();
         opaqueBoxEntities.Dispose();
         shadHitBoxes.Dispose();
+        shadHitPositions.Dispose();
         shadHitBoxEntities.Dispose();
     }
 
