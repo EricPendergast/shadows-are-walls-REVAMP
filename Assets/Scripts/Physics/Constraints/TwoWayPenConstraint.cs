@@ -20,7 +20,7 @@ public struct ShadowEdgeManifold {
     public int contactIdOn2;
 }
 
-public struct TwoWayPenConstraint : IConstraint<float> {
+public struct TwoWayPenConstraint : IWarmStartConstraint<float> {
     // The opaque object
     public Entity e1;
     // The shadow hitting object
@@ -42,18 +42,46 @@ public struct TwoWayPenConstraint : IConstraint<float> {
 
         Float6 M_inv = new Float6(masses[e1].M_inv, masses[e2].M_inv);
         id = p.id;
-        penConstraint = new PenetrationConstraint<Float6>(p.J_n, M_inv, p.bias/dt);
+
+        float beta = CollisionSystem.positionCorrection ? .1f : 0;
+        float delta_slop = -.01f;
+
+        float bias = 0;
+
+        if (p.delta < delta_slop) {
+            bias = beta * (p.delta - delta_slop) / dt;
+        }
+
+        penConstraint = new PenetrationConstraint<Float6>(p.J_n, M_inv, bias);
+
         this.M_inv = M_inv;
 
         lambdaAccum = new float();
     }
+
+    public float GetBeta() {
+        return GetBetaStatic();
+    }
+
+    public IConstraint Clone() {
+        return this;
+    }
+
+    private static float GetBetaStatic() {
+        return CollisionSystem.positionCorrection ? .1f : 0;
+    }
+
+    public void DebugMultiplyBias(float biasMult) {
+        penConstraint = penConstraint.WithBiasMultiplied(biasMult);
+    }
+
     public struct Partial {
         public Entity e1;
         public Entity e2;
         public int id;
 
         public Float6 J_n;
-        public float bias;
+        public float delta;
 
 
         public Partial(in Prototype p, in ShadowCornerCalculator.EdgeMount mount, in ShadowEdgeManifold m) {
@@ -61,7 +89,7 @@ public struct TwoWayPenConstraint : IConstraint<float> {
             e2 = m.e2;
             id = new int2(m.contactIdOn2, mount.id).GetHashCode();
             J_n = p.J_n;
-            bias = p.bias;
+            delta = p.delta;
             if (mount.castingShapeType == EdgeSourceType.Box) {
                 float2 velMult = Lin.Cross(1, mount.point - m.x1)/math.lengthsq(mount.point - m.x1);
                 float angVelMult = math.dot(mount.point - mount.shapeCenter, mount.point - m.x1)/math.lengthsq(mount.point - m.x1);
@@ -85,7 +113,7 @@ public struct TwoWayPenConstraint : IConstraint<float> {
 
         public struct Prototype {
             public Float6 J_n;
-            public float bias;
+            public float delta;
 
             public Prototype(in ShadowEdgeManifold m) {
                 J_n = new Float6(
@@ -93,19 +121,12 @@ public struct TwoWayPenConstraint : IConstraint<float> {
                     new float3(-m.n, -Lin.Cross(m.p - m.x2, m.n))
                 );
 
-                float beta = CollisionSystem.positionCorrection ? .1f : 0;
-                float delta_slop = -.01f;
-
-                bias = 0;
-
-                if (m.delta < delta_slop) {
-                    bias = beta * (m.delta - delta_slop);
-                }
+                delta = m.delta;
             }
         }
     }
 
-    public void PreStep(ComponentDataFromEntity<Velocity> vels, float dt, float prevLambda) {
+    public void WarmStart(ComponentDataFromEntity<Velocity> vels, float dt, float prevLambda) {
         lambdaAccum = prevLambda;
 
         var v1 = vels[e1];

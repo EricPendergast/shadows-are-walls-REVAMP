@@ -25,7 +25,7 @@ public class DirectConstraintSystem : SystemBase {
         masses = GetComponentDataFromEntity<Mass>();
         positions = GetComponentDataFromEntity<Position>();
 
-        var constraints = World.GetOrCreateSystem<CollisionSystem>().GetStandardConstraintsInput();
+        var constraints = World.GetOrCreateSystem<ConstraintGatherSystem>().GetTwoWayPenFricConstraintsInput();
 
         for (int i = 0; i < boxEntities.Length; i++ ) {
             for (int j = i+1; j < boxEntities.Length; j++ ) {

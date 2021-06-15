@@ -3,12 +3,10 @@ using Unity.Mathematics;
 
 using Physics.Math;
 
-using ContactId = Physics.Math.Geometry.ContactId;
-
 // Constraint for penetration and friction. With the correct
 // jacobian, should work for normal rigidbodies (like box, circle,
 // etc). May or may not work for crazier rigidbodies.
-public struct TwoWayPenFricConstraint : IConstraint<LambdaNT> {
+public struct TwoWayPenFricConstraint : IWarmStartConstraint<LambdaNT> {
     public Entity e1 {get;}
     public Entity e2 {get;}
     private LambdaNT lambdaAccum;
@@ -29,10 +27,36 @@ public struct TwoWayPenFricConstraint : IConstraint<LambdaNT> {
 
         M_inv = new Float6(masses[e1].M_inv, masses[e2].M_inv);
         id = p.id;
-        penConstraint = new PenetrationConstraint<Float6>(p.J_n, M_inv, p.bias/dt);
+
+        float beta = GetBetaStatic();
+        float delta_slop = -.01f;
+
+        float bias = 0;
+        
+        if (p.delta < delta_slop) {
+            bias = beta * (p.delta - delta_slop) / dt;
+        }
+
+        penConstraint = new PenetrationConstraint<Float6>(p.J_n, M_inv, bias);
         fricConstraint = new FrictionConstraint<Float6>(p.J_t, M_inv, CollisionSystem.globalFriction);
 
         lambdaAccum = new LambdaNT();
+    }
+
+    public void DebugMultiplyBias(float biasMult) {
+        penConstraint = penConstraint.WithBiasMultiplied(biasMult);
+    }
+
+    public float GetBeta() {
+        return GetBetaStatic();
+    }
+
+    public IConstraint Clone() {
+        return this;
+    }
+
+    private static float GetBetaStatic() {
+        return CollisionSystem.positionCorrection ? .1f : 0;
     }
 
     public struct Partial {
@@ -42,7 +66,7 @@ public struct TwoWayPenFricConstraint : IConstraint<LambdaNT> {
 
         public Float6 J_n;
         public Float6 J_t;
-        public float bias;
+        public float delta;
 
         public Partial(Entity e1, Entity e2, Position pos1, Position pos2, Geometry.Manifold m, bool useContact1) {
             this.e1 = e1;
@@ -58,15 +82,7 @@ public struct TwoWayPenFricConstraint : IConstraint<LambdaNT> {
                     new float3(m.normal, Lin.Cross(contact-pos2.pos, m.normal))
                 );
 
-                float delta = -m.overlap;
-                float beta = CollisionSystem.positionCorrection ? .1f : 0;
-                float delta_slop = -.01f;
-
-                bias = 0;
-
-                if (delta < delta_slop) {
-                    bias = beta * (delta - delta_slop);
-                }
+                delta = -m.overlap;
             }
 
 
@@ -81,7 +97,7 @@ public struct TwoWayPenFricConstraint : IConstraint<LambdaNT> {
         }
     }
 
-    public void PreStep(ComponentDataFromEntity<Velocity> vels, float dt, LambdaNT prevLambdas) {
+    public void WarmStart(ComponentDataFromEntity<Velocity> vels, float dt, LambdaNT prevLambdas) {
 
         lambdaAccum = prevLambdas;
 

@@ -22,7 +22,7 @@ public struct ShadowCornerManifold {
     public int contactIdOnBox;
 }
 
-public struct ThreeWayPenConstraint : IConstraint<float> {
+public struct ThreeWayPenConstraint : IWarmStartConstraint<float> {
     // The owner of the first shadow edge
     public Entity e1 {get;}
     // The owner of the second shadow edge
@@ -45,17 +45,45 @@ public struct ThreeWayPenConstraint : IConstraint<float> {
         Breadth
     }
 
-    public ThreeWayPenConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt) {
+    public ThreeWayPenConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt) :
+        this(in p, masses, dt: dt, beta: GetBetaStatic(), delta_slop: -.01f){
+    }
+
+    public ThreeWayPenConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt, float beta, float delta_slop) {
         e1 = p.e1;
         e2 = p.e2;
         e3 = p.e3;
 
         Float9 M_inv = new Float9(masses[e1].M_inv, masses[e2].M_inv, masses[e3].M_inv);
         id = p.id;
-        penConstraint = new PenetrationConstraint<Float9>(p.J_n, M_inv, p.bias/dt);
+
+        float bias = 0;
+
+        if (p.delta < delta_slop) {
+            bias = beta * (p.delta - delta_slop) / dt;
+        }
+
+        penConstraint = new PenetrationConstraint<Float9>(p.J_n, M_inv, bias);
+
         this.M_inv = M_inv;
 
         lambdaAccum = new float();
+    }
+
+    public IConstraint Clone() {
+        return this;
+    }
+
+    public float GetBeta() {
+        return GetBetaStatic();
+    }
+
+    private static float GetBetaStatic() {
+        return CollisionSystem.positionCorrection ? .1f : 0;
+    }
+
+    public void DebugMultiplyBias(float biasMult) {
+        penConstraint = penConstraint.WithBiasMultiplied(biasMult);
     }
 
     public struct Partial {
@@ -65,7 +93,7 @@ public struct ThreeWayPenConstraint : IConstraint<float> {
         public int id;
 
         public Float9 J_n;
-        public float bias;
+        public float delta;
 
         private static void HandleMount(in ShadowCornerCalculator.EdgeMount mount, ref float3 J_n_part, float2 x, float2 d) {
             float2 c = mount.point;
@@ -87,7 +115,7 @@ public struct ThreeWayPenConstraint : IConstraint<float> {
             e3 = em3.castingEntity;
             id = em1.id ^ em2.id ^ em3.id ^ 406325; // Arbitrary number
             J_n = p.J_n;
-            bias = p.bias;
+            delta = p.delta;
         
             HandleMount(in em1, ref J_n.v1, m.x1, m.d1);
             HandleMount(in em2, ref J_n.v2, m.x2, m.d2);
@@ -101,24 +129,18 @@ public struct ThreeWayPenConstraint : IConstraint<float> {
             this.e3 = e3;
             id = new int2(m.contactIdOnBox, em1.id ^ em2.id).GetHashCode() ^ 98034; // Arbitrary number
             J_n = p.J_n;
-            bias = p.bias;
+            delta = p.delta;
 
             HandleMount(in em1, ref J_n.v1, m.x1, m.d1);
             HandleMount(in em2, ref J_n.v2, m.x2, m.d2);
         }
 
         public struct Prototype {
-            public float bias;
+            public float delta;
             public Float9 J_n;
 
-            public Prototype(in ShadowCornerManifold m) : 
-                this(m: in m,
-                   beta: CollisionSystem.positionCorrection ? .1f : 0,
-                   delta_slop: -.01f) {
-            }
-            public Prototype(in ShadowCornerManifold m, float beta, float delta_slop) {
+            public Prototype(in ShadowCornerManifold m) {
                 ResolveMode resolveMode;
-                float delta;
                 {
                     float depth = Lin.IsFinite(m.p) ?
                         math.dot(m.p - m.s, m.n) :
@@ -144,7 +166,7 @@ public struct ThreeWayPenConstraint : IConstraint<float> {
                 if (!math.isfinite(delta)) {
                     Debug.Assert(false, "ShadowCornerConstraint has infinite penetration");
                     J_n = new Float9(0,0,0);
-                    bias = 0;
+                    delta = 0;
                     return;
                 }
 
@@ -198,16 +220,11 @@ public struct ThreeWayPenConstraint : IConstraint<float> {
                     );
                 }
 
-                bias = 0;
-
-                if (delta < delta_slop) {
-                    bias = beta * (delta - delta_slop);
-                }
             }
         }
     }
 
-    public void PreStep(ComponentDataFromEntity<Velocity> vels, float dt, float prevLambda) {
+    public void WarmStart(ComponentDataFromEntity<Velocity> vels, float dt, float prevLambda) {
         lambdaAccum = prevLambda;
 
         var v1 = vels[e1];

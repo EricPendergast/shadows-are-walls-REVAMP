@@ -27,6 +27,18 @@ public readonly struct TwoDOFConstraint<T> where T : FloatX<T> {
         m_c = 1 / new float2(J1.Mult(M_inv).Dot(J1) + softness, J2.Mult(M_inv).Dot(J2) + softness);
     }
 
+    private TwoDOFConstraint(T J1, T J2, float2 m_c, float2 bias, float softness) {
+        this.J1 = J1;
+        this.J2 = J2;
+        this.m_c = m_c;
+        this.bias = bias;
+        this.softness = softness;
+    }
+
+    public TwoDOFConstraint<T> WithBiasMultiplied(float biasMult) {
+        return new TwoDOFConstraint<T>(J1: J1, J2: J2, m_c: m_c, bias: bias*biasMult, softness: softness);
+    }
+
     public T GetImpulse(float2 lambda) {
         return J1.Mult(lambda.x).Add(J2.Mult(lambda.y));
     }
@@ -90,6 +102,16 @@ public readonly struct PenetrationConstraint<T> where T : FloatX<T> {
         this.bias = bias;
     
         m_c = 1 / (J.Mult(M_inv).Dot(J) + CollisionSystem.globalSoftness);
+    }
+
+    private PenetrationConstraint(T J, float m_c, float bias) {
+        this.J = J;
+        this.m_c = m_c;
+        this.bias = bias;
+    }
+
+    public PenetrationConstraint<T> WithBiasMultiplied(float biasMult) {
+        return new PenetrationConstraint<T>(J: this.J, m_c: this.m_c, bias: this.bias*biasMult);
     }
 
     public T GetImpulse(float lambda) {

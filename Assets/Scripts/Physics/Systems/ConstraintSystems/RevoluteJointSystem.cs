@@ -12,7 +12,7 @@ public class RevoluteJointSystem : SystemBase {
         var masses = GetComponentDataFromEntity<Mass>();
         var positions = GetComponentDataFromEntity<Position>();
 
-        var constraints = World.GetOrCreateSystem<CollisionSystem>().GetTwoWayTwoDOFConstraintsInput();
+        var constraints = World.GetOrCreateSystem<ConstraintGatherSystem>().GetTwoWayTwoDOFConstraintsInput();
 
         Entities.ForEach((Entity jointEntity, in RevoluteJoint joint) => {
             constraints.Add(new TwoWayTwoDOFConstraint(

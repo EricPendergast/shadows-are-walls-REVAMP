@@ -1,18 +1,9 @@
-using System.Collections.Generic;
-using Unity.Collections;
 using Unity.Entities;
 using Unity.Transforms;
 using Unity.Mathematics;
-using Unity.Rendering;
-using UnityEngine;
-using Physics.Math;
-
-using Utilities;
 
 // Syncs the physics state with the rendering state.
-[UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
-[UpdateAfter(typeof(CollisionSystem))]
-[UpdateBefore(typeof(VelocityIntegrationSystem))]
+[UpdateInGroup(typeof(RenderSystemGroup))]
 public class LightRenderSystem : SystemBase {
     protected override void OnUpdate() {
         ShadowRenderPassFeature.lights.Clear();

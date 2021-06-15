@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 using Unity.Entities;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -21,10 +23,23 @@ public class CollisionSystem : SystemBase {
     public static float globalFriction = .5f;
     public static float globalSoftness = 0;
 
+    private float dt = 0;
+
+    public float DeltaTime() {
+        return dt;
+    }
+
     private TwoWayPenFricCM twoWayPenFricCM;
     private TwoWayPenCM twoWayPenCM;
     private ThreeWayPenCM threeWayPenCM;
     private TwoWayTwoDOFCM twoWayTwoDOFCM;
+
+    public IEnumerable<IConstraintManager> DebugIterConstraintManagers() {
+        yield return twoWayPenFricCM;
+        yield return twoWayPenCM;
+        yield return threeWayPenCM;
+        yield return twoWayTwoDOFCM;
+    }
 
     protected override void OnCreate() {
         boxesQuery = GetEntityQuery(typeof(Box));
@@ -45,16 +60,21 @@ public class CollisionSystem : SystemBase {
     }
 
     protected override void OnUpdate() {
-
         var vels = GetComponentDataFromEntity<Velocity>(false);
 
-        float dt = Time.DeltaTime;
+        dt = Time.DeltaTime;
+
+        var constraintGatherer = World.GetExistingSystem<ConstraintGatherSystem>();
+
+        constraintGatherer.GiveConstraintsTo(ref twoWayPenFricCM);
+        constraintGatherer.GiveConstraintsTo(ref twoWayPenCM);
+        constraintGatherer.GiveConstraintsTo(ref threeWayPenCM);
+        constraintGatherer.GiveConstraintsTo(ref twoWayTwoDOFCM);
         
         twoWayPenFricCM.PreSteps(dt, ref vels);
         twoWayPenCM.PreSteps(dt, ref vels);
         threeWayPenCM.PreSteps(dt, ref vels);
         twoWayTwoDOFCM.PreSteps(dt, ref vels);
-
 
         // Do a dry run on the first frame. This is useful because when you
         // start the game paused, the first frame is always executed before the
@@ -68,26 +88,10 @@ public class CollisionSystem : SystemBase {
             }
         }
 
-        twoWayPenFricCM.PostSteps();
-        twoWayPenCM.PostSteps();
-        threeWayPenCM.PostSteps();
-        twoWayTwoDOFCM.PostSteps();
-    }
-
-    public NativeList<TwoWayPenFricConstraint> GetStandardConstraintsInput() {
-        return twoWayPenFricCM.GetConstraintsInput();
-    }
-
-    public NativeList<TwoWayPenConstraint> GetTwoWayPenConstraintsInput() {
-        return twoWayPenCM.GetConstraintsInput();
-    }
-
-    public NativeList<ThreeWayPenConstraint> GetThreeWayPenConstraintsInput() {
-        return threeWayPenCM.GetConstraintsInput();
-    }
-
-    public NativeList<TwoWayTwoDOFConstraint> GetTwoWayTwoDOFConstraintsInput() {
-        return twoWayTwoDOFCM.GetConstraintsInput();
+        twoWayPenFricCM.SaveWarmStartParameters();
+        twoWayPenCM.SaveWarmStartParameters();
+        threeWayPenCM.SaveWarmStartParameters();
+        twoWayTwoDOFCM.SaveWarmStartParameters();
     }
 
     public struct DebugContactInfo {
@@ -96,13 +100,13 @@ public class CollisionSystem : SystemBase {
         public int id;
     }
 
-    // TODO: Make debug contact rendering not be broken
-    //public IEnumerable<DebugContactInfo> GetContactsForDebug() {
-    //    foreach (var item in boxBoxCM.GetContactsForDebug()) {
-    //        yield return item;
-    //    }
-    //    foreach (var item in shadowEdgeCM.GetContactsForDebug()) {
-    //        yield return item;
-    //    }
-    //}
+    public void DebugApplyWarmStart(IConstraint c, ComponentDataFromEntity<Velocity> vels, float dt) {
+        foreach (var cm in DebugIterConstraintManagers()) {
+            if (cm.DebugTryWarmStart(c, vels, dt)) {
+                return;
+            }
+        }
+
+        UnityEngine.Debug.LogError("Failed to warm start a constraint");
+    }
 }

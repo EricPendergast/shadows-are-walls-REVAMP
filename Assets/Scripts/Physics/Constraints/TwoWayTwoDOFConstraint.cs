@@ -17,7 +17,7 @@ public struct RevoluteJointManifold {
 }
 
 
-public struct TwoWayTwoDOFConstraint : IConstraint<Lambda> {
+public struct TwoWayTwoDOFConstraint : IWarmStartConstraint<Lambda> {
     private Entity e1;
     private Entity e2;
 
@@ -31,6 +31,20 @@ public struct TwoWayTwoDOFConstraint : IConstraint<Lambda> {
     private TwoDOFConstraint<Float6> constraint;
 
     Float6 M_inv;
+
+    float beta;
+
+    public float GetBeta() {
+        return beta;
+    }
+
+    public IConstraint Clone() {
+        return this;
+    }
+
+    public void DebugMultiplyBias(float biasMult) {
+        constraint = constraint.WithBiasMultiplied(biasMult);
+    }
 
     public TwoWayTwoDOFConstraint(RevoluteJointManifold m, ComponentDataFromEntity<Mass> masses, float dt) {
         e1 = m.e1;
@@ -55,11 +69,13 @@ public struct TwoWayTwoDOFConstraint : IConstraint<Lambda> {
             bias: m.delta * m.beta / dt,
             softness: m.softness
         );
+
+        beta = m.beta;
             
         lambdaAccum = float2.zero;
     }
 
-    public void PreStep(ComponentDataFromEntity<Velocity> vels, float dt, Lambda prevLambda) {
+    public void WarmStart(ComponentDataFromEntity<Velocity> vels, float dt, Lambda prevLambda) {
         lambdaAccum = prevLambda;
 
         var v1 = vels[e1];
@@ -79,14 +95,18 @@ public struct TwoWayTwoDOFConstraint : IConstraint<Lambda> {
         var v1 = vels[e1];
         var v2 = vels[e2];
 
+        ApplyImpulses(ref v1, ref v2, dt);
+
+        vels[e1] = v1;
+        vels[e2] = v2;
+    }
+
+    public void ApplyImpulses(ref Velocity v1, ref Velocity v2, float dt) {
         Float6 v = GetV(ref v1, ref v2);
 
         Float6 P = constraint.GetImpulse(v, ref lambdaAccum);
 
         ApplyImpulse(P, ref v1, ref v2);
-
-        vels[e1] = v1;
-        vels[e2] = v2;
     }
 
     private static Float6 GetV(ref Velocity v1, ref Velocity v2) {

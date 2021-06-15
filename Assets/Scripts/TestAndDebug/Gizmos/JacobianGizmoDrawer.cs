@@ -62,11 +62,11 @@ public class JacobianGizmoDrawer : MonoBehaviour {
         Gizmos.DrawRay((Vector2)mount, (Vector2)dir*50);
     }
 
-    private static void DrawWireframeBoxGizmo(World w, Entity e) {
+    public static void DrawWireframeBoxGizmo(World w, Entity e) {
         DrawWireframeBoxGizmo(w, e, 0, 0);
     }
 
-    private static void DrawWireframeBoxGizmo(World w, Entity e, float2 posOffset, float angOffset) {
+    public static void DrawWireframeBoxGizmo(World w, Entity e, float2 posOffset, float angOffset) {
         Box box = w.EntityManager.GetComponentData<Box>(e);
         Position pos = w.EntityManager.GetComponentData<Position>(e);
         pos.pos += posOffset;
@@ -92,14 +92,14 @@ public class JacobianGizmoDrawer : MonoBehaviour {
                 var (manifold, mount1, mount2, mount3, pConstraint) = tup;
 
                 // Recalculating pConstraint to have bias such that a complete resolution occurs
-                var prototype = new ThreeWayPenConstraint.Partial.Prototype(in manifold, beta:1, delta_slop:0);
+                var prototype = new ThreeWayPenConstraint.Partial.Prototype(in manifold);
                 if (mount3 != null) {
                     Debug.Log("JacobianGizmoDrawer does not support triple shadow edge constraints");
                     //pConstraint = new ShadowCornerConstraint.Partial(prototype, mount1, mount2, mount3.Value, float2.zero, manifold);
                 } else {
                     pConstraint = new ThreeWayPenConstraint.Partial(prototype, mount1, mount2, pConstraint.e3, manifold);
                 }
-                var constraint = new ThreeWayPenConstraint(pConstraint, masses, dt: 1);
+                var constraint = new ThreeWayPenConstraint(pConstraint, masses, dt: 1, beta: 1, delta_slop: 0);
 
                 Velocity GetVelocity(Entity e) {
                     if (velocities.TryGetValue(e, out var vel)) {

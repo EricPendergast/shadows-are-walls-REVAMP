@@ -46,7 +46,7 @@ public class ShadowConstraintSystem : SystemBase {
         boxOverlappingEdges.Dispose();
         edgeMounts.Dispose();
         lightSources.Dispose();
-        lightAngleCalculators.Clear();
+        lightAngleCalculators.Dispose();
     }
 
     protected override void OnUpdate() {
@@ -123,7 +123,7 @@ public class ShadowConstraintSystem : SystemBase {
         {
             var masses = GetComponentDataFromEntity<Mass>();
 
-            var edgeConstraintsOut = World.GetOrCreateSystem<CollisionSystem>().GetTwoWayPenConstraintsInput();
+            var edgeConstraintsOut = World.GetOrCreateSystem<ConstraintGatherSystem>().GetTwoWayPenConstraintsInput();
 
             float dt = Time.DeltaTime;
 
@@ -131,7 +131,7 @@ public class ShadowConstraintSystem : SystemBase {
                 edgeConstraintsOut.Add(new TwoWayPenConstraint(pec, masses, dt));
             }
 
-            var cornerConstraintsOut = World.GetOrCreateSystem<CollisionSystem>().GetThreeWayPenConstraintsInput();
+            var cornerConstraintsOut = World.GetOrCreateSystem<ConstraintGatherSystem>().GetThreeWayPenConstraintsInput();
 
             foreach (var pcc in partialCornerConstraints) {
                 cornerConstraintsOut.Add(new ThreeWayPenConstraint(pcc, masses, dt));

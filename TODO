@@ -1,5 +1,7 @@
 TODOs:
-1. Add a Position component
+1. Make PhysicsDebugger get constraints by calling into each of the constraint generators
+2. Remove GetBeta from IConstraint
+3. Remove all those WithBiasMultiplied functions
 
 
 Later TODOs:
