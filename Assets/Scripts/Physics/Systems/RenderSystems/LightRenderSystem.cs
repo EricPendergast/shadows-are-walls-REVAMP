@@ -10,9 +10,13 @@ public class LightRenderSystem : SystemBase {
 
         Entities
             .WithoutBurst()
-            .ForEach((ref Translation t, ref Rotation rot, in LightSource lightSource, in Position lightPos) => {
-                t.Value = new float3(lightPos.pos, 0);
-                rot.Value = quaternion.Euler(0, 0, lightPos.rot);
+            .ForEach((ref LocalToWorld rot, in LightSource lightSource, in Position lightPos) => {
+                rot.Value = float4x4.TRS(
+                    new float3(lightPos.pos, 0),
+                    quaternion.RotateZ(lightPos.rot),
+                    new float3(1, 1, 1)
+                );
+
                 ShadowRenderPassFeature.lights.Add(lightSource.GetLightMatrix(lightPos));
             }).Run();
     }

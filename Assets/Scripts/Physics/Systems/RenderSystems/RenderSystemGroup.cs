@@ -1,7 +1,7 @@
 using Unity.Entities;
+using Unity.Rendering;
 
-[UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
-[UpdateAfter(typeof(CollisionSystem))]
-[UpdateBefore(typeof(VelocityIntegrationSystem))]
+[UpdateInGroup(typeof(PresentationSystemGroup))]
+[UpdateBefore(typeof(RenderMeshSystemV2))]
 public class RenderSystemGroup : ComponentSystemGroup {
 }

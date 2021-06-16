@@ -52,6 +52,8 @@ public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
                 inertia = inertia
             });
 
+        dstManager.AddComponentData(entity, new IgnoreHierarchyTag());
+
         if (gravityScale != 1) {
             dstManager.AddComponentData(entity,
                 new GravityScale {gravityScale = gravityScale}

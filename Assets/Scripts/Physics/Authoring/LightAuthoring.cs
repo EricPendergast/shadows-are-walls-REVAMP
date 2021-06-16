@@ -30,6 +30,8 @@ public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
         dstManager.AddComponentData(entity,
             new GravityScale {gravityScale = 0}
         );
+
+        dstManager.AddComponentData(entity, new IgnoreHierarchyTag());
     }
 
     public Position GetLightPosition() {

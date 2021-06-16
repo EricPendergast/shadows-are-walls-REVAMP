@@ -7,9 +7,12 @@ using Unity.Mathematics;
 public class BoxRenderSystem : SystemBase {
     protected override void OnUpdate() {
         Entities
-            .ForEach((ref Translation pos, ref Rotation rot, in Box box, in Position boxPos) => {
-                pos.Value = new float3(boxPos.pos, 0);
-                rot.Value = quaternion.Euler(0, 0, boxPos.rot);
+            .ForEach((ref LocalToWorld l2w, in Box box, in Position boxPos) => {
+                l2w.Value = float4x4.TRS(
+                    new float3(boxPos.pos, 0),
+                    quaternion.RotateZ(boxPos.rot),
+                    new float3(math.length(box.width), math.length(box.height), 1)
+                );
             }).Run();
     }
 }
