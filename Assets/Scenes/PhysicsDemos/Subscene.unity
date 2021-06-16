@@ -533,7 +533,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &58698948
 Transform:
   m_ObjectHideFlags: 0
@@ -4063,7 +4063,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &609421712
 Transform:
   m_ObjectHideFlags: 0
@@ -8651,6 +8651,9 @@ MonoBehaviour:
   obj2: {fileID: 1258058605}
   beta: 0.2
   softness: 0
+  offset:
+    x: 0
+    y: -1
 --- !u!4 &1456548694 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1995005348454554816, guid: d6b02f7353001c8d2a9215627b1c6d22, type: 3}

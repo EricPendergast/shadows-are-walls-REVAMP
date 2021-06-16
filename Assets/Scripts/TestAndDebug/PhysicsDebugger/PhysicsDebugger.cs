@@ -8,8 +8,11 @@ using Unity.Rendering;
 using UnityEditor;
 using UnityEngine;
 
+using CornerMountTuple = ShadowCornerCalculator.Outputs.CornerMountTuple;
+using EdgeMountTuple = ShadowCornerCalculator.Outputs.EdgeMountTuple;
+
 [ExecuteAlways]
-public class PhysicsDebugger : MonoBehaviour {
+public partial class PhysicsDebugger : MonoBehaviour {
     public int sequentialImpulseIterations = 1;
     public bool performWarmStarting = true;
     public bool resolveConstraintsCompletely = false;
@@ -17,15 +20,17 @@ public class PhysicsDebugger : MonoBehaviour {
     public float2 shift;
 
 
-    public List<IConstraint> constraints = new List<IConstraint>();
+    [SerializeField]
+    private List<IConstraintWrapper> constraints = new List<IConstraintWrapper>();
     [HideInInspector]
     private double lastLoadOfConstraints = -1;
 
     [HideInInspector]
     private bool autoRendering = false;
-    [HideInInspector]
-    private bool renderOnce = false;
 
+    private float DeltaTime() {
+        return World.DefaultGameObjectInjectionWorld.GetExistingSystem<CollisionSystem>().DeltaTime();
+    }
 
     private class HelperSystem : SystemBase {
         private Dictionary<Entity, Position> positions = new Dictionary<Entity, Position>();
@@ -69,10 +74,40 @@ public class PhysicsDebugger : MonoBehaviour {
         }
     }
 
+    private interface IConstraintWrapper {
+        IConstraint c {get;}
+        IConstraint cFullResolve {get;}
+        IConstraintWrapper Clone();
+    }
+    [System.Serializable]
+    private struct ConstraintWrapper<ConstraintType, LambdaType> : IConstraintWrapper 
+            where ConstraintType : struct, IWarmStartConstraint<LambdaType>
+            where LambdaType : struct {
+
+        private ConstraintType c_;
+        private ConstraintType cFullResolve_;
+
+        public IConstraint c {get => c_;}
+        public IConstraint cFullResolve {get => cFullResolve_;}
+
+        public ConstraintWrapper(ConstraintType c, ConstraintType cFullResolve) {
+            this.c_ = c;
+            this.cFullResolve_ = cFullResolve;
+        }
+
+        public IConstraintWrapper Clone() {
+            return (IConstraintWrapper)this.MemberwiseClone();
+        }
+    }
+
     private bool CanRun() {
         var world = World.DefaultGameObjectInjectionWorld;
         var collisionSystem = world.GetExistingSystem<CollisionSystem>();
         return Application.isPlaying && EditorApplication.isPaused && enabled && collisionSystem != null;
+    }
+
+    private bool IsDebugging() {
+        return CanRun() && ConstraintsUpToDate();
     }
 
     private void LoadConstraints() {
@@ -80,18 +115,38 @@ public class PhysicsDebugger : MonoBehaviour {
         // generation group, and then getting the constraints from the
         // collision system.
         var world = World.DefaultGameObjectInjectionWorld;
-        var constraintGatherer = world.GetExistingSystem<ConstraintGatherSystem>();
 
-        constraintGatherer.ClearConstraintBuffers();
+        var shadowConstraintSystem = world.GetOrCreateSystem<ShadowConstraintSystem>();
+        shadowConstraintSystem.Update();
+        var masses = shadowConstraintSystem.GetComponentDataFromEntity<Mass>();
 
-        world.GetExistingSystem<ConstraintGenerationSystemGroup>().Update();
+        float dt = DeltaTime();
 
-        constraints = new List<IConstraint>();
-        constraints.AddRange(constraintGatherer.DebugIterAllConstraints());
+        constraints = new List<IConstraintWrapper>();
+        lastLoadOfConstraints = shadowConstraintSystem.Time.ElapsedTime;
 
-        constraintGatherer.ClearConstraintBuffers();
+        foreach (CornerMountTuple tup in shadowConstraintSystem.GetCornerMountsForDebug()) {
+            var c = new ThreeWayPenConstraint(tup.partialConstraint, masses, dt: dt);
+            var cFullResolve = new ThreeWayPenConstraint(tup.partialConstraint, masses, dt: dt, beta: 1, delta_slop: 0);
+            constraints.Add(new ConstraintWrapper<ThreeWayPenConstraint, float>(c, cFullResolve));
+        }
 
-        lastLoadOfConstraints = constraintGatherer.Time.ElapsedTime;
+        foreach (EdgeMountTuple tup in shadowConstraintSystem.GetEdgeMountsForDebug()) {
+            var c = new TwoWayPenConstraint(tup.partialConstraint, masses, dt: dt);
+            var cFullResolve = new TwoWayPenConstraint(tup.partialConstraint, masses, dt: dt, beta: 1, delta_slop: 0);
+            constraints.Add(new ConstraintWrapper<TwoWayPenConstraint, float>(c, cFullResolve));
+        }
+        
+        var revoluteJointSystem = world.GetOrCreateSystem<RevoluteJointSystem>();
+
+        foreach (RevoluteJointManifold m_ in revoluteJointSystem.GetManifoldsForDebug()) {
+            var m = m_;
+            var c = new TwoWayTwoDOFConstraint(m, masses, dt: dt);
+            m.beta = 1;
+            m.softness = 0;
+            var cFullResolve = new TwoWayTwoDOFConstraint(m, masses, dt: dt);
+            constraints.Add(new ConstraintWrapper<TwoWayTwoDOFConstraint, float2>(c, cFullResolve));
+        }
     }
 
     private bool ConstraintsUpToDate() {
@@ -120,6 +175,7 @@ public class PhysicsDebugger : MonoBehaviour {
         //helperSystem.Do(shift);
         ApplyConstraints();
         Render();
+        SaveGizmosState();
         helperSystem.RestorePhysicsState();
 
         SceneView.lastActiveSceneView.Repaint();
@@ -130,29 +186,27 @@ public class PhysicsDebugger : MonoBehaviour {
         var collisionSystem = world.GetExistingSystem<CollisionSystem>();
         var helperSystem = world.GetOrCreateSystem<HelperSystem>();
 
-        var constraints = new List<IConstraint>();
+        //world.GetExistingSystem<GravitySystem>().Update();
+
+        float dt = DeltaTime();
+
+        var constraints = new List<IConstraintWrapper>();
         foreach (var c in this.constraints) {
             constraints.Add(c.Clone());
-        }
-
-        float dt = collisionSystem.DeltaTime();
-
-        if (resolveConstraintsCompletely) {
-            foreach (var constraint in constraints) {
-                constraint.DebugMultiplyBias(1 / constraint.GetBeta());
-            }
         }
 
         var velocities = helperSystem.GetComponentDataFromEntity<Velocity>(false);
 
         if (performWarmStarting) {
-            foreach (var constraint in constraints) {
+            foreach (var cw in constraints) {
+                var constraint = resolveConstraintsCompletely ? cw.cFullResolve : cw.c;
                 collisionSystem.DebugApplyWarmStart(constraint, velocities, dt);
             }
         }
 
         for (int i = 0; i < sequentialImpulseIterations; i++) {
-            foreach (var constraint in constraints) {
+            foreach (var cw in constraints) {
+                var constraint = resolveConstraintsCompletely ? cw.cFullResolve : cw.c;
                 constraint.ApplyImpulses(velocities, dt);
             }
         }
@@ -196,13 +250,10 @@ public class PhysicsDebugger : MonoBehaviour {
         
         public void OnSceneGUI() {
             var t = target as PhysicsDebugger;
-            Debug.Log("Scene GUI");
-            Debug.Log("t.renderOnce = " + t.renderOnce);
 
-            if (t.CanRun() && (t.autoRendering || t.renderOnce)) {
-                Debug.Log("Rendering");
+            if (t.IsDebugging() && t.autoRendering) {
+                Debug.Log("Auto rendering");
                 t.RenderConstraintResults();
-                t.renderOnce = false;
             }
             //var tr = t.transform;
             //var pos = tr.position;
@@ -232,10 +283,7 @@ public class PhysicsDebugger : MonoBehaviour {
                     t.autoRendering = GUILayout.Toggle(t.autoRendering, "Auto Render");
                     if (!t.autoRendering) {
                         if (GUILayout.Button("Render")) {
-                            Debug.Log("Rendering once");
-                            Debug.Log("Rendering once");
                             t.RenderConstraintResults();
-                            t.renderOnce = true;
                         }
                     }
                 } else {

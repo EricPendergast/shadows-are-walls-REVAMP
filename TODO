@@ -1,5 +1,5 @@
 TODOs:
-1. Make PhysicsDebugger get constraints by calling into each of the constraint generators
+✓1. Make PhysicsDebugger get constraints by calling into each of the constraint generators
 2. Remove GetBeta from IConstraint
 3. Remove all those WithBiasMultiplied functions
 

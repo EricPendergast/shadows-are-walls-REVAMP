@@ -147,12 +147,18 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 493017800}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b4935f683c656241c9b6e7f1a24d3d24, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  enable: 1
+  color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  colorBetween: {r: 1, g: 0, b: 0, a: 1}
+  drawRadius: 0.1
+  sequentialImpulseIterations: 1
+  performWarmStarting: 1
+  resolveConstraintsCompletely: 0
+  applyVelocityScale: 1
   shift:
     x: 0
     y: 0
@@ -230,7 +236,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8d8971ecd791b079b88db319581f5599, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  enable: 1
+  enable: 0
   drawRadius: 0.2
 --- !u!114 &849137633
 MonoBehaviour:
@@ -244,11 +250,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 998d318be2fc21b05afdb18a0d27ef9b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  enable: 1
   color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   colorBetween: {r: 1, g: 0, b: 0, a: 1}
   drawRadius: 0.1
-  debugJacobians: 1
+  debugJacobians: 0
   fractionToResolve: 1
 --- !u!1 &1489330076
 GameObject:
@@ -431,7 +436,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6694085602743877399, guid: 8f87530a5ffed29fbb3c9cd3a09b94d0, type: 3}
       propertyPath: enable
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6694085602743877400, guid: 8f87530a5ffed29fbb3c9cd3a09b94d0, type: 3}
       propertyPath: enable
@@ -439,7 +444,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6694085602743877401, guid: 8f87530a5ffed29fbb3c9cd3a09b94d0, type: 3}
       propertyPath: enable
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6694085602743877402, guid: 8f87530a5ffed29fbb3c9cd3a09b94d0, type: 3}
       propertyPath: m_RootOrder
@@ -495,7 +500,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6694085602743877405, guid: 8f87530a5ffed29fbb3c9cd3a09b94d0, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8514780731496454372, guid: 8f87530a5ffed29fbb3c9cd3a09b94d0, type: 3}
       propertyPath: enable
