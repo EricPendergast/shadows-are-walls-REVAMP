@@ -36,15 +36,15 @@ public struct TwoWayPenConstraint : IWarmStartConstraint<float> {
 
     PenetrationConstraint<Float6> penConstraint;
 
-    public TwoWayPenConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt) {
+    public TwoWayPenConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt) :
+        this(in p, masses, dt, CollisionSystem.positionCorrection ? .1f : 0, -.01f) {}
+
+    public TwoWayPenConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt, float beta, float delta_slop) {
         e1 = p.e1;
         e2 = p.e2;
 
         Float6 M_inv = new Float6(masses[e1].M_inv, masses[e2].M_inv);
         id = p.id;
-
-        float beta = CollisionSystem.positionCorrection ? .1f : 0;
-        float delta_slop = -.01f;
 
         float bias = 0;
 
