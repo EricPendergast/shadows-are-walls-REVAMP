@@ -2,28 +2,79 @@ using System.Collections.Generic;
 
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Collections;
+using Unity.Burst;
 
 using UnityEngine;
+
+using RJConstraint = TwoWayTwoDOFConstraint;
 
 [UpdateInGroup(typeof(ConstraintGenerationSystemGroup))]
 public class RevoluteJointSystem : SystemBase {
 
+    private struct Emitter {
+        public static List<IDebuggableConstraint> debuggableConstraints;
+        public NativeList<TwoWayTwoDOFConstraint>? constraints;
+
+        [BurstDiscard]
+        public void EmitDebuggableConstraint(RevoluteJointManifold m, RJConstraint c, ComponentDataFromEntity<Position> positions, float dt) {
+            if (debuggableConstraints != null) {
+                debuggableConstraints.Add(new DebuggableConstraint(m, c, positions, dt));
+            }
+        }
+
+        public void EmitConstraint(TwoWayTwoDOFConstraint constraint) {
+            if (constraints != null) {
+                constraints.Value.Add(constraint);
+            }
+        }
+    }
+
     protected override void OnUpdate() {
+        var constraintsOut = World.GetOrCreateSystem<ConstraintGatherSystem>().  GetTwoWayTwoDOFConstraintsInput();
+        Emit(
+            new Emitter{
+                constraints = constraintsOut
+            },
+            useBurst: true
+        );
+    }
+
+    private void Emit(Emitter emitter, bool useBurst) {
         float dt = Time.DeltaTime;
 
         var masses = GetComponentDataFromEntity<Mass>();
         var positions = GetComponentDataFromEntity<Position>();
 
-        var constraints = World.GetOrCreateSystem<ConstraintGatherSystem>().GetTwoWayTwoDOFConstraintsInput();
-
-        Entities.ForEach((Entity jointEntity, in RevoluteJoint joint) => {
-            constraints.Add(new TwoWayTwoDOFConstraint(
-                GetManifold(jointEntity, joint, positions),
-                masses,
-                dt
-            ));
-        }).Run();
-
+        if (useBurst) {
+            Entities.
+                ForEach((Entity jointEntity, in RevoluteJoint joint) => {
+                var m = GetManifold(jointEntity, joint, positions);
+                var c = new TwoWayTwoDOFConstraint(
+                    m,
+                    masses,
+                    dt
+                );
+                emitter.EmitConstraint(c);
+                emitter.EmitDebuggableConstraint(m, c, positions, dt);
+            }).Run();
+        } else {
+            // This code is exactly the same as above except with a
+            // WithoutBurst(). Not sure if there's a better solution
+            // here.
+            Entities
+                .WithoutBurst()
+                .ForEach((Entity jointEntity, in RevoluteJoint joint) => {
+                var m = GetManifold(jointEntity, joint, positions);
+                var c = new TwoWayTwoDOFConstraint(
+                    m,
+                    masses,
+                    dt
+                );
+                emitter.EmitConstraint(c);
+                emitter.EmitDebuggableConstraint(m, c, positions, dt);
+            }).Run();
+        }
     }
 
     private static RevoluteJointManifold GetManifold(Entity jointEntity, RevoluteJoint joint, ComponentDataFromEntity<Position> positions) {
@@ -48,24 +99,10 @@ public class RevoluteJointSystem : SystemBase {
     }
 
     public IEnumerable<IDebuggableConstraint> GetDebuggableConstraints() {
-        float dt = Time.DeltaTime;
-        var masses = GetComponentDataFromEntity<Mass>();
-
         var ret = new List<IDebuggableConstraint>();
-        if (dt == 0) {
-            return ret;
-        }
-    
-        var positions = GetComponentDataFromEntity<Position>();
-    
-        Entities
-            .WithoutBurst()
-            .ForEach((Entity jointEntity, in RevoluteJoint joint) => {
-                var m = GetManifold(jointEntity, joint, positions);
-                var c = new TwoWayTwoDOFConstraint(m, masses, dt);
-                ret.Add(new DebuggableConstraint(m, c, positions, dt));
-        }).Run();
-    
+        Emitter.debuggableConstraints = ret;
+        Emit(new Emitter(), useBurst: false);
+        Emitter.debuggableConstraints = null;
         return ret;
     }
 
