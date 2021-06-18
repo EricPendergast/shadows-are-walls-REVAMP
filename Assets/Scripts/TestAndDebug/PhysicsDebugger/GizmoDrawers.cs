@@ -5,42 +5,39 @@ using System.Collections.Generic;
 using Physics.Math;
 
 public partial class PhysicsDebugger {
-    public Color color = Color.gray;
-    public Color colorBetween = Color.red;
-    public float drawRadius = .1f;
-
-    private List<RevoluteJointManifold> jointManifolds;
-
-    private void SaveGizmosState() {
-        var jointSystem = World.DefaultGameObjectInjectionWorld.GetExistingSystem<RevoluteJointSystem>();
-        if (jointSystem != null) {
-            jointManifolds = jointSystem.GetManifoldsForDebug();
-        }
+    public enum DrawMode {
+        drawGizmosBeforeDebug,
+        drawGizmosAfterDebug
     }
+    public DrawMode drawMode = DrawMode.drawGizmosAfterDebug;
+    [SerializeField]
+    public IDebuggableConstraint.DrawGizmosSettings gizmoSettings = new IDebuggableConstraint.DrawGizmosSettings{
+        color = Color.gray,
+        springStretchColor = Color.red,
+        drawRadius = .1f
+    };
+
+    List<IDebuggableConstraint> constraintsAfterDebug = new List<IDebuggableConstraint>();
 
     private void OnDrawGizmos() {
-        if (!IsDebugging()) {
-            SaveGizmosState();
+        if (!Application.isPlaying) {
+            return;
         }
-        var helperSystem = World.DefaultGameObjectInjectionWorld.GetOrCreateSystem<HelperSystem>();
-        if (jointManifolds != null) {
-            var positions = helperSystem.GetComponentDataFromEntity<Position>();
-            foreach (var joint in jointManifolds) {
-                Vector2 x1 = positions[joint.e1].pos;
-                Vector2 x2 = positions[joint.e2].pos;
-                Vector2 m1 = x1 + (Vector2)joint.r1;
-                Vector2 m2 = x2 + (Vector2)joint.r2;
-
-                Gizmos.color = color;
-                Gizmos.DrawLine(x1, m1);
-                Gizmos.DrawSphere(m1, drawRadius);
-
-                Gizmos.color = colorBetween;
-                Gizmos.DrawLine(m1, m2);
-
-                Gizmos.color = color;
-                Gizmos.DrawLine(x2, m2);
-                Gizmos.DrawSphere(m2, drawRadius);
+        if (drawMode == DrawMode.drawGizmosAfterDebug) {
+            foreach (var dc in constraintsAfterDebug) {
+                dc.DrawGizmos(gizmoSettings);
+            }
+        } else {
+            if (ConstraintsUpToDate()) {
+                foreach (var dc in constraints) {
+                    dc.DrawGizmos(gizmoSettings);
+                }
+            } else {
+                var gizmoConstraints = new List<IDebuggableConstraint>();
+                StoreConstraints(gizmoConstraints);
+                foreach (var dc in gizmoConstraints) {
+                    dc.DrawGizmos(gizmoSettings);
+                }
             }
         }
     }

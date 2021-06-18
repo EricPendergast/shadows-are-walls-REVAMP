@@ -147,18 +147,20 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 493017800}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b4935f683c656241c9b6e7f1a24d3d24, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
-  colorBetween: {r: 1, g: 0, b: 0, a: 1}
-  drawRadius: 0.1
+  drawMode: 1
+  gizmoSettings:
+    color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    drawRadius: 0.1
+    springStretchColor: {r: 1, g: 0, b: 0, a: 1}
   sequentialImpulseIterations: 1
   performWarmStarting: 1
   resolveConstraintsCompletely: 0
-  applyVelocityScale: 1
+  applyVelocityScale: 1.12
   shift:
     x: 0
     y: 0

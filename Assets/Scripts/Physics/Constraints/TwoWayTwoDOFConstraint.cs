@@ -30,7 +30,7 @@ public struct TwoWayTwoDOFConstraint : IWarmStartConstraint<Lambda> {
 
     private TwoDOFConstraint<Float6> constraint;
 
-    Float6 M_inv;
+    public Float6 M_inv;
 
     float beta;
 
@@ -46,7 +46,10 @@ public struct TwoWayTwoDOFConstraint : IWarmStartConstraint<Lambda> {
         constraint = constraint.WithBiasMultiplied(biasMult);
     }
 
-    public TwoWayTwoDOFConstraint(RevoluteJointManifold m, ComponentDataFromEntity<Mass> masses, float dt) {
+    public TwoWayTwoDOFConstraint(RevoluteJointManifold m, ComponentDataFromEntity<Mass> masses, float dt) :
+        this(m, new Float6(masses[m.e1].M_inv, masses[m.e2].M_inv), dt) {}
+
+    public TwoWayTwoDOFConstraint(RevoluteJointManifold m, Float6 M_inv, float dt) {
         e1 = m.e1;
         e2 = m.e2;
         id = m.id;
@@ -54,7 +57,7 @@ public struct TwoWayTwoDOFConstraint : IWarmStartConstraint<Lambda> {
         float2 normX = new float2(1, 0);
         float2 normY = new float2(0, 1);
 
-        M_inv = new Float6(masses[e1].M_inv, masses[e2].M_inv);
+        this.M_inv = M_inv;
 
         constraint = new TwoDOFConstraint<Float6>(
             J1: new Float6(
