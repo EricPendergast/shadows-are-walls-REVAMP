@@ -152,7 +152,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b4935f683c656241c9b6e7f1a24d3d24, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  drawMode: 1
+  drawMode: 0
   gizmoSettings:
     color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
     drawRadius: 0.1
@@ -161,9 +161,6 @@ MonoBehaviour:
   performWarmStarting: 1
   resolveConstraintsCompletely: 0
   applyVelocityScale: 1.12
-  shift:
-    x: 0
-    y: 0
 --- !u!4 &493017802
 Transform:
   m_ObjectHideFlags: 0

@@ -16,20 +16,20 @@ public struct TwoWayPenFricConstraint : IWarmStartConstraint<LambdaNT> {
 
     public int id {get;}
 
-    Float6 M_inv;
+    public Float6 M_inv;
 
     PenetrationConstraint<Float6> penConstraint;
     FrictionConstraint<Float6> fricConstraint;
 
-    public TwoWayPenFricConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt) {
+    public TwoWayPenFricConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt, float beta, float delta_slop) :
+        this(in p, new Float6(masses[p.e1].M_inv, masses[p.e2].M_inv), dt: dt, beta: beta, delta_slop: delta_slop) {}
+
+    public TwoWayPenFricConstraint(in Partial p, Float6 M_inv, float dt, float beta, float delta_slop) {
         e1 = p.e1;
         e2 = p.e2;
 
-        M_inv = new Float6(masses[e1].M_inv, masses[e2].M_inv);
+        this.M_inv = M_inv;
         id = p.id;
-
-        float beta = GetBetaStatic();
-        float delta_slop = -.01f;
 
         float bias = 0;
         
@@ -41,14 +41,6 @@ public struct TwoWayPenFricConstraint : IWarmStartConstraint<LambdaNT> {
         fricConstraint = new FrictionConstraint<Float6>(p.J_t, M_inv, CollisionSystem.globalFriction);
 
         lambdaAccum = new LambdaNT();
-    }
-
-    public void DebugMultiplyBias(float biasMult) {
-        penConstraint = penConstraint.WithBiasMultiplied(biasMult);
-    }
-
-    public float GetBeta() {
-        return GetBetaStatic();
     }
 
     public IConstraint Clone() {

@@ -86,6 +86,9 @@ public partial class PhysicsDebugger : MonoBehaviour {
         storeInto.AddRange(
             world.GetExistingSystem<RevoluteJointSystem>()?.GetDebuggableConstraints());
 
+        storeInto.AddRange(
+            world.GetExistingSystem<DirectConstraintSystem>()?.GetDebuggableConstraints());
+
         //constraints = new List<IConstraintWrapper>();
         //
         //foreach (CornerMountTuple tup in shadowConstraintSystem.GetCornerMountsForDebug()) {

@@ -8,8 +8,6 @@ using UnityEngine;
 
 public interface IConstraint {
     public void ApplyImpulses(ComponentDataFromEntity<Velocity> vels, float dt);
-    public void DebugMultiplyBias(float biasMult);
-    public float GetBeta();
     public IConstraint Clone();
 }
 

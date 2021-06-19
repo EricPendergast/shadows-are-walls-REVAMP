@@ -4,9 +4,9 @@ public interface IDebuggableConstraint {
     IDebuggableConstraint Clone();
     void DrawGizmos(DrawGizmosSettings settings);
     public struct Constants {
-        public float? beta;
-        public float? delta_slop;
-        public float? softness;
+        public float beta;
+        public float delta_slop;
+        public float softness;
     }
     void SetConstants(Constants constants);
     IConstraint GetConstraint();
