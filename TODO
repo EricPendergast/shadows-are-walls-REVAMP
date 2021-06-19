@@ -1,8 +1,9 @@
 TODOs:
 ✓1. Make PhysicsDebugger get constraints by calling into each of the constraint generators
-2. Remove GetBeta from IConstraint
-3. Remove all those WithBiasMultiplied functions
-4. Move gizmo drawers behavior to PhysicsDebugger
+✓2. Remove GetBeta from IConstraint
+✓3. Remove all those WithBiasMultiplied functions
+✓4. Fix problems with Time.DeltaTime being 0 at the start of the frame
+5. Move gizmo drawers behavior to PhysicsDebugger
 
 
 Later TODOs:
