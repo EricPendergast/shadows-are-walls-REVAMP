@@ -32,18 +32,8 @@ public struct TwoWayTwoDOFConstraint : IWarmStartConstraint<Lambda> {
 
     public Float6 M_inv;
 
-    float beta;
-
-    public float GetBeta() {
-        return beta;
-    }
-
     public IConstraint Clone() {
         return this;
-    }
-
-    public void DebugMultiplyBias(float biasMult) {
-        constraint = constraint.WithBiasMultiplied(biasMult);
     }
 
     public TwoWayTwoDOFConstraint(RevoluteJointManifold m, ComponentDataFromEntity<Mass> masses, float dt) :
@@ -73,8 +63,6 @@ public struct TwoWayTwoDOFConstraint : IWarmStartConstraint<Lambda> {
             softness: m.softness
         );
 
-        beta = m.beta;
-            
         lambdaAccum = float2.zero;
     }
 

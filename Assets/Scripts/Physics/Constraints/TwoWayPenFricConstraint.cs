@@ -47,10 +47,6 @@ public struct TwoWayPenFricConstraint : IWarmStartConstraint<LambdaNT> {
         return this;
     }
 
-    private static float GetBetaStatic() {
-        return CollisionSystem.positionCorrection ? .1f : 0;
-    }
-
     public struct Partial {
         public Entity e1;
         public Entity e2;

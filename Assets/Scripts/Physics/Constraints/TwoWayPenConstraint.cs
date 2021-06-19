@@ -59,20 +59,8 @@ public struct TwoWayPenConstraint : IWarmStartConstraint<float> {
         lambdaAccum = new float();
     }
 
-    public float GetBeta() {
-        return GetBetaStatic();
-    }
-
     public IConstraint Clone() {
         return this;
-    }
-
-    private static float GetBetaStatic() {
-        return CollisionSystem.positionCorrection ? .1f : 0;
-    }
-
-    public void DebugMultiplyBias(float biasMult) {
-        penConstraint = penConstraint.WithBiasMultiplied(biasMult);
     }
 
     public struct Partial {

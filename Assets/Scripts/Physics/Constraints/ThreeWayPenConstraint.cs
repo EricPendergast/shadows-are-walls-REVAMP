@@ -46,7 +46,7 @@ public struct ThreeWayPenConstraint : IWarmStartConstraint<float> {
     }
 
     public ThreeWayPenConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt) :
-        this(in p, masses, dt: dt, beta: GetBetaStatic(), delta_slop: -.01f){
+        this(in p, masses, dt: dt, beta: CollisionSystem.positionCorrection ? .1f : 0, delta_slop: -.01f){
     }
 
     public ThreeWayPenConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt, float beta, float delta_slop) {
@@ -72,18 +72,6 @@ public struct ThreeWayPenConstraint : IWarmStartConstraint<float> {
 
     public IConstraint Clone() {
         return this;
-    }
-
-    public float GetBeta() {
-        return GetBetaStatic();
-    }
-
-    private static float GetBetaStatic() {
-        return CollisionSystem.positionCorrection ? .1f : 0;
-    }
-
-    public void DebugMultiplyBias(float biasMult) {
-        penConstraint = penConstraint.WithBiasMultiplied(biasMult);
     }
 
     public struct Partial {
