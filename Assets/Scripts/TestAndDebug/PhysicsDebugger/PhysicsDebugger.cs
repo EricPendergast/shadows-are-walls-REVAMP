@@ -194,6 +194,7 @@ public partial class PhysicsDebugger : MonoBehaviour {
                 }
             } else if (t.CanRun()) {
                 if (GUILayout.Button("Load Constraints and Start Debugging")) {
+                    t.drawMode = DrawMode.drawGizmosAfterDebug;
                     t.UpdateConstraints();
                 }
             } else {
@@ -210,6 +211,10 @@ public partial class PhysicsDebugger : MonoBehaviour {
                 if (World.DefaultGameObjectInjectionWorld.GetExistingSystem<CollisionSystem>() == null) {
                     GUILayout.Label("CollisionSystem is not created.", EditorStyles.boldLabel);
                 }
+            }
+
+            if (!t.IsDebugging()) {
+                t.drawMode = DrawMode.drawGizmosBeforeDebug;
             }
             DrawDefaultInspector();
 
