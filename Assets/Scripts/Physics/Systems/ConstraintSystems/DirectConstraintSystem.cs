@@ -34,27 +34,29 @@ public class DirectConstraintSystem : SystemBase {
     ComponentDataFromEntity<Box> boxes;
     ComponentDataFromEntity<Position> positions;
     ComponentDataFromEntity<Mass> masses;
-    float dt;
 
     protected override void OnCreate() {
         boxesQuery = GetEntityQuery(typeof(Box));
     }
 
     protected override void OnUpdate() {
-        Emit(new Emitter{constraints = World.GetOrCreateSystem<ConstraintGatherSystem>().GetTwoWayPenFricConstraintsInput()});
+        Emit(
+            new Emitter{
+                constraints = World.GetOrCreateSystem<ConstraintGatherSystem>().GetTwoWayPenFricConstraintsInput()
+            }, Time.DeltaTime
+        );
     }
 
-    public IEnumerable<IDebuggableConstraint> GetDebuggableConstraints() {
+    public IEnumerable<IDebuggableConstraint> GetDebuggableConstraints(float dt) {
         var ret = new List<IDebuggableConstraint>();
         Emitter.debuggableConstraints = ret;
-        Emit(new Emitter());
+        Emit(new Emitter(), dt);
         Emitter.debuggableConstraints = null;
         return ret;
     }
 
-    private void Emit(Emitter emitter) {
+    private void Emit(Emitter emitter, float dt) {
         NativeArray<Entity> boxEntities = boxesQuery.ToEntityArray(Allocator.TempJob);
-        dt = Time.DeltaTime;
         boxes = GetComponentDataFromEntity<Box>();
         masses = GetComponentDataFromEntity<Mass>();
         positions = GetComponentDataFromEntity<Position>();
@@ -69,11 +71,11 @@ public class DirectConstraintSystem : SystemBase {
                 if (manifoldNullable is Geometry.Manifold manifold) {
 
 
-                    AddConstraint(emitter, box1, box2, manifold, true);
+                    AddConstraint(emitter, box1, box2, manifold, true, dt);
 
                     if (manifold.contact2 is Geometry.Contact contact) {
 
-                        AddConstraint(emitter, box1, box2, manifold, false);
+                        AddConstraint(emitter, box1, box2, manifold, false, dt);
                         Debug.Assert(!manifold.contact1.id.Equals(contact.id), "Duplicate contact ids within the same manifold");
                     }
                 }
@@ -83,7 +85,7 @@ public class DirectConstraintSystem : SystemBase {
         boxEntities.Dispose();
     }
 
-    private void AddConstraint(Emitter emitter, Entity e1, Entity e2, Geometry.Manifold manifold, bool useContact1) {
+    private void AddConstraint(Emitter emitter, Entity e1, Entity e2, Geometry.Manifold manifold, bool useContact1, float dt) {
         Box box1 = boxes[e1];
         Box box2 = boxes[e2];
 

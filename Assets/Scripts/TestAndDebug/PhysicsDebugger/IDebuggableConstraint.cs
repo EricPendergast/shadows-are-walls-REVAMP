@@ -6,7 +6,7 @@ public interface IDebuggableConstraint {
     public struct Constants {
         public float beta;
         public float delta_slop;
-        public float softness;
+        public float? softness;
     }
     void SetConstants(Constants constants);
     IConstraint GetConstraint();

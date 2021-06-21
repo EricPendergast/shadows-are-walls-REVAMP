@@ -25,10 +25,6 @@ public class CollisionSystem : SystemBase {
 
     private float dt = 0;
 
-    public float DeltaTime() {
-        return dt;
-    }
-
     private TwoWayPenFricCM twoWayPenFricCM;
     private TwoWayPenCM twoWayPenCM;
     private ThreeWayPenCM threeWayPenCM;

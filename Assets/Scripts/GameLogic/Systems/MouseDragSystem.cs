@@ -54,7 +54,7 @@ public class MouseDragSystem : SystemBase {
                 if (box.ToRect(pos).Contains(mousePosition.pos)) {
                     mouseComponent.grabData = new MouseComponent.EntityGrabData{
                         entity = e,
-                        grabOffset = pos.GlobalToLocal(mousePosition.pos)
+                        grabLocalAnchor = pos.GlobalToLocal(mousePosition.pos)
                     };
                 }
 
@@ -70,9 +70,9 @@ public class MouseDragSystem : SystemBase {
             em.AddComponentData(mouseEntity, new RevoluteJoint{
                 e1 = mouseEntity,
                 e2 = gd.entity,
-                r1 = 0,
-                r2 = gd.grabOffset,
-                softness = 10,
+                localAnchor1 = float2.zero,
+                localAnchor2 = gd.grabLocalAnchor,
+                softness = 10f,
                 beta = .1f
             });
         } else {
@@ -80,7 +80,7 @@ public class MouseDragSystem : SystemBase {
         }
 
         em.SetComponentData(mouseEntity, mouseComponent);
-        em.SetComponentData(mouseEntity, mouseVelocity);
+        em.SetComponentData(mouseEntity, new Velocity());
         em.SetComponentData(mouseEntity, mousePosition);
 
         //if (mouseComponent.grabData is MouseComponent.EntityGrabData g) {

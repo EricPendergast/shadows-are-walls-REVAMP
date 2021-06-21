@@ -36,12 +36,12 @@ public class RevoluteJointSystem : SystemBase {
             new Emitter{
                 constraints = constraintsOut
             },
-            useBurst: true
+            useBurst: true,
+            Time.DeltaTime
         );
     }
 
-    private void Emit(Emitter emitter, bool useBurst) {
-        float dt = Time.DeltaTime;
+    private void Emit(Emitter emitter, bool useBurst, float dt) {
 
         var masses = GetComponentDataFromEntity<Mass>();
         var positions = GetComponentDataFromEntity<Position>();
@@ -83,8 +83,8 @@ public class RevoluteJointSystem : SystemBase {
 
         float2 x1 = pos1.pos;
         float2 x2 = pos2.pos;
-        float2 r1 = pos1.LocalDirectionToGlobal(joint.r1);
-        float2 r2 = pos2.LocalDirectionToGlobal(joint.r2);
+        float2 r1 = pos1.LocalDirectionToGlobal(joint.localAnchor1);
+        float2 r2 = pos2.LocalDirectionToGlobal(joint.localAnchor2);
 
         return new RevoluteJointManifold{
             e1 = joint.e1,
@@ -98,10 +98,10 @@ public class RevoluteJointSystem : SystemBase {
         };
     }
 
-    public IEnumerable<IDebuggableConstraint> GetDebuggableConstraints() {
+    public IEnumerable<IDebuggableConstraint> GetDebuggableConstraints(float dt) {
         var ret = new List<IDebuggableConstraint>();
         Emitter.debuggableConstraints = ret;
-        Emit(new Emitter(), useBurst: false);
+        Emit(new Emitter(), useBurst: false, dt);
         Emitter.debuggableConstraints = null;
         return ret;
     }

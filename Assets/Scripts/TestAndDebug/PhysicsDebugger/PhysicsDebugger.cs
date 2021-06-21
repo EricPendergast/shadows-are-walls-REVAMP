@@ -11,7 +11,15 @@ using UnityEngine;
 public partial class PhysicsDebugger : MonoBehaviour {
     public int sequentialImpulseIterations = 1;
     public bool performWarmStarting = true;
+
+    [HideInInspector]
     public bool resolveConstraintsCompletely = false;
+    [HideInInspector]
+    public bool overrideBetaAndSlop = false;
+    [HideInInspector]
+    public float betaNewValue = 1;
+    [HideInInspector]
+    public float deltaSlopNewValue = 0;
     public float applyVelocityScale = 1;
 
 
@@ -21,7 +29,7 @@ public partial class PhysicsDebugger : MonoBehaviour {
     private double lastLoadOfConstraints = -1;
 
     private static float DeltaTime() {
-        return World.DefaultGameObjectInjectionWorld.GetExistingSystem<CollisionSystem>().DeltaTime();
+        return World.DefaultGameObjectInjectionWorld.GetExistingSystem<PhysicsPreTimeSystem>().PhysicsDeltaTime();
     }
 
     private class HelperSystem : SystemBase {
@@ -61,6 +69,9 @@ public partial class PhysicsDebugger : MonoBehaviour {
 
     private bool CanRun() {
         var world = World.DefaultGameObjectInjectionWorld;
+        if (world == null) {
+            return false;
+        }
         var collisionSystem = world.GetExistingSystem<CollisionSystem>();
         return Application.isPlaying && EditorApplication.isPaused && enabled && collisionSystem != null;
     }
@@ -84,10 +95,10 @@ public partial class PhysicsDebugger : MonoBehaviour {
         storeInto.Clear();
 
         storeInto.AddRange(
-            world.GetExistingSystem<RevoluteJointSystem>()?.GetDebuggableConstraints());
+            world.GetExistingSystem<RevoluteJointSystem>()?.GetDebuggableConstraints(dt));
 
         storeInto.AddRange(
-            world.GetExistingSystem<DirectConstraintSystem>()?.GetDebuggableConstraints());
+            world.GetExistingSystem<DirectConstraintSystem>()?.GetDebuggableConstraints(dt));
 
         //constraints = new List<IConstraintWrapper>();
         //
@@ -117,10 +128,23 @@ public partial class PhysicsDebugger : MonoBehaviour {
     }
 
     void OnDisable() {
-        Render();
+        RenderCurrentState();
     }
 
-    void Render() {
+    void OnEnable() {
+        UpdateRender();
+    }
+
+    void UpdateRender() {
+        if (IsDebugging()) {
+            RenderConstraintResults();
+        } else {
+            RenderCurrentState();
+        }
+        UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
+    }
+
+    void RenderCurrentState() {
         var world = World.DefaultGameObjectInjectionWorld;
 
         world?.GetExistingSystem<RenderSystemGroup>()?.Update();
@@ -134,11 +158,9 @@ public partial class PhysicsDebugger : MonoBehaviour {
         helperSystem.SavePhysicsState();
         world.GetOrCreateSystem<GravitySystem>().Update();
         ApplyConstraints();
-        Render();
+        RenderCurrentState();
         StoreConstraints(constraintsAfterDebug);
         helperSystem.RestorePhysicsState();
-
-        UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
     }
 
     void ApplyConstraints() {
@@ -154,13 +176,24 @@ public partial class PhysicsDebugger : MonoBehaviour {
         foreach (var c in this.constraints) {
             constraints.Add(c.Clone());
         }
+
         if (resolveConstraintsCompletely) {
+            var newConstants = new IDebuggableConstraint.Constants{
+                beta = 1,
+                delta_slop = 0,
+                softness = 0
+            };
             foreach (var c in constraints) {
-                c.SetConstants(new IDebuggableConstraint.Constants{
-                    beta = 1,
-                    delta_slop = 0,
-                    softness = 0
-                });
+                c.SetConstants(newConstants);
+            }
+        } else if (overrideBetaAndSlop) {
+            var newConstants = new IDebuggableConstraint.Constants{
+                beta = betaNewValue,
+                delta_slop = deltaSlopNewValue,
+                softness = null
+            };
+            foreach (var c in constraints) {
+                c.SetConstants(newConstants);
             }
         }
 
@@ -192,6 +225,13 @@ public partial class PhysicsDebugger : MonoBehaviour {
                 if (GUILayout.Button("Reload Constraints")) {
                     t.UpdateConstraints();
                 }
+
+                if (!(t.resolveConstraintsCompletely = GUILayout.Toggle(t.resolveConstraintsCompletely, "Resolve constraints completely"))) {
+                    if (t.overrideBetaAndSlop = GUILayout.Toggle(t.overrideBetaAndSlop, "Override beta and delta_slop")) {
+                        t.betaNewValue = EditorGUILayout.FloatField("beta override", t.betaNewValue);
+                        t.deltaSlopNewValue = EditorGUILayout.FloatField("delta_slop override", t.deltaSlopNewValue);
+                    }
+                }
             } else if (t.CanRun()) {
                 if (GUILayout.Button("Load Constraints and Start Debugging")) {
                     t.drawMode = DrawMode.drawGizmosAfterDebug;
@@ -219,10 +259,7 @@ public partial class PhysicsDebugger : MonoBehaviour {
             DrawDefaultInspector();
 
             if(GUI.changed) {
-                if (t.IsDebugging()) {
-                    t.RenderConstraintResults();
-                }
-                UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
+                t.UpdateRender();
             }
         }
 

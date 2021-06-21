@@ -10,6 +10,10 @@ public class PhysicsPreTimeSystem : SystemBase {
         public double elapsedTime;
     }
 
+    public float PhysicsDeltaTime() {
+        return UnityEngine.Time.fixedDeltaTime;
+    }
+
     protected override void OnCreate() {
         if (!HasSingleton<FixedTimeCounter>()) {
             var e = World.EntityManager.CreateEntity();

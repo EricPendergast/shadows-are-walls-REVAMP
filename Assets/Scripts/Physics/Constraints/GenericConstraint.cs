@@ -11,7 +11,7 @@ public readonly struct TwoDOFConstraint<T> where T : FloatX<T> {
     public readonly T J1;
     public readonly T J2;
 
-    public readonly float2 m_c;
+    public readonly float2x2 m_c;
 
     public readonly float2 bias;
 
@@ -24,10 +24,20 @@ public readonly struct TwoDOFConstraint<T> where T : FloatX<T> {
         this.bias = bias;
         this.softness = softness;
 
-        m_c = 1 / new float2(J1.Mult(M_inv).Dot(J1) + softness, J2.Mult(M_inv).Dot(J2) + softness);
+        float2x2 K = new float2x2();
+
+        K.c0.x = J1.Mult(M_inv).Dot(J1);    K.c1.x = J1.Mult(M_inv).Dot(J2);
+        K.c0.y = J2.Mult(M_inv).Dot(J1);    K.c1.y = J2.Mult(M_inv).Dot(J2);
+
+        K.c0.x += softness;
+        K.c1.y += softness;
+
+
+        m_c = math.inverse(K);
+        //m_c = new float2(1/(J1.Mult(M_inv).Dot(J1) + softness), 1/(J2.Mult(M_inv).Dot(J2) + softness));
     }
 
-    private TwoDOFConstraint(T J1, T J2, float2 m_c, float2 bias, float softness) {
+    private TwoDOFConstraint(T J1, T J2, float2x2 m_c, float2 bias, float softness) {
         this.J1 = J1;
         this.J2 = J2;
         this.m_c = m_c;
@@ -44,10 +54,15 @@ public readonly struct TwoDOFConstraint<T> where T : FloatX<T> {
     }
 
     public T GetImpulse(T v, ref float2 accumulatedLambda) {
-        float2 lambda = new float2(
-            -m_c.x * (J1.Dot(v) + softness*accumulatedLambda.x + bias.x),
-            -m_c.y * (J2.Dot(v) + softness*accumulatedLambda.y + bias.y)
+        float2 thing = new float2(J1.Dot(v), J2.Dot(v)) + softness*accumulatedLambda + bias;
+        float2 lambda = math.mul(
+            -m_c,
+            thing
         );
+        //float2 lambda = new float2(
+        //    -m_c.x * (J1.Dot(v) + softness*accumulatedLambda.x + bias.x),
+        //    -m_c.y * (J2.Dot(v) + softness*accumulatedLambda.y + bias.y)
+        //);
         accumulatedLambda += lambda;
 
         return GetImpulse(lambda);
@@ -126,6 +141,7 @@ public readonly struct PenetrationConstraint<T> where T : FloatX<T> {
     
     public float GetLambda(T v, ref float accumulatedLambda) {
         float lambda = -m_c * (J.Dot(v) + CollisionSystem.globalSoftness*accumulatedLambda + bias);
+        //accumulatedLambda += lambda;
         ClampLambda(ref lambda, ref accumulatedLambda);
         return lambda;
     }

@@ -26,8 +26,8 @@ public class RevoluteJointAuthoring : MonoBehaviour, IConvertGameObjectToEntity 
         dstManager.AddComponentData(entity, new RevoluteJoint{
             e1 = conversionSystem.GetPrimaryEntity(obj1),
             e2 = conversionSystem.GetPrimaryEntity(obj2),
-            r1 = GetR1(),
-            r2 = GetR2(),
+            localAnchor1 = GetLocalAnchor1(),
+            localAnchor2 = GetLocalAnchor2(),
             beta = beta,
             softness = softness
         });
@@ -39,23 +39,34 @@ public class RevoluteJointAuthoring : MonoBehaviour, IConvertGameObjectToEntity 
         return point;
     }
 
-    Vector2 GetR1() {
-        return WorldToLocal(obj1, (Vector2)transform.position - (Vector2)offset/2);
+    Vector2 GetLocalAnchor1() {
+        return WorldToLocal(obj1, GetMount1());
     }
-    Vector2 GetR2() {
-        return WorldToLocal(obj2, (Vector2)transform.position + (Vector2)offset/2);
+    Vector2 GetLocalAnchor2() {
+        return WorldToLocal(obj2, GetMount2());
+    }
+
+    Vector2 GetMount1() {
+        return (Vector2)transform.position - (Vector2)offset/2;
+    }
+
+    Vector2 GetMount2() {
+        return (Vector2)transform.position + (Vector2)offset/2;
     }
 
     void OnDrawGizmos() {
         Vector2 x1 = obj1.transform.position;
         Vector2 x2 = obj2.transform.position;
 
-        Gizmos.DrawSphere(x1 + GetR1(), .1f);
-        Gizmos.DrawRay(x1, GetR1());
-        Gizmos.DrawSphere(x2 + GetR2(), .1f);
-        Gizmos.DrawRay(x2, GetR2());
+        Vector2 m1 = GetMount1();
+        Vector2 m2 = GetMount2();
+
+        Gizmos.DrawSphere(m1, .1f);
+        Gizmos.DrawLine(x1, m1);
+        Gizmos.DrawSphere(m2, .1f);
+        Gizmos.DrawLine(x2, m2);
 
         Gizmos.color = Color.red;
-        Gizmos.DrawLine(x1 + GetR1(), x2 + GetR2());
+        Gizmos.DrawLine(m1, m2);
     }
 }

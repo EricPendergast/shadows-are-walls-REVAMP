@@ -47,21 +47,84 @@ public struct TwoWayTwoDOFConstraint : IWarmStartConstraint<Lambda> {
         float2 normX = new float2(1, 0);
         float2 normY = new float2(0, 1);
 
+        float2 oneCrossR1 = Lin.Cross(1, m.r1);
+        float2 oneCrossR2 = Lin.Cross(1, m.r2);
+
         this.M_inv = M_inv;
 
+        var normal_n = normY;
+        Float6 J_n = new Float6(
+            new float3(-normal_n, -Lin.Cross(m.r1, normal_n)), 
+            new float3(normal_n, Lin.Cross(m.r2, normal_n))
+        );
+
+        var normal_t = normX;
+        Float6 J_t = new Float6(
+            new float3(-normal_t, -Lin.Cross(m.r1, normal_t)), 
+            new float3(normal_t, Lin.Cross(m.r2, normal_t))
+        );
+
+        float2x2 K1;
+        K1.c0.x = M_inv.v1.x + M_inv.v2.x;	        K1.c1.x = 0.0f;
+        K1.c0.y = 0.0f;								K1.c1.y = M_inv.v1.x + M_inv.v2.x;
+
+        float2 r1 = m.r1;
+        float2 r2 = m.r2;
+        float2x2 K2;
+        K2.c0.x =  M_inv.v1.z * r1.y * r1.y;		K2.c1.x = -M_inv.v1.z * r1.x * r1.y;
+        K2.c0.y = -M_inv.v1.z * r1.x * r1.y;		K2.c1.y =  M_inv.v1.z * r1.x * r1.x;
+
+        float2x2 K3;
+        K3.c0.x =  M_inv.v2.z * r2.y * r2.y;		K3.c1.x = -M_inv.v2.z * r2.x * r2.y;
+        K3.c0.y = -M_inv.v2.z * r2.x * r2.y;		K3.c1.y =  M_inv.v2.z * r2.x * r2.x;
+
+        float2x2 K = K1 + K2 + K3;
+
+
+        float2x2 myK = new float2x2();
+
+        var J1 = J_n;
+        var J2 = J_t;
+
+        myK.c0.x = J2.Mult(M_inv).Dot(J2);    myK.c1.x = J1.Mult(M_inv).Dot(J2);
+        myK.c0.y = J2.Mult(M_inv).Dot(J2);    myK.c1.y = J1.Mult(M_inv).Dot(J1);
+
+        //constraint = new OneDOFConstraint<Float6>(
+        //    //J1: new Float6(
+        //    //    new float3(-normX, 0),// -Lin.Cross(m.r1, normX)),
+        //    //    new float3(normX, 0)// Lin.Cross(m.r2, normX))
+        //    //),
+        //    J: J_n,
+        //    //J: new Float6(
+        //    //    new float3(-normY, -Lin.Cross(m.r1, normY)),
+        //    //    new float3(normY, Lin.Cross(m.r2, normY))
+        //    //),
+        //    //J1: new Float6(-1, 0, -oneCrossR1.x, 1, 0, oneCrossR2.x),
+        //    //J: new Float6(0, -1, -oneCrossR1.y, 0, 1, oneCrossR2.y),
+        //    M_inv: M_inv,
+        //    //bias: m.delta * m.beta / dt,
+        //    bias: math.dot(m.delta, normal_n) * m.beta / dt,
+        //    softness: m.softness
+        //);
         constraint = new TwoDOFConstraint<Float6>(
-            J1: new Float6(
-                new float3(-normX, -Lin.Cross(m.r1, normX)),
-                new float3(normX, Lin.Cross(m.r2, normX))
-            ),
-            J2: new Float6(
-                new float3(-normY, -Lin.Cross(m.r1, normY)),
-                new float3(normY, Lin.Cross(m.r2, normY))
-            ),
+            //J1: new Float6(
+            //    new float3(-normX, 0),// -Lin.Cross(m.r1, normX)),
+            //    new float3(normX, 0)// Lin.Cross(m.r2, normX))
+            //),
+            J1: J_n,
+            J2: J_t,
+            //J: new Float6(
+            //    new float3(-normY, -Lin.Cross(m.r1, normY)),
+            //    new float3(normY, Lin.Cross(m.r2, normY))
+            //),
+            //J1: new Float6(-1, 0, -oneCrossR1.x, 1, 0, oneCrossR2.x),
+            //J: new Float6(0, -1, -oneCrossR1.y, 0, 1, oneCrossR2.y),
             M_inv: M_inv,
-            bias: m.delta * m.beta / dt,
+            //bias: m.delta * m.beta / dt,
+            bias: (new float2(math.dot(m.delta, normal_n), math.dot(m.delta, normal_t))) * m.beta / dt,
             softness: m.softness
         );
+
 
         lambdaAccum = float2.zero;
     }
@@ -74,6 +137,7 @@ public struct TwoWayTwoDOFConstraint : IWarmStartConstraint<Lambda> {
 
         if (CollisionSystem.accumulateImpulses) {
             Float6 P_n = constraint.GetImpulse(lambdaAccum);
+            //Float6 P_n = constraint.GetImpulse(lambdaAccum.y);
 
             ApplyImpulse(P_n, ref v1, ref v2);
         }
@@ -96,6 +160,7 @@ public struct TwoWayTwoDOFConstraint : IWarmStartConstraint<Lambda> {
         Float6 v = GetV(ref v1, ref v2);
 
         Float6 P = constraint.GetImpulse(v, ref lambdaAccum);
+        //Float6 P = constraint.GetImpulse(v, ref lambdaAccum.y);
 
         ApplyImpulse(P, ref v1, ref v2);
     }
