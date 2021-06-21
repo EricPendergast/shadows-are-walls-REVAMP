@@ -42,11 +42,14 @@ public class ShadowRenderPassFeature : ScriptableRendererFeature {
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData) {
             var camera = renderingData.cameraData.camera;
             var prevCullingMatrix = camera.cullingMatrix;
+
             camera.cullingMatrix = Matrix4x4.Ortho(float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue);
-            if (!camera.TryGetCullingParameters(out var cullingParameters)) {
+            bool foundCullingParameters = camera.TryGetCullingParameters(out var cullingParameters);
+            camera.cullingMatrix = prevCullingMatrix;
+
+            if (!foundCullingParameters) {
                 return;
             }
-            camera.cullingMatrix = prevCullingMatrix;
             CommandBuffer cmd = new CommandBuffer(){
                 name = "Render Light"
             };

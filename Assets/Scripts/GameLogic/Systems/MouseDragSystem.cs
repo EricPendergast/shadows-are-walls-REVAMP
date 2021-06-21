@@ -72,7 +72,7 @@ public class MouseDragSystem : SystemBase {
                 e2 = gd.entity,
                 localAnchor1 = float2.zero,
                 localAnchor2 = gd.grabLocalAnchor,
-                softness = 10f,
+                softness = 1f,
                 beta = .1f
             });
         } else {

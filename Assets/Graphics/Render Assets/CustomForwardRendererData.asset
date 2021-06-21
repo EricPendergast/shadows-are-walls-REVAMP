@@ -66,5 +66,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 463c98dc70ef7943e87ca1dfa2b9c7c9, type: 3}
   m_Name: ShadowRenderPassFeature
   m_EditorClassIdentifier: 
-  m_Active: 0
+  m_Active: 1
   lightConeMaterial: {fileID: 2100000, guid: 7f1c57d44ac57dbb5aaa578e3b09457a, type: 2}
