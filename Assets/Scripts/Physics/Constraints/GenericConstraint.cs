@@ -32,9 +32,7 @@ public readonly struct TwoDOFConstraint<T> where T : FloatX<T> {
         K.c0.x += softness;
         K.c1.y += softness;
 
-
         m_c = math.inverse(K);
-        //m_c = new float2(1/(J1.Mult(M_inv).Dot(J1) + softness), 1/(J2.Mult(M_inv).Dot(J2) + softness));
     }
 
     private TwoDOFConstraint(T J1, T J2, float2x2 m_c, float2 bias, float softness) {
@@ -59,10 +57,6 @@ public readonly struct TwoDOFConstraint<T> where T : FloatX<T> {
             -m_c,
             thing
         );
-        //float2 lambda = new float2(
-        //    -m_c.x * (J1.Dot(v) + softness*accumulatedLambda.x + bias.x),
-        //    -m_c.y * (J2.Dot(v) + softness*accumulatedLambda.y + bias.y)
-        //);
         accumulatedLambda += lambda;
 
         return GetImpulse(lambda);
@@ -141,7 +135,6 @@ public readonly struct PenetrationConstraint<T> where T : FloatX<T> {
     
     public float GetLambda(T v, ref float accumulatedLambda) {
         float lambda = -m_c * (J.Dot(v) + CollisionSystem.globalSoftness*accumulatedLambda + bias);
-        //accumulatedLambda += lambda;
         ClampLambda(ref lambda, ref accumulatedLambda);
         return lambda;
     }

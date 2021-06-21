@@ -8684,7 +8684,7 @@ MonoBehaviour:
   beta: 0.2
   softness: 0.01
   offset:
-    x: 0
+    x: 1
     y: 0
 --- !u!4 &1456548694 stripped
 Transform:

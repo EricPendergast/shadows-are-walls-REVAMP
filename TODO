@@ -3,7 +3,7 @@ TODOs:
 ✓2. Remove GetBeta from IConstraint
 ✓3. Remove all those WithBiasMultiplied functions
 ✓4. Fix problems with Time.DeltaTime being 0 at the start of the frame
-5. Remove random code in TwoWayTwoDOFConstraint and GenericConstraint
+✓5. Remove random code in TwoWayTwoDOFConstraint and GenericConstraint
 5. Move gizmo drawers behavior to PhysicsDebugger
 
 
