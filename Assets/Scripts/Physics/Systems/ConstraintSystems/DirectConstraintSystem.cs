@@ -3,6 +3,7 @@ using Unity.Entities;
 using Unity.Collections;
 using Unity.Mathematics;
 using Unity.Burst;
+using Unity.Jobs;
 
 using UnityEngine;
 
@@ -29,94 +30,124 @@ public class DirectConstraintSystem : SystemBase {
         }
     }
 
-
     EntityQuery boxesQuery;
-    ComponentDataFromEntity<Box> boxes;
-    ComponentDataFromEntity<Position> positions;
-    ComponentDataFromEntity<Mass> masses;
-
-    protected override void OnCreate() {
-        boxesQuery = GetEntityQuery(typeof(Box));
-    }
 
     protected override void OnUpdate() {
         Emit(
             new Emitter{
                 constraints = World.GetOrCreateSystem<ConstraintGatherSystem>().GetTwoWayPenFricConstraintsInput()
-            }, Time.DeltaTime
+            },
+            Time.DeltaTime,
+            useBurst: true
         );
     }
 
     public IEnumerable<IDebuggableConstraint> GetDebuggableConstraints(float dt) {
         var ret = new List<IDebuggableConstraint>();
         Emitter.debuggableConstraints = ret;
-        Emit(new Emitter(), dt);
+        Emit(new Emitter(), dt, false);
         Emitter.debuggableConstraints = null;
         return ret;
     }
 
-    private void Emit(Emitter emitter, float dt) {
-        NativeArray<Entity> boxEntities = boxesQuery.ToEntityArray(Allocator.TempJob);
-        boxes = GetComponentDataFromEntity<Box>();
-        masses = GetComponentDataFromEntity<Mass>();
-        positions = GetComponentDataFromEntity<Position>();
+    private struct Env {
+        public ComponentDataFromEntity<Box> boxes;
+        public ComponentDataFromEntity<Mass> masses;
+        public ComponentDataFromEntity<Position> positions;
+        public NativeArray<Entity> boxEntities;
+        public float dt;
+    }
 
-        for (int i = 0; i < boxEntities.Length; i++ ) {
-            for (int j = i+1; j < boxEntities.Length; j++ ) {
-                Entity box1 = boxEntities[i];
-                Entity box2 = boxEntities[j];
+    private void Emit(Emitter emitter, float dt, bool useBurst) {
+        NativeArray<Entity> boxEntities = boxesQuery.ToEntityArrayAsync(Allocator.TempJob, out JobHandle jh);
+        Dependency = JobHandle.CombineDependencies(Dependency, jh);
 
-                var manifoldNullable = GetManifold(box1, box2);
+        var env = new Env {
+            boxes = GetComponentDataFromEntity<Box>(),
+            masses = GetComponentDataFromEntity<Mass>(),
+            positions = GetComponentDataFromEntity<Position>(),
+            dt = dt,
+            boxEntities = boxEntities
+        };
 
-                if (manifoldNullable is Geometry.Manifold manifold) {
+        if (useBurst) {
+            var boxes = env.boxes;
+            var masses = env.masses;
+            var positions = env.positions;
+            Entities
+            .WithReadOnly(boxes)
+            .WithReadOnly(boxEntities)
+            .WithReadOnly(masses)
+            .WithReadOnly(positions)
+            .WithStoreEntityQueryInField(ref boxesQuery)
+            .ForEach((int entityInQueryIndex, in Box box) => {
+                var env = new Env {
+                    boxes = boxes,
+                    boxEntities = boxEntities,
+                    dt = dt,
+                    masses = masses,
+                    positions = positions
+                };
+                EmitForBox(entityInQueryIndex, in box, in emitter, in env);
+            }).Schedule();
+        } else {
+            Entities
+            .WithoutBurst()
+            .ForEach((int entityInQueryIndex, in Box box) => {
+                EmitForBox(entityInQueryIndex, in box, in emitter, in env);
+            }).Run();
+        }
 
+        Dependency = boxEntities.Dispose(Dependency);
+    }
 
-                    AddConstraint(emitter, box1, box2, manifold, true, dt);
+    private static void EmitForBox(int boxIndex, in Box box, in Emitter emitter, in Env env) {
+        for (int j = boxIndex+1; j < env.boxEntities.Length; j++ ) {
+            Entity box1 = env.boxEntities[boxIndex];
+            Entity box2 = env.boxEntities[j];
 
-                    if (manifold.contact2 is Geometry.Contact contact) {
+            var manifoldNullable = Geometry.GetIntersectData(
+                env.boxes[box1].ToRect(env.positions[box1]),
+                env.boxes[box2].ToRect(env.positions[box2])
+            );
 
-                        AddConstraint(emitter, box1, box2, manifold, false, dt);
-                        Debug.Assert(!manifold.contact1.id.Equals(contact.id), "Duplicate contact ids within the same manifold");
-                    }
+            if (manifoldNullable is Geometry.Manifold manifold) {
+                AddConstraint(emitter, env, box1, box2, manifold, true);
+
+                if (manifold.contact2 is Geometry.Contact contact) {
+
+                    AddConstraint(emitter, env, box1, box2, manifold, false);
+                    Debug.Assert(!manifold.contact1.id.Equals(contact.id), "Duplicate contact ids within the same manifold");
                 }
             }
         }
-
-        boxEntities.Dispose();
     }
 
-    private void AddConstraint(Emitter emitter, Entity e1, Entity e2, Geometry.Manifold manifold, bool useContact1, float dt) {
-        Box box1 = boxes[e1];
-        Box box2 = boxes[e2];
+    private static void AddConstraint(in Emitter emitter, in Env env, Entity e1, Entity e2, Geometry.Manifold manifold, bool useContact1) {
+        Box box1 = env.boxes[e1];
+        Box box2 = env.boxes[e2];
 
-        if (masses[e1].mass == math.INFINITY && masses[e2].mass == math.INFINITY) {
+        if (env.masses[e1].mass == math.INFINITY && env.masses[e2].mass == math.INFINITY) {
             return;
         }
 
         var partial = new TwoWayPenFricConstraint.Partial(
             e1, e2,
-            positions[e1], positions[e2],
+            env.positions[e1], env.positions[e2],
             manifold,
             useContact1
         );
 
         var c = new TwoWayPenFricConstraint(
             partial,
-            masses,
-            dt: dt,
+            env.masses,
+            dt: env.dt,
             beta: CollisionSystem.positionCorrection ? .1f : 0,
             delta_slop: -.01f
         );
 
         emitter.EmitConstraint(c);
-        emitter.EmitDebuggableConstraint(manifold, partial, c, useContact1, dt);
-    }
-
-    private Geometry.Manifold? GetManifold(Entity box1, Entity box2) {
-        return Geometry.GetIntersectData(
-            boxes[box1].ToRect(positions[box1]),
-            boxes[box2].ToRect(positions[box2])
-        );
+        emitter.EmitDebuggableConstraint(manifold, partial, c, useContact1, env.dt);
     }
 
     private struct DebuggableConstraint : IDebuggableConstraint {
