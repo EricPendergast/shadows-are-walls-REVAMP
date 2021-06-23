@@ -76,7 +76,7 @@ public struct Float4 : FloatX<Float4> {
     public float4 v;
 
     public static implicit operator float4(Float4 v) {
-        return v;
+        return v.v;
     }
     public static implicit operator Float4(float4 v) {
         return new Float4(v);
@@ -106,6 +106,40 @@ public struct Float4 : FloatX<Float4> {
     }
 
     public Float4 Mult(float o) {
+        return v * o;
+    }
+}
+
+public struct Float3 : FloatX<Float3> {
+    public float3 v;
+
+    public static implicit operator float3(Float3 v) {
+        return v.v;
+    }
+    public static implicit operator Float3(float3 v) {
+        return new Float3(v);
+    }
+    public Float3(float3 v) {
+        this.v = v;
+    }
+
+    public Float3(float f1, float f2, float f3) {
+        this.v = new float3(f1, f2, f3);
+    }
+
+    public Float3 Add(Float3 o) {
+        return v + o.v;
+    }
+
+    public float Dot(Float3 o) {
+        return math.dot(this, o);
+    }
+
+    public Float3 Mult(Float3 o) {
+        return v * o.v;
+    }
+
+    public Float3 Mult(float o) {
         return v * o;
     }
 }

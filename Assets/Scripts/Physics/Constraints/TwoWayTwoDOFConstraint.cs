@@ -68,7 +68,6 @@ public struct TwoWayTwoDOFConstraint : IWarmStartConstraint<Lambda> {
 
         if (CollisionSystem.accumulateImpulses) {
             Float6 P_n = constraint.GetImpulse(lambdaAccum);
-            //Float6 P_n = constraint.GetImpulse(lambdaAccum.y);
 
             ApplyImpulse(P_n, ref v1, ref v2);
         }
@@ -91,7 +90,6 @@ public struct TwoWayTwoDOFConstraint : IWarmStartConstraint<Lambda> {
         Float6 v = GetV(ref v1, ref v2);
 
         Float6 P = constraint.GetImpulse(v, ref lambdaAccum);
-        //Float6 P = constraint.GetImpulse(v, ref lambdaAccum.y);
 
         ApplyImpulse(P, ref v1, ref v2);
     }
