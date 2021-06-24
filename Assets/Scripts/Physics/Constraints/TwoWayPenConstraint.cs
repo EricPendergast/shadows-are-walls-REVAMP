@@ -20,6 +20,17 @@ public struct ShadowEdgeManifold {
     public int contactIdOn2;
 }
 
+public struct RelativeVelocityManifold {
+    public Entity e1;
+    public Entity e2;
+    public float2 r1;
+    public float2 r2;
+    public float2 normal;
+    public float minSpeedE1AlongNormal;
+    public int id;
+    public float softness;
+}
+
 public struct TwoWayPenConstraint : IWarmStartConstraint<float> {
     // The opaque object
     public Entity e1;
@@ -35,6 +46,26 @@ public struct TwoWayPenConstraint : IWarmStartConstraint<float> {
     Float6 M_inv;
 
     PenetrationConstraint<Float6> penConstraint;
+
+    public TwoWayPenConstraint(in RelativeVelocityManifold m, ComponentDataFromEntity<Mass> masses, float dt) {
+        e1 = m.e1;
+        e2 = m.e2;
+        id = m.id;
+
+        M_inv = new Float6(masses[e1].M_inv, masses[e2].M_inv);
+
+        lambdaAccum = 0;
+
+        penConstraint = new PenetrationConstraint<Float6>(
+            J: new Float6(
+                    new float3(m.normal, Lin.Cross(m.r1, m.normal)), 
+                    new float3(-m.normal, -Lin.Cross(m.r2, m.normal))
+            ),
+            M_inv: M_inv,
+            bias: -m.minSpeedE1AlongNormal,
+            softness: m.softness
+        );
+    }
 
     public TwoWayPenConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt) :
         this(in p, masses, dt, CollisionSystem.positionCorrection ? .1f : 0, -.01f) {}

@@ -38,6 +38,10 @@ public class ConstraintGatherSystem : SystemBase {
 
     protected override void OnUpdate() {
         ClearConstraintBuffers();
+
+        Entities.ForEach((ref DynamicBuffer<DirectContactStore> b) => {
+            b.Clear();
+        }).ScheduleParallel();
     }
 
     public void ClearConstraintBuffers() {

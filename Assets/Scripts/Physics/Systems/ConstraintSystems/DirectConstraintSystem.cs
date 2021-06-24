@@ -15,6 +15,7 @@ public class DirectConstraintSystem : SystemBase {
     private struct Emitter {
         public static List<IDebuggableConstraint> debuggableConstraints;
         public NativeList<TwoWayPenFricConstraint>? constraints;
+        public BufferFromEntity<DirectContactStore>? directContacts;
 
         [BurstDiscard]
         public void EmitDebuggableConstraint(Geometry.Manifold m, TwoWayPenFricConstraint.Partial p, TwoWayPenFricConstraint c, bool useContact1, float dt) {
@@ -23,9 +24,17 @@ public class DirectConstraintSystem : SystemBase {
             }
         }
 
-        public void EmitConstraint(TwoWayPenFricConstraint constraint) {
+        public void EmitConstraint(in TwoWayPenFricConstraint constraint) {
             if (constraints != null) {
                 constraints.Value.Add(constraint);
+            }
+        }
+
+        public void EmitContact(Entity e, in DirectContactStore dc) {
+            if (directContacts != null) {
+                if (directContacts.Value.HasComponent(e)) {
+                    directContacts.Value[e].Add(dc);
+                }
             }
         }
     }
@@ -35,9 +44,10 @@ public class DirectConstraintSystem : SystemBase {
     protected override void OnUpdate() {
         Emit(
             new Emitter{
-                constraints = World.GetOrCreateSystem<ConstraintGatherSystem>().GetTwoWayPenFricConstraintsInput()
+                constraints = World.GetOrCreateSystem<ConstraintGatherSystem>().GetTwoWayPenFricConstraintsInput(),
+                directContacts = GetBufferFromEntity<DirectContactStore>()
             },
-            Time.DeltaTime,
+            dt: Time.DeltaTime,
             useBurst: true
         );
     }
@@ -45,7 +55,7 @@ public class DirectConstraintSystem : SystemBase {
     public IEnumerable<IDebuggableConstraint> GetDebuggableConstraints(float dt) {
         var ret = new List<IDebuggableConstraint>();
         Emitter.debuggableConstraints = ret;
-        Emit(new Emitter(), dt, false);
+        Emit(new Emitter(), dt, useBurst: false);
         Emitter.debuggableConstraints = null;
         return ret;
     }
@@ -147,7 +157,25 @@ public class DirectConstraintSystem : SystemBase {
         );
 
         emitter.EmitConstraint(c);
+
+        var contactPoint = useContact1 ? manifold.contact1.point : manifold.contact2.Value.point;
+
+        emitter.EmitContact(e1,
+            new DirectContactStore {
+                normal = -manifold.normal,
+                other = e2,
+                point = contactPoint
+            }
+        );
+        emitter.EmitContact(e2,
+            new DirectContactStore {
+                normal = manifold.normal,
+                other = e1,
+                point = contactPoint
+            }
+        );
         emitter.EmitDebuggableConstraint(manifold, partial, c, useContact1, env.dt);
+
     }
 
     private struct DebuggableConstraint : IDebuggableConstraint {

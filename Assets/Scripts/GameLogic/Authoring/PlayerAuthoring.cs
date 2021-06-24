@@ -9,5 +9,7 @@ public class PlayerAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
                 moveDirection = 0
             }
         );
+
+        dstManager.AddBuffer<DirectContactStore>(entity);
     }
 }

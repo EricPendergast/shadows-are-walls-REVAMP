@@ -16,9 +16,12 @@ public class PlayerInputSystem : SystemBase {
             lrDirection += 1;
         }
 
+        bool jump = keyboard.spaceKey.isPressed;
+
         Entities.ForEach(
         (ref PlayerComponent pc) => {
             pc.moveDirection = lrDirection;
+            pc.jumpPressed = jump;
         }).ScheduleParallel();
     }
 }

@@ -17,12 +17,12 @@ public class CollisionSystem : SystemBase {
     EntityQuery hitShadBoxesQuery;
     EntityQuery lightSourcesQuery;
     // Warning: Friction no longer works when accumulateImpulses is false
-    public static readonly bool accumulateImpulses = true;
-    public static readonly bool warmStarting = true;
-    public static readonly bool positionCorrection = true;
+    public const bool accumulateImpulses = true;
+    public const bool warmStarting = true;
+    public const bool positionCorrection = true;
     // In the future, this will be configurable on a per object basis
-    public static readonly float globalFriction = .5f;
-    public static readonly float globalSoftness = 0;
+    public const float globalFriction = .7f;
+    public const float globalSoftness = 0;
 
     private float dt = 0;
 
