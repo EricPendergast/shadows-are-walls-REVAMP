@@ -9,6 +9,7 @@ using TwoWayPenCM = ConstraintManager<TwoWayPenConstraint, float>;
 using ThreeWayPenCM = ConstraintManager<ThreeWayPenConstraint, float>;
 using TwoWayTwoDOFCM = ConstraintManager<TwoWayTwoDOFConstraint, Unity.Mathematics.float2>;
 using OneWayOneDOFCM = ConstraintManager<OneWayOneDOFConstraint, float>;
+using TwoWayOneDOFCM = ConstraintManager<TwoWayOneDOFConstraint, float>;
 
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
 [UpdateAfter(typeof(ConstraintGenerationSystemGroup))]
@@ -31,6 +32,7 @@ public class CollisionSystem : SystemBase {
     private ThreeWayPenCM threeWayPenCM;
     private TwoWayTwoDOFCM twoWayTwoDOFCM;
     private OneWayOneDOFCM oneWayOneDOFCM;
+    private TwoWayOneDOFCM twoWayOneDOFCM;
 
     public IEnumerable<IConstraintManager> DebugIterConstraintManagers() {
         yield return twoWayPenFricCM;
@@ -38,6 +40,7 @@ public class CollisionSystem : SystemBase {
         yield return threeWayPenCM;
         yield return twoWayTwoDOFCM;
         yield return oneWayOneDOFCM;
+        yield return twoWayOneDOFCM;
     }
 
     protected override void OnCreate() {
@@ -50,6 +53,7 @@ public class CollisionSystem : SystemBase {
         threeWayPenCM = new ThreeWayPenCM();
         twoWayTwoDOFCM = new TwoWayTwoDOFCM();
         oneWayOneDOFCM = new OneWayOneDOFCM();
+        twoWayOneDOFCM = new TwoWayOneDOFCM();
     }
 
     protected override void OnDestroy() {
@@ -58,6 +62,7 @@ public class CollisionSystem : SystemBase {
         threeWayPenCM.Dispose();
         twoWayTwoDOFCM.Dispose();
         oneWayOneDOFCM.Dispose();
+        twoWayOneDOFCM.Dispose();
     }
 
     protected override void OnUpdate() {
@@ -72,12 +77,14 @@ public class CollisionSystem : SystemBase {
         constraintGatherer.GiveConstraintsTo(ref threeWayPenCM);
         constraintGatherer.GiveConstraintsTo(ref twoWayTwoDOFCM);
         constraintGatherer.GiveConstraintsTo(ref oneWayOneDOFCM);
+        constraintGatherer.GiveConstraintsTo(ref twoWayOneDOFCM);
         
         twoWayPenFricCM.PreSteps(dt, ref vels);
         twoWayPenCM.PreSteps(dt, ref vels);
         threeWayPenCM.PreSteps(dt, ref vels);
         twoWayTwoDOFCM.PreSteps(dt, ref vels);
         oneWayOneDOFCM.PreSteps(dt, ref vels);
+        twoWayOneDOFCM.PreSteps(dt, ref vels);
 
         // Do a dry run on the first frame. This is useful because when you
         // start the game paused, the first frame is always executed before the
@@ -89,6 +96,7 @@ public class CollisionSystem : SystemBase {
                 threeWayPenCM.ApplyImpulses(dt);
                 twoWayTwoDOFCM.ApplyImpulses(dt);
                 oneWayOneDOFCM.ApplyImpulses(dt);
+                twoWayOneDOFCM.ApplyImpulses(dt);
             }
         }
 
@@ -97,6 +105,7 @@ public class CollisionSystem : SystemBase {
         threeWayPenCM.SaveWarmStartParameters();
         twoWayTwoDOFCM.SaveWarmStartParameters();
         oneWayOneDOFCM.SaveWarmStartParameters();
+        twoWayOneDOFCM.SaveWarmStartParameters();
     }
 
     public struct DebugContactInfo {

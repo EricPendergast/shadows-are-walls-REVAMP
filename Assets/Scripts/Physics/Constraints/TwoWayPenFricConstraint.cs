@@ -21,10 +21,27 @@ public struct TwoWayPenFricConstraint : IWarmStartConstraint<LambdaNT> {
     PenetrationConstraint<Float6> penConstraint;
     FrictionConstraint<Float6> fricConstraint;
 
-    public TwoWayPenFricConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt, float beta, float delta_slop) :
-        this(in p, new Float6(masses[p.e1].M_inv, masses[p.e2].M_inv), dt: dt, beta: beta, delta_slop: delta_slop) {}
+    public TwoWayPenFricConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt, float beta, float delta_slop, float friction) :
+        this(
+            in p,
+            new Float6(masses[p.e1].M_inv, masses[p.e2].M_inv),
+            dt: dt,
+            beta: beta,
+            delta_slop: delta_slop,
+            friction: friction
+        ) {}
 
-    public TwoWayPenFricConstraint(in Partial p, Float6 M_inv, float dt, float beta, float delta_slop) {
+    public TwoWayPenFricConstraint(in TwoWayPenFricConstraint previous, in Partial p, float dt, float beta, float delta_slop) :
+    this(
+        in p,
+        previous.M_inv,
+        dt: dt,
+        beta: beta,
+        delta_slop: delta_slop,
+        friction: previous.fricConstraint.frictionCoeff
+    ) {}
+
+    private TwoWayPenFricConstraint(in Partial p, Float6 M_inv, float dt, float beta, float delta_slop, float friction) {
         e1 = p.e1;
         e2 = p.e2;
 
@@ -38,7 +55,7 @@ public struct TwoWayPenFricConstraint : IWarmStartConstraint<LambdaNT> {
         }
 
         penConstraint = new PenetrationConstraint<Float6>(p.J_n, M_inv, bias);
-        fricConstraint = new FrictionConstraint<Float6>(p.J_t, M_inv, CollisionSystem.globalFriction);
+        fricConstraint = new FrictionConstraint<Float6>(p.J_t, M_inv, friction);
 
         lambdaAccum = new LambdaNT();
     }

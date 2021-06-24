@@ -8,6 +8,7 @@ using TwoWayPenCM = ConstraintManager<TwoWayPenConstraint, float>;
 using ThreeWayPenCM = ConstraintManager<ThreeWayPenConstraint, float>;
 using TwoWayTwoDOFCM = ConstraintManager<TwoWayTwoDOFConstraint, Unity.Mathematics.float2>;
 using OneWayOneDOFCM = ConstraintManager<OneWayOneDOFConstraint, float>;
+using TwoWayOneDOFCM = ConstraintManager<TwoWayOneDOFConstraint, float>;
 
 
 [AlwaysUpdateSystem]
@@ -19,6 +20,7 @@ public class ConstraintGatherSystem : SystemBase {
     NativeList<ThreeWayPenConstraint> constraints3;
     NativeList<TwoWayTwoDOFConstraint> constraints4;
     NativeList<OneWayOneDOFConstraint> constraints5;
+    NativeList<TwoWayOneDOFConstraint> constraints6;
 
     protected override void OnCreate() {
         constraints1 = new NativeList<TwoWayPenFricConstraint>(Allocator.Persistent);
@@ -26,6 +28,7 @@ public class ConstraintGatherSystem : SystemBase {
         constraints3 = new NativeList<ThreeWayPenConstraint>(Allocator.Persistent);
         constraints4 = new NativeList<TwoWayTwoDOFConstraint>(Allocator.Persistent);
         constraints5 = new NativeList<OneWayOneDOFConstraint>(Allocator.Persistent);
+        constraints6 = new NativeList<TwoWayOneDOFConstraint>(Allocator.Persistent);
     }
 
     protected override void OnDestroy() {
@@ -34,6 +37,7 @@ public class ConstraintGatherSystem : SystemBase {
         constraints3.Dispose();
         constraints4.Dispose();
         constraints5.Dispose();
+        constraints6.Dispose();
     }
 
     protected override void OnUpdate() {
@@ -50,6 +54,7 @@ public class ConstraintGatherSystem : SystemBase {
         constraints3.Clear();
         constraints4.Clear();
         constraints5.Clear();
+        constraints6.Clear();
     }
 
     public void GiveConstraintsTo(ref TwoWayPenFricCM cm) {
@@ -67,6 +72,9 @@ public class ConstraintGatherSystem : SystemBase {
     public void GiveConstraintsTo(ref OneWayOneDOFCM cm) {
         cm.RecieveConstraints(new NativeSlice<OneWayOneDOFConstraint>(constraints5));
     }
+    public void GiveConstraintsTo(ref TwoWayOneDOFCM cm) {
+        cm.RecieveConstraints(new NativeSlice<TwoWayOneDOFConstraint>(constraints6));
+    }
 
     public NativeList<TwoWayPenFricConstraint> GetTwoWayPenFricConstraintsInput() {
         return constraints1;
@@ -83,6 +91,9 @@ public class ConstraintGatherSystem : SystemBase {
     public NativeList<OneWayOneDOFConstraint> GetOneWayOneDOFConstraintsInput() {
         return constraints5;
     }
+    public NativeList<TwoWayOneDOFConstraint> GetTwoWayOneDOFConstraintsInput() {
+        return constraints6;
+    }
 
     public IEnumerable<IConstraint> DebugIterAllConstraints() {
         foreach (var c in constraints1) {
@@ -98,6 +109,9 @@ public class ConstraintGatherSystem : SystemBase {
             yield return c;
         }
         foreach (var c in constraints5) {
+            yield return c;
+        }
+        foreach (var c in constraints6) {
             yield return c;
         }
     }

@@ -20,7 +20,7 @@ public struct ShadowEdgeManifold {
     public int contactIdOn2;
 }
 
-public struct RelativeVelocityManifold {
+public struct MinRelativeVelocityManifold {
     public Entity e1;
     public Entity e2;
     public float2 r1;
@@ -47,7 +47,7 @@ public struct TwoWayPenConstraint : IWarmStartConstraint<float> {
 
     PenetrationConstraint<Float6> penConstraint;
 
-    public TwoWayPenConstraint(in RelativeVelocityManifold m, ComponentDataFromEntity<Mass> masses, float dt) {
+    public TwoWayPenConstraint(in MinRelativeVelocityManifold m, ComponentDataFromEntity<Mass> masses, float dt) {
         e1 = m.e1;
         e2 = m.e2;
         id = m.id;

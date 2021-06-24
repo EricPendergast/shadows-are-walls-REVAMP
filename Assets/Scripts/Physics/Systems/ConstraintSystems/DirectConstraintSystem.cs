@@ -64,6 +64,7 @@ public class DirectConstraintSystem : SystemBase {
         public ComponentDataFromEntity<Box> boxes;
         public ComponentDataFromEntity<Mass> masses;
         public ComponentDataFromEntity<Position> positions;
+        public ComponentDataFromEntity<Friction> frictions;
         public NativeArray<Entity> boxEntities;
         public float dt;
     }
@@ -76,6 +77,7 @@ public class DirectConstraintSystem : SystemBase {
             boxes = GetComponentDataFromEntity<Box>(),
             masses = GetComponentDataFromEntity<Mass>(),
             positions = GetComponentDataFromEntity<Position>(),
+            frictions = GetComponentDataFromEntity<Friction>(),
             dt = dt,
             boxEntities = boxEntities
         };
@@ -84,11 +86,13 @@ public class DirectConstraintSystem : SystemBase {
             var boxes = env.boxes;
             var masses = env.masses;
             var positions = env.positions;
+            var frictions = env.frictions;
             Entities
             .WithReadOnly(boxes)
             .WithReadOnly(boxEntities)
             .WithReadOnly(masses)
             .WithReadOnly(positions)
+            .WithReadOnly(frictions)
             .WithStoreEntityQueryInField(ref boxesQuery)
             .ForEach((int entityInQueryIndex, in Box box) => {
                 var env = new Env {
@@ -96,7 +100,8 @@ public class DirectConstraintSystem : SystemBase {
                     boxEntities = boxEntities,
                     dt = dt,
                     masses = masses,
-                    positions = positions
+                    positions = positions,
+                    frictions = frictions
                 };
                 EmitForBox(entityInQueryIndex, in box, in emitter, in env);
             }).Schedule();
@@ -148,12 +153,16 @@ public class DirectConstraintSystem : SystemBase {
             useContact1
         );
 
+        float fric1 = env.frictions.HasComponent(e1) ? env.frictions[e1].friction : 0;
+        float fric2 = env.frictions.HasComponent(e2) ? env.frictions[e2].friction : 0;
+
         var c = new TwoWayPenFricConstraint(
             partial,
             env.masses,
             dt: env.dt,
             beta: CollisionSystem.positionCorrection ? .1f : 0,
-            delta_slop: -.01f
+            delta_slop: -.01f,
+            friction: fric1 * fric2
         );
 
         emitter.EmitConstraint(c);
@@ -182,7 +191,6 @@ public class DirectConstraintSystem : SystemBase {
         private Geometry.Manifold m;
         private IConstraint constraint;
 
-        Float6 M_inv;
         float dt;
         bool useContact1;
         TwoWayPenFricConstraint.Partial p;
@@ -191,7 +199,6 @@ public class DirectConstraintSystem : SystemBase {
             this.m = m;
             this.useContact1 = useContact1;
             constraint = c;
-            M_inv = c.M_inv;
             this.dt = dt;
             this.p = p;
         }
@@ -225,7 +232,7 @@ public class DirectConstraintSystem : SystemBase {
         }
 
         public void SetConstants(IDebuggableConstraint.Constants constants) {
-            constraint = new TwoWayPenFricConstraint(p, M_inv, dt: dt, beta: constants.beta, delta_slop: constants.delta_slop);
+            constraint = new TwoWayPenFricConstraint((TwoWayPenFricConstraint)constraint, p, dt: dt, beta: constants.beta, delta_slop: constants.delta_slop);
         }
 
         public IConstraint GetConstraint() {

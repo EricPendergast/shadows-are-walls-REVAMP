@@ -21,6 +21,8 @@ public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
 
     public float gravityScale = 1;
 
+    public float friction = .75f;
+
     public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem) {
         float w = transform.localScale.x*width;
         float h = transform.localScale.y*height;
@@ -53,6 +55,8 @@ public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
             });
 
         dstManager.AddComponentData(entity, new IgnoreHierarchyTag());
+
+        dstManager.AddComponentData(entity, new Friction{friction = friction});
 
         if (gravityScale != 1) {
             dstManager.AddComponentData(entity,
