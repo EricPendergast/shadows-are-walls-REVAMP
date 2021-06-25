@@ -1,10 +1,8 @@
 TODOs:
-✓1. Make PhysicsDebugger get constraints by calling into each of the constraint generators
-✓2. Remove GetBeta from IConstraint
-✓3. Remove all those WithBiasMultiplied functions
-✓4. Fix problems with Time.DeltaTime being 0 at the start of the frame
-✓5. Remove random code in TwoWayTwoDOFConstraint and GenericConstraint
-5. Move gizmo drawers behavior to PhysicsDebugger
+✓1. Create LightMountJoint
+✓2. Create a (temporary) way to author a LightMountJoint
+✓3. Implement LightMountSystem
+4. Implement custom light editor
 
 
 Later TODOs:
@@ -12,3 +10,4 @@ Later TODOs:
 2. Make ShadowHitting objects choose to always resolve to light areas or dark areas.
 3. Allow for overlapping shadow edges
 4. Unbreak constraint gizmos
+5. Move gizmo drawers behavior to PhysicsDebugger

@@ -4,11 +4,17 @@ using Unity.Mathematics;
 
 using Random = UnityEngine.Random;
 
+using Physics.Math;
+
 public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
 
     public float angularVelocity;
     public float inertia = .1f;
     public float aperture = 40;
+
+    public GameObject mount;
+    public float rangeStart;
+    public float rangeEnd;
 
     public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem) {
         dstManager.AddComponentData(entity, GetLightSource());
@@ -32,6 +38,16 @@ public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
         );
 
         dstManager.AddComponentData(entity, new IgnoreHierarchyTag());
+
+        if (mount != null) {
+            dstManager.AddComponentData(entity,
+                new LightMountJoint{
+                    mount = conversionSystem.GetPrimaryEntity(mount),
+                    rangeStart = math.radians(rangeStart),
+                    rangeEnd = math.radians(rangeEnd)
+                }
+            );
+        }
     }
 
     public Position GetLightPosition() {
@@ -57,5 +73,10 @@ public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
         float rot = transform.eulerAngles.z;
         Gizmos.DrawRay(transform.position, Quaternion.Euler(0,0,rot+aperture/2)*Vector2.right*20);
         Gizmos.DrawRay(transform.position, Quaternion.Euler(0,0,rot-aperture/2)*Vector2.right*20);
+
+        if (mount != null) {
+            Gizmos.DrawRay(transform.position, Quaternion.Euler(0,0, rangeStart) * mount.transform.right);
+            Gizmos.DrawRay(transform.position, Quaternion.Euler(0,0, rangeEnd) * mount.transform.right);
+        }
     }
 }

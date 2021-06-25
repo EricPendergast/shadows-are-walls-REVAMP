@@ -10,6 +10,12 @@ public struct LightSource : IComponentData {
     public int minEdgeId;
     public int maxEdgeId;
 
+    public Physics.Math.AngleRange GetAngleRange(float rot) {
+        return new Physics.Math.AngleRange(
+            rangeStart: rot - aperture/2,
+            rangeEnd: rot + aperture/2
+        );
+    }
     public float2 GetLeadingEdgeNorm(float rot) {
         return math.mul(float2x2.Rotate(rot - aperture/2), new float2(1, 0));
     }

@@ -31,6 +31,17 @@ public struct MinRelativeVelocityManifold {
     public float softness;
 }
 
+public struct AnglePenetrationManifold {
+    public Entity e1;
+    public Entity e2;
+    // Resolves delta to zero (or further, depending on what other constraints
+    // are doing)
+    public float delta;
+    public int id;
+    public float beta;
+    public float softness;
+}
+
 public struct TwoWayPenConstraint : IWarmStartConstraint<float> {
     // The opaque object
     public Entity e1;
@@ -46,6 +57,26 @@ public struct TwoWayPenConstraint : IWarmStartConstraint<float> {
     Float6 M_inv;
 
     PenetrationConstraint<Float6> penConstraint;
+
+    public TwoWayPenConstraint(in AnglePenetrationManifold m, ComponentDataFromEntity<Mass> masses, float dt) {
+        e1 = m.e1;
+        e2 = m.e2;
+        id = m.id;
+
+        M_inv = new Float6(masses[e1].M_inv, masses[e2].M_inv);
+
+        lambdaAccum = 0;
+
+        penConstraint = new PenetrationConstraint<Float6>(
+            J: new Float6(
+                    new float3(0, 0, math.sign(m.delta)),
+                    new float3(0, 0, -math.sign(m.delta))
+            ),
+            M_inv: M_inv,
+            bias: -m.beta*math.abs(m.delta)/dt,
+            softness: m.softness
+        );
+    }
 
     public TwoWayPenConstraint(in MinRelativeVelocityManifold m, ComponentDataFromEntity<Mass> masses, float dt) {
         e1 = m.e1;
