@@ -9,13 +9,16 @@ public class LightMountSystem : SystemBase {
 
         var masses = GetComponentDataFromEntity<Mass>();
         var positions = GetComponentDataFromEntity<Position>();
+        var lightSources = GetComponentDataFromEntity<LightSource>();
 
         float dt = Time.DeltaTime;
 
         Entities
         .WithReadOnly(masses)
         .WithReadOnly(positions)
-        .ForEach((Entity lightEntity, in LightSource lightSource, in LightMountJoint joint, in Position lightPos) => {
+        .ForEach((in LightMountJoint joint) => {
+            var lightSource = lightSources[joint.lightEntity];
+            var lightPos = positions[joint.lightEntity];
 
             float delta = joint
                 .GetAngleRange(positions[joint.mount].rot)
@@ -25,9 +28,9 @@ public class LightMountSystem : SystemBase {
 
             if (delta != 0) {
                 var m = new AnglePenetrationManifold{
-                    e1 = lightEntity,
+                    e1 = joint.lightEntity,
                     e2 = joint.mount,
-                    id = new int2(lightEntity.GetHashCode(), joint.mount.GetHashCode()).GetHashCode() ^ 280232179,
+                    id = joint.id,
                     softness = 0,
                     beta = .2f,
                     delta = delta

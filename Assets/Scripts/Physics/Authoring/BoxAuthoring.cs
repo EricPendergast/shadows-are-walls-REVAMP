@@ -24,30 +24,23 @@ public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
     public float friction = .75f;
 
     public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem) {
-        float w = transform.localScale.x*width;
-        float h = transform.localScale.y*height;
+        float w = GetWidth();
+        float h = GetHeight();
         var inertia = fixRotation ? Mathf.Infinity : this.mass*(w*w + h*h)/12;
         var mass = fixPosition ? Mathf.Infinity : this.mass;
         var gravityScale = fixPosition ? 0 : this.gravityScale;
 
-        dstManager.AddComponentData(entity, 
-            new Box {
-                width = w,
-                height = h,
-                id = Random.Range(1, int.MaxValue)
-            });
+        dstManager.AddComponentData(entity, GetBox());
 
         dstManager.AddComponentData(entity,
-            new Position {
-                pos = (Vector2)transform.position,
-                rot = transform.eulerAngles.z*Mathf.Deg2Rad,
-            });
+            GetPosition());
 
         dstManager.AddComponentData(entity, 
             new Velocity {
                 vel = velocity,
                 angVel = angularVelocity*Mathf.Deg2Rad,
             });
+
         dstManager.AddComponentData(entity, 
             new Mass {
                 mass = mass,
@@ -71,6 +64,33 @@ public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
         if (boxType == BoxType.OpaqueObject) {
             dstManager.AddComponentData(entity, new OpaqueObject());
         }
+    }
+
+    private Position GetPosition() {
+        return new Position {
+            pos = (Vector2)transform.position,
+            rot = transform.eulerAngles.z*Mathf.Deg2Rad,
+        };
+    }
+
+    private float GetWidth() {
+        return transform.localScale.x*width;
+    }
+
+    private float GetHeight() {
+        return transform.localScale.y*height;
+    }
+
+    private Box GetBox() {
+        return new Box {
+            width = GetWidth(),
+            height = GetHeight(),
+            id = GetHashCode()
+        };
+    }
+
+    public Physics.Math.Rect GetRect() {
+        return new Box{width = GetWidth(), height = GetHeight()}.ToRect(GetPosition());
     }
 }
 

@@ -10,7 +10,9 @@ public struct LightMountJoint : IComponentData {
     // mount entity.
     public float rangeStart;
     public float rangeEnd;
+    public Entity lightEntity;
     public Entity mount;
+    public int id;
 
     public Physics.Math.AngleRange GetAngleRange(float mountRotation) {
         return new Physics.Math.AngleRange(rangeStart+mountRotation, rangeEnd+mountRotation);

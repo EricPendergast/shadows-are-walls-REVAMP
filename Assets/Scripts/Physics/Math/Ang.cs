@@ -56,5 +56,15 @@ namespace Physics.Math {
 
             return ToRange0To2Pi(dist);
         }
+
+        public static float SignedAngleOf(float2 vector) {
+            var v1 = math.normalize(vector);
+            var v2 = new float2(1, 0);
+            float angle = math.acos(math.dot(v1, v2));
+            if (Lin.Cross(v2, v1) < 0) {
+                angle = -angle;
+            }
+            return angle;
+        }
     }
 }

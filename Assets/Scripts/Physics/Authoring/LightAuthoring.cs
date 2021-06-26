@@ -1,8 +1,13 @@
+using System.Collections.Generic;
+
 using Unity.Entities;
-using UnityEngine;
 using Unity.Mathematics;
 
 using Random = UnityEngine.Random;
+
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEditor;
 
 using Physics.Math;
 
@@ -12,9 +17,24 @@ public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
     public float inertia = .1f;
     public float aperture = 40;
 
-    public GameObject mount;
-    public float rangeStart;
-    public float rangeEnd;
+    public float snapRadius = 1;
+
+    [System.Serializable]
+    public struct SnapInfo {
+        public Vector2 pos;
+        public Vector2 ccw;
+        public Vector2 cw;
+        public GameObject mount;
+
+        public void Set(SerializedProperty prop) {
+            prop.FindPropertyRelative("pos").vector2Value = pos;
+            prop.FindPropertyRelative("ccw").vector2Value = ccw;
+            prop.FindPropertyRelative("cw").vector2Value = cw;
+            prop.FindPropertyRelative("mount").objectReferenceValue = mount;
+        }
+    }
+
+    public SnapInfo[] snapInfos = new SnapInfo[0];
 
     public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem) {
         dstManager.AddComponentData(entity, GetLightSource());
@@ -39,20 +59,35 @@ public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
 
         dstManager.AddComponentData(entity, new IgnoreHierarchyTag());
 
-        if (mount != null) {
-            dstManager.AddComponentData(entity,
-                new LightMountJoint{
-                    mount = conversionSystem.GetPrimaryEntity(mount),
-                    rangeStart = math.radians(rangeStart),
-                    rangeEnd = math.radians(rangeEnd)
+        foreach (var snapInfo in snapInfos) {
+            var joint = conversionSystem.CreateAdditionalEntity(gameObject);
+            dstManager.SetName(joint, "Light mount joint");
+            dstManager.AddComponentData(joint,
+                new LightMountJoint {
+                    lightEntity = entity,
+                    mount = conversionSystem.GetPrimaryEntity(snapInfo.mount),
+                    rangeStart = Ang.SignedAngleOf(snapInfo.ccw),
+                    rangeEnd = Ang.SignedAngleOf(snapInfo.cw),
+                    id = Random.Range(0, int.MaxValue)
                 }
             );
         }
     }
 
     public Position GetLightPosition() {
+        var snapPosition = Vector2.zero;
+
+        if (snapInfos == null || snapInfos.Length == 0) {
+            snapPosition = transform.position;
+        } else {
+            foreach (var info in snapInfos) {
+                snapPosition += (Vector2)info.mount.transform.TransformPoint(info.pos);
+            }
+            snapPosition /= snapInfos.Length;
+        }
+
         return new Position {
-            pos = (Vector2)transform.position,
+            pos = snapPosition,
             rot = transform.eulerAngles.z*Mathf.Deg2Rad,
         };
     }
@@ -67,16 +102,97 @@ public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
     }
 
     void OnDrawGizmos() {
+        var posComponent = GetLightPosition();
+        Vector2 pos = posComponent.pos;
+        float rot = math.degrees(posComponent.rot);
+
         Gizmos.color = Color.red;
-        Gizmos.DrawSphere(transform.position, .1f);
+        Gizmos.DrawSphere(pos, .1f);
 
-        float rot = transform.eulerAngles.z;
-        Gizmos.DrawRay(transform.position, Quaternion.Euler(0,0,rot+aperture/2)*Vector2.right*20);
-        Gizmos.DrawRay(transform.position, Quaternion.Euler(0,0,rot-aperture/2)*Vector2.right*20);
+        Gizmos.DrawRay(pos, Quaternion.Euler(0,0,rot+aperture/2)*Vector2.right*20);
+        Gizmos.DrawRay(pos, Quaternion.Euler(0,0,rot-aperture/2)*Vector2.right*20);
 
-        if (mount != null) {
-            Gizmos.DrawRay(transform.position, Quaternion.Euler(0,0, rangeStart) * mount.transform.right);
-            Gizmos.DrawRay(transform.position, Quaternion.Euler(0,0, rangeEnd) * mount.transform.right);
+        foreach (var snapInfo in snapInfos) {
+            Gizmos.DrawRay(pos, snapInfo.mount.transform.TransformDirection(snapInfo.cw));
+            Gizmos.DrawRay(pos, snapInfo.mount.transform.TransformDirection(snapInfo.ccw));
+        }
+    }
+
+    static SnapInfo[] GetSnapInfo(Transform transform, float snapRadius) {
+        var snapInfos = new List<SnapInfo>();
+        void Search(Transform t) {
+            foreach (var child in t.GetComponentsInChildren<BoxAuthoring>()) {
+                var closestPoint = child.GetRect().ClosestPoint((Vector2)transform.position, ccwVec: out var ccwVec, cwVec: out var cwVec);
+                if (math.distance(closestPoint, (Vector2)transform.position) < snapRadius) {
+                    Vector2 WorldToLocalVec(float2 vec) {
+                        return child.transform.InverseTransformDirection((Vector2)math.normalize(vec));
+                    }
+                    snapInfos.Add(new SnapInfo{
+                        pos = child.transform.InverseTransformPoint((Vector2)closestPoint),
+                        ccw = WorldToLocalVec(ccwVec),
+                        cw = WorldToLocalVec(cwVec),
+                        mount = child.gameObject
+                    });
+                }
+            }
+        }
+
+        if (transform.parent == null) {
+            foreach (var root in SceneManager.GetActiveScene().GetRootGameObjects()) {
+                Search(root.transform);
+            }
+        } else {
+            Search(transform.parent);
+        }
+
+        return snapInfos.ToArray();
+    }
+
+    [CustomEditor(typeof(LightAuthoring))]
+    private class LightEditor : Editor {
+        SerializedProperty snapInfosField;
+
+        void OnEnable() {
+            snapInfosField = serializedObject.FindProperty("snapInfos");
+        }
+
+        public override void OnInspectorGUI() {
+            void DrawProperty(string propName) {
+                EditorGUILayout.PropertyField(serializedObject.FindProperty(propName), true);
+            }
+
+            serializedObject.Update();
+
+            DrawProperty("angularVelocity");
+            DrawProperty("inertia");
+            DrawProperty("aperture");
+            GUILayout.Label("");
+            DrawProperty("snapRadius");
+
+            serializedObject.ApplyModifiedProperties();
+
+            GUILayout.Label("");
+
+            serializedObject.Update();
+
+            var t = target as LightAuthoring;
+
+            if (GUI.changed || t.transform.hasChanged) {
+                snapInfosField.ClearArray();
+                foreach(var snapInfo in LightAuthoring.GetSnapInfo(t.transform, t.snapRadius)) {
+                    snapInfosField.InsertArrayElementAtIndex(0);
+                    snapInfo.Set(snapInfosField.GetArrayElementAtIndex(0));
+                }
+            }
+
+            bool wasEnabled = GUI.enabled;
+            GUI.enabled = false;
+
+            DrawProperty("snapInfos");
+
+            GUI.enabled = wasEnabled;
+
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
         }
     }
 }

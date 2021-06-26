@@ -87,6 +87,67 @@ namespace Physics.Math {
             }
         }
 
+        // ccwVec and cwVec are the directions (not normalized) of the surface
+        // counterclockwise from and clockwise from the closest point on the
+        // rectangle. For instance, if the closest point is a corner, these
+        // vectors will be perpendicular. Otherwise they will be parallel and
+        // opposite.
+        public float2 ClosestPoint(float2 point, out float2 ccwVec, out float2 cwVec) {
+            point -= this.pos;
+
+            float widthMag = math.length(this.width);
+            float2 widthNorm = this.width/widthMag;
+            float2 width = this.width;
+            float wDist = math.dot(widthNorm, point);
+            if (wDist < 0) {
+                widthNorm *= -1;
+                width *= -1;
+                wDist *= -1;
+            }
+
+            float heightMag = math.length(this.height);
+            float2 heightNorm = this.height/heightMag;
+            float2 height = this.height;
+            float hDist = math.dot(heightNorm, point);
+            if (hDist < 0) {
+                heightNorm *= -1;
+                height *= -1;
+                hDist *= -1;
+            }
+
+            bool withinWidth = wDist < widthMag;
+            bool withinHeight = hDist < heightMag;
+
+            if (withinWidth && withinHeight) {
+                if (widthMag - wDist < heightMag - hDist) {
+                    ccwVec = Lin.Cross(width, -1);
+                    cwVec = -ccwVec;
+                    return this.pos + width + hDist*heightNorm;
+                } else {
+                    ccwVec = Lin.Cross(height, -1);
+                    cwVec = -ccwVec;
+                    return this.pos + height + wDist*widthNorm;
+                }
+            } else if (withinWidth) {
+                ccwVec = Lin.Cross(height, -1);
+                cwVec = -ccwVec;
+                return this.pos + height + wDist*widthNorm;
+            } else if (withinHeight) {
+                ccwVec = Lin.Cross(width, -1);
+                cwVec = -ccwVec;
+                return this.pos + width + hDist*heightNorm;
+            } else {
+                if (Lin.Cross(width, height) > 0) {
+                    ccwVec = -width;
+                    cwVec = -height;
+                } else {
+                    ccwVec = -height;
+                    cwVec = -width;
+                }
+                return this.pos + width + height;
+            }
+        }
+
         public float2 GetVertex(int index) {
             index = index & 3;
         
