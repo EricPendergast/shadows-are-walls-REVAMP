@@ -8,6 +8,7 @@ public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
         OpaqueObject
     }
     public BoxType boxType;
+    public bool isTrigger;
 
     public Vector2 velocity;
     public float angularVelocity;
@@ -24,6 +25,9 @@ public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
     public float friction = .75f;
 
     public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem) {
+        var fixRotation = isTrigger ? true : this.fixRotation;
+        var fixPosition = isTrigger ? true : this.fixPosition;
+
         float w = GetWidth();
         float h = GetHeight();
         var inertia = fixRotation ? Mathf.Infinity : this.mass*(w*w + h*h)/12;
@@ -50,6 +54,10 @@ public class BoxAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
         dstManager.AddComponentData(entity, new IgnoreHierarchyTag());
 
         dstManager.AddComponentData(entity, new Friction{friction = friction});
+
+        if (isTrigger) {
+            dstManager.AddComponentData(entity, new IsTrigger());
+        }
 
         if (gravityScale != 1) {
             dstManager.AddComponentData(entity,

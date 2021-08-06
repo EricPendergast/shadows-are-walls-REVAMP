@@ -9,7 +9,7 @@ public class GravitySystem : SystemBase {
         if (Time.ElapsedTime == 0) {
             return;
         }
-        float2 gravityAccel = new float2(0, -10f);
+        float2 gravityAccel = new float2(0, -30f);
         float dt = Time.DeltaTime;
         Entities.
             WithNone<GravityScale>().

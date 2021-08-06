@@ -3,6 +3,8 @@ TODOs:
 ✓2. Create a (temporary) way to author a LightMountJoint
 ✓3. Implement LightMountSystem
 ✓4. Implement custom light editor
+✓5. Implement Button, with contact detection
+✓6. Implement ButtonLightController
 
 
 Later TODOs:

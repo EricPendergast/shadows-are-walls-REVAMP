@@ -3,6 +3,12 @@ using Unity.Mathematics;
 
 using Physics.Math;
 
+public struct TargetAngularVelocityManifold {
+    public Entity e;
+    public int id;
+    public float targetAngVel;
+    public float softness;
+}
 
 public struct TargetVelocityManifold {
     public Entity e;
@@ -29,6 +35,25 @@ public struct OneWayOneDOFConstraint : IWarmStartConstraint<float> {
 
     public IConstraint Clone() {
         return this;
+    }
+
+    public OneWayOneDOFConstraint(TargetAngularVelocityManifold m, ComponentDataFromEntity<Mass> masses, float dt) :
+        this(m, masses[m.e].M_inv, dt) {}
+
+    public OneWayOneDOFConstraint(TargetAngularVelocityManifold m, Float3 M_inv, float dt) {
+        e = m.e;
+        id = m.id;
+
+        this.M_inv = M_inv;
+
+        constraint = new OneDOFConstraint<Float3>(
+            J: new float3(0, 0, math.sign(m.targetAngVel)),
+            M_inv: M_inv,
+            bias: -math.abs(m.targetAngVel),
+            softness: m.softness
+        );
+
+        lambdaAccum = 0;
     }
 
     public OneWayOneDOFConstraint(TargetVelocityManifold m, ComponentDataFromEntity<Mass> masses, float dt) :

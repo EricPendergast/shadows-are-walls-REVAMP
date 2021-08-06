@@ -9,7 +9,7 @@ using UnityEngine;
 
 using RJConstraint = TwoWayTwoDOFConstraint;
 
-[UpdateInGroup(typeof(ConstraintGenerationSystemGroup))]
+[UpdateInGroup(typeof(ContactGenerationGroup))]
 public class RevoluteJointSystem : SystemBase {
 
     private struct Emitter {

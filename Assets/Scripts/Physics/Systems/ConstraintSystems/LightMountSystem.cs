@@ -1,7 +1,7 @@
 using Unity.Entities;
 using Unity.Mathematics;
 
-[UpdateInGroup(typeof(ConstraintGenerationSystemGroup))]
+[UpdateInGroup(typeof(ContactGenerationGroup))]
 public class LightMountSystem : SystemBase {
 
     protected override void OnUpdate() {

@@ -4,7 +4,7 @@ using Unity.Mathematics;
 
 using Physics.Math;
 
-[UpdateInGroup(typeof(ConstraintGenerationSystemGroup), OrderFirst=true)]
+[UpdateInGroup(typeof(PreContactGenerationGroup))]
 public class PlayerFrictionSystem : SystemBase {
 
     protected override void OnUpdate() {
@@ -18,7 +18,7 @@ public class PlayerFrictionSystem : SystemBase {
     }
 }
 
-[UpdateInGroup(typeof(ConstraintGenerationSystemGroup), OrderLast=true)]
+[UpdateInGroup(typeof(PostContactGenerationGroup))]
 public class PlayerPhysicsSystem : SystemBase {
 
     protected override void OnCreate() {

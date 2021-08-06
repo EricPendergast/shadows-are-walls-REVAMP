@@ -6,7 +6,7 @@ using Utilities;
 
 using EdgeMountsMap = Unity.Collections.NativeMultiHashMap<ShadowCornerCalculator.Edge.EdgeKey, ShadowCornerCalculator.EdgeMount>;
 
-[UpdateInGroup(typeof(ConstraintGenerationSystemGroup))]
+[UpdateInGroup(typeof(ContactGenerationGroup))]
 public class ShadowConstraintSystem : SystemBase {
     private EntityQuery lightSourceQuery;
     private EntityQuery opaqueBoxesQuery;

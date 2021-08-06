@@ -9,7 +9,7 @@ using UnityEngine;
 
 using Physics.Math;
 
-[UpdateInGroup(typeof(ConstraintGenerationSystemGroup))]
+[UpdateInGroup(typeof(ContactGenerationGroup))]
 public class DirectConstraintSystem : SystemBase {
 
     private struct Emitter {
@@ -65,6 +65,7 @@ public class DirectConstraintSystem : SystemBase {
         public ComponentDataFromEntity<Mass> masses;
         public ComponentDataFromEntity<Position> positions;
         public ComponentDataFromEntity<Friction> frictions;
+        public ComponentDataFromEntity<IsTrigger> isTrigger;
         public NativeArray<Entity> boxEntities;
         public float dt;
     }
@@ -78,6 +79,7 @@ public class DirectConstraintSystem : SystemBase {
             masses = GetComponentDataFromEntity<Mass>(),
             positions = GetComponentDataFromEntity<Position>(),
             frictions = GetComponentDataFromEntity<Friction>(),
+            isTrigger = GetComponentDataFromEntity<IsTrigger>(),
             dt = dt,
             boxEntities = boxEntities
         };
@@ -87,12 +89,14 @@ public class DirectConstraintSystem : SystemBase {
             var masses = env.masses;
             var positions = env.positions;
             var frictions = env.frictions;
+            var isTrigger = env.isTrigger;
             Entities
             .WithReadOnly(boxes)
             .WithReadOnly(boxEntities)
             .WithReadOnly(masses)
             .WithReadOnly(positions)
             .WithReadOnly(frictions)
+            .WithReadOnly(isTrigger)
             .WithStoreEntityQueryInField(ref boxesQuery)
             .ForEach((int entityInQueryIndex, in Box box) => {
                 var env = new Env {
@@ -101,7 +105,8 @@ public class DirectConstraintSystem : SystemBase {
                     dt = dt,
                     masses = masses,
                     positions = positions,
-                    frictions = frictions
+                    frictions = frictions,
+                    isTrigger = isTrigger
                 };
                 EmitForBox(entityInQueryIndex, in box, in emitter, in env);
             }).Schedule();
@@ -165,7 +170,12 @@ public class DirectConstraintSystem : SystemBase {
             friction: fric1 * fric2
         );
 
-        emitter.EmitConstraint(c);
+        bool triggerInvolved = env.isTrigger.HasComponent(e1) || env.isTrigger.HasComponent(e2);
+
+        if (!triggerInvolved) {
+            emitter.EmitConstraint(c);
+            emitter.EmitDebuggableConstraint(manifold, partial, c, useContact1, env.dt);
+        }
 
         var contactPoint = useContact1 ? manifold.contact1.point : manifold.contact2.Value.point;
 
@@ -183,8 +193,6 @@ public class DirectConstraintSystem : SystemBase {
                 point = contactPoint
             }
         );
-        emitter.EmitDebuggableConstraint(manifold, partial, c, useContact1, env.dt);
-
     }
 
     private struct DebuggableConstraint : IDebuggableConstraint {

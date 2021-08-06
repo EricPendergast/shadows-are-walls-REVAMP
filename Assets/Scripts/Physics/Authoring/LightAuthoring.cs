@@ -127,10 +127,14 @@ public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
                     Vector2 WorldToLocalVec(float2 vec) {
                         return child.transform.InverseTransformDirection((Vector2)math.normalize(vec));
                     }
+
+                    ccwVec = WorldToLocalVec(ccwVec);
+                    cwVec = WorldToLocalVec(cwVec);
+
                     snapInfos.Add(new SnapInfo{
-                        pos = child.transform.InverseTransformPoint((Vector2)closestPoint),
-                        ccw = WorldToLocalVec(ccwVec),
-                        cw = WorldToLocalVec(cwVec),
+                        pos = (Vector2)child.transform.InverseTransformPoint((Vector2)closestPoint) + (Vector2)math.normalize(Lin.Cross(ccwVec, 1))*.1f,
+                        ccw = ccwVec,
+                        cw = cwVec,
                         mount = child.gameObject
                     });
                 }
