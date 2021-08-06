@@ -518,6 +518,9 @@ public struct AngleCalculator {
         float a1 = Angle(p1);
         float a2 = Angle(p2);
 
+        // Swap a1 and a2 so that the counterclockwise distance between them is
+        // smaller than the clockwise distance. We remember that we swapped so
+        // we can swap them back at the end.
         bool swap = Lin.Cross(p1 - sourcePos, p2 - sourcePos) < 0;
 
         if (swap) {
@@ -539,6 +542,10 @@ public struct AngleCalculator {
             } else {
                 return new FloatPair(math.NAN, math.NAN);
             }
+        }
+
+        if (math.isinf(a1) && math.isinf(a2) && a1 > a2) {
+            return new FloatPair(math.NAN, math.NAN);
         }
 
         return swap ? new FloatPair(a2, a1) : new FloatPair(a1, a2);

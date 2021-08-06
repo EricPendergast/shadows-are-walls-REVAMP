@@ -41,11 +41,12 @@ public class ShadowRenderPassFeature : ScriptableRendererFeature {
         // You don't have to call ScriptableRenderContext.submit, the render pipeline will call it at specific points in the pipeline.
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData) {
             var camera = renderingData.cameraData.camera;
-            var prevCullingMatrix = camera.cullingMatrix;
 
-            camera.cullingMatrix = Matrix4x4.Ortho(float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue);
+            camera.cullingMatrix = Matrix4x4.Ortho(-99999, 99999, -99999, 99999, 0.001f, 99999) * 
+                Matrix4x4.Translate(Vector3.forward * -99999 / 2f) * 
+                camera.worldToCameraMatrix;
             bool foundCullingParameters = camera.TryGetCullingParameters(out var cullingParameters);
-            camera.cullingMatrix = prevCullingMatrix;
+            camera.ResetCullingMatrix();
 
             if (!foundCullingParameters) {
                 return;

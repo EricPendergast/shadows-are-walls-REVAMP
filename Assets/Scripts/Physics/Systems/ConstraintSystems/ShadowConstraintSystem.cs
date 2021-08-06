@@ -102,6 +102,7 @@ public class ShadowConstraintSystem : SystemBase {
         partialEdgeConstraints.Clear();
 
         Entities.WithAll<HitShadowsObject>()
+            .WithoutBurst()
             .WithReadOnly(boxOverlappingEdges)
             .WithReadOnly(edgeMounts)
             .ForEach((in Box box, in Position pos, in Entity entity) => {

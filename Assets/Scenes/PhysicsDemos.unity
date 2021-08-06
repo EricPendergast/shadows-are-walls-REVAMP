@@ -157,6 +157,12 @@ MonoBehaviour:
     color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
     drawRadius: 0.1
     springStretchColor: {r: 1, g: 0, b: 0, a: 1}
+  shadowIslandGizmoDrawer:
+    enable: 1
+    onlyDrawIslandsWithIndex: -1
+    onlyDrawEdgesWithIndex: -5
+    drawEdgeLabels: 1
+    islandsColor: {r: 1, g: 0, b: 0, a: 1}
   sequentialImpulseIterations: 1
   performWarmStarting: 1
   resolveConstraintsCompletely: 0
@@ -515,5 +521,6 @@ PrefabInstance:
       propertyPath: color.r
       value: 0.8679245
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 6694085602743877400, guid: 8f87530a5ffed29fbb3c9cd3a09b94d0, type: 3}
   m_SourcePrefab: {fileID: 100100000, guid: 8f87530a5ffed29fbb3c9cd3a09b94d0, type: 3}

@@ -17,6 +17,9 @@ public partial class PhysicsDebugger {
         drawRadius = .1f
     };
 
+    [SerializeField]
+    public ShadowIslandsGizmoDrawer shadowIslandGizmoDrawer = new ShadowIslandsGizmoDrawer();
+
     List<IDebuggableConstraint> constraintsAfterDebug = new List<IDebuggableConstraint>();
 
     private void OnDrawGizmos() {
@@ -40,5 +43,7 @@ public partial class PhysicsDebugger {
                 }
             }
         }
+
+        shadowIslandGizmoDrawer.OnDrawGizmos();
     }
 }

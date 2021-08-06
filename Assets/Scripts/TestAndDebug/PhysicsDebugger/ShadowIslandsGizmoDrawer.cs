@@ -6,7 +6,8 @@ using UnityEditor;
 
 using Corner = ShadowCornerCalculator.Corner;
 
-public class ShadowIslandsGizmoDrawer : MonoBehaviour {
+[System.Serializable]
+public class ShadowIslandsGizmoDrawer {
     public bool enable = true;
     [Range(-1, 15)]
     public int onlyDrawIslandsWithIndex = -1;
@@ -16,7 +17,7 @@ public class ShadowIslandsGizmoDrawer : MonoBehaviour {
     public bool drawEdgeLabels = true;
     public Color islandsColor = Color.red;
 
-    void OnDrawGizmos() {
+    public void OnDrawGizmos() {
         if (Application.isPlaying && enable) {
             var world = World.DefaultGameObjectInjectionWorld;
 
