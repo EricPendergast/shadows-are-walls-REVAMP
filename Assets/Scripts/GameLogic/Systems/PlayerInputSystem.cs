@@ -4,6 +4,11 @@ using UnityEngine.InputSystem;
 
 
 public class PlayerInputSystem : SystemBase {
+    protected override void OnCreate() {
+        if (!HasSingleton<PlayerControlInputs>()) {
+            World.EntityManager.CreateEntity(typeof(PlayerControlInputs));
+        }
+    }
 
     protected override void OnUpdate() {
         var keyboard = Keyboard.current;
@@ -18,10 +23,12 @@ public class PlayerInputSystem : SystemBase {
 
         bool jump = keyboard.spaceKey.isPressed;
 
-        Entities.ForEach(
-        (ref PlayerComponent pc) => {
-            pc.moveDirection = lrDirection;
-            pc.jumpPressed = jump;
-        }).ScheduleParallel();
+        bool swap = keyboard.eKey.wasPressedThisFrame;
+
+        SetSingleton(new PlayerControlInputs {
+            moveDirection = lrDirection,
+            jumpPressed = jump,
+            swapAttempted = swap
+        });
     }
 }

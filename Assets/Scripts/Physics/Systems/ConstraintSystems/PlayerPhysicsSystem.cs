@@ -4,25 +4,26 @@ using Unity.Mathematics;
 
 using Physics.Math;
 
-[UpdateInGroup(typeof(PreContactGenerationGroup))]
-public class PlayerFrictionSystem : SystemBase {
-
-    protected override void OnUpdate() {
-        var em = World.EntityManager;
-        Entities
-        .WithStructuralChanges()
-        .WithAll<PlayerComponent, Friction>()
-        .ForEach((Entity e, in PlayerComponent pc, in Friction f) => {
-            em.RemoveComponent<Friction>(e);
-        }).Run();
-    }
-}
+//[UpdateInGroup(typeof(PreContactGenerationGroup))]
+//public class PlayerFrictionSystem : SystemBase {
+//
+//    protected override void OnUpdate() {
+//        var em = World.EntityManager;
+//        Entities
+//        .WithStructuralChanges()
+//        .WithAll<PlayerComponent, Friction>()
+//        .ForEach((Entity e, in PlayerComponent pc, in Friction f) => {
+//            em.RemoveComponent<Friction>(e);
+//        }).Run();
+//    }
+//}
 
 [UpdateInGroup(typeof(PostContactGenerationGroup))]
 public class PlayerPhysicsSystem : SystemBase {
 
     protected override void OnCreate() {
         RequireSingletonForUpdate<PlayerSettings>();
+        RequireSingletonForUpdate<PlayerControlInputs>();
     }
 
     protected override void OnUpdate() {
@@ -38,8 +39,11 @@ public class PlayerPhysicsSystem : SystemBase {
         var dt = Time.DeltaTime;
 
         var settings = GetSingleton<PlayerSettings>();
+        var controls = GetSingleton<PlayerControlInputs>();
 
-        Entities.ForEach((Entity e, in PlayerComponent pc, in Box playerBox, in Position playerPos, in DynamicBuffer<DirectContactStore> contacts) => {
+        Entities
+            .WithAll<ActivePlayer>()
+            .ForEach((Entity e, in Box playerBox, in Position playerPos, in DynamicBuffer<DirectContactStore> contacts) => {
 
             bool canJump = false;
             foreach (var contact in contacts) {
@@ -52,11 +56,11 @@ public class PlayerPhysicsSystem : SystemBase {
                     float2 r2 = contact.point - positions[contact.other].pos;
 
                     var moveDir = Lin.Cross(contact.normal, 1);
-                    if (math.dot(moveDir, new float2(pc.moveDirection)) < 0) {
+                    if (math.dot(moveDir, new float2(controls.moveDirection)) < 0) {
                         moveDir *= -1;
                     }
 
-                    if (pc.moveDirection != 0) {
+                    if (controls.moveDirection != 0) {
                         var manifold = new MinRelativeVelocityManifold {
                             e1 = e,
                             e2 = contact.other,
@@ -83,7 +87,7 @@ public class PlayerPhysicsSystem : SystemBase {
                         input3.Add(new TwoWayOneDOFConstraint(manifold, masses, dt));
                     }
 
-                    if (pc.jumpPressed) {
+                    if (controls.jumpPressed) {
                         var manifold = new MinRelativeVelocityManifold {
                             e1 = e,
                             e2 = contact.other,
@@ -100,13 +104,13 @@ public class PlayerPhysicsSystem : SystemBase {
                 }
             }
 
-            if (!canJump && pc.moveDirection != 0) {
+            if (!canJump && controls.moveDirection != 0) {
                 var manifold = new TargetVelocityManifold {
                     softness = settings.airMoveSoftness,
                     id = e.GetHashCode() ^ 422603802,
                     r = float2.zero,
                     e = e,
-                    normal = new float2(pc.moveDirection, 0),
+                    normal = new float2(controls.moveDirection, 0),
                     targetSpeed = settings.airMoveSpeed
                 };
                 input.Add(new OneWayOneDOFConstraint(manifold, masses, dt));

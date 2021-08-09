@@ -1,15 +1,16 @@
 using Unity.Entities;
 using UnityEngine;
 
-public class PlayerAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
+public class RootPlayerAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
 
     public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem) {
         dstManager.AddComponentData(entity, 
-            new PlayerComponent{
-                moveDirection = 0
+            new PlayerRoot { // TODO: Have the proper swappable detector
+                swappableDetector = Entity.Null
             }
         );
 
+        dstManager.AddComponent<ActivePlayer>(entity);
         dstManager.AddBuffer<DirectContactStore>(entity);
     }
 }
