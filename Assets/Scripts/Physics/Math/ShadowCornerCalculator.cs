@@ -17,14 +17,10 @@ public struct ShadowCornerCalculator {
         public NativeList<TwoWayPenConstraint.Partial>? partialEdgeConstraints;
         public NativeList<ThreeWayPenConstraint.Partial>? partialCornerConstraints;
 
-        [BurstDiscard]
-        public List<ShadowEdgeManifold> debugEdgeManifoldCollector {get; set;}
-        [BurstDiscard]
-        public List<ShadowCornerManifold> debugCornerManifolds {get; set;}
-        [BurstDiscard]
-        public List<EdgeMountTuple> debugEdgeMounts {get; set;}
-        [BurstDiscard]
-        public List<CornerMountTuple> debugCornerMounts {get; set;}
+        public static List<ShadowEdgeManifold> debugEdgeManifoldCollector {get; set;}
+        public static List<ShadowCornerManifold> debugCornerManifolds {get; set;}
+        public static List<EdgeMountTuple> debugEdgeMounts {get; set;}
+        public static List<CornerMountTuple> debugCornerMounts {get; set;}
 
         public struct CornerMountTuple {
             public ShadowCornerManifold m;

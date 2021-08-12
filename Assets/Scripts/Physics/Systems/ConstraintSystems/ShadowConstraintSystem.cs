@@ -102,7 +102,6 @@ public class ShadowConstraintSystem : SystemBase {
         partialEdgeConstraints.Clear();
 
         Entities.WithAll<HitShadowsObject>()
-            .WithoutBurst()
             .WithReadOnly(boxOverlappingEdges)
             .WithReadOnly(edgeMounts)
             .ForEach((in Box box, in Position pos, in Entity entity) => {
@@ -182,41 +181,50 @@ public class ShadowConstraintSystem : SystemBase {
 
     public List<ShadowEdgeManifold> GetEdgeManifoldsForDebug() {
         var ret = new List<ShadowEdgeManifold>();
+
+        ShadowCornerCalculator.Outputs.debugEdgeManifoldCollector = ret;
         ComputeCornersForDebug(
-            new ShadowCornerCalculator.Outputs{
-                debugEdgeManifoldCollector = ret
-            }
+            new ShadowCornerCalculator.Outputs{}
         );
+        ShadowCornerCalculator.Outputs.debugEdgeManifoldCollector = null;
+
         return ret;
     }
 
     public List<ShadowCornerManifold> GetCornerManifoldsForDebug() {
         var ret = new List<ShadowCornerManifold>();
+
+        ShadowCornerCalculator.Outputs.debugCornerManifolds = ret;
         ComputeCornersForDebug(
-            new ShadowCornerCalculator.Outputs{
-                debugCornerManifolds = ret
-            }
+            new ShadowCornerCalculator.Outputs{}
         );
+        ShadowCornerCalculator.Outputs.debugCornerManifolds = null;
+
         return ret;
     }
 
     public List<ShadowCornerCalculator.Outputs.EdgeMountTuple> GetEdgeMountsForDebug() {
         var ret = new List<ShadowCornerCalculator.Outputs.EdgeMountTuple>();
+
+        ShadowCornerCalculator.Outputs.debugEdgeMounts = ret;
         ComputeCornersForDebug(
-            new ShadowCornerCalculator.Outputs{
-                debugEdgeMounts = ret
-            }
+            new ShadowCornerCalculator.Outputs{}
         );
+        ShadowCornerCalculator.Outputs.debugEdgeMounts = null;
+
         return ret;
     }
 
     public List<ShadowCornerCalculator.Outputs.CornerMountTuple> GetCornerMountsForDebug() {
         var ret = new List<ShadowCornerCalculator.Outputs.CornerMountTuple>();
+
+        ShadowCornerCalculator.Outputs.debugCornerMounts = ret;
         ComputeCornersForDebug(
             new ShadowCornerCalculator.Outputs{
-                debugCornerMounts = ret
             }
         );
+        ShadowCornerCalculator.Outputs.debugCornerMounts = null;
+
         return ret;
     }
 

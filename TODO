@@ -1,11 +1,5 @@
 TODOs:
-✓1. Create PlayerRoot, PlayerBranch, ActivePlayer components
-✓2. Make PlayerControls a singleton
-✓3. Make ActivePlayer determine what object is controled
-✓3. Implement detecting swap key press
-✓4. Implement swappable detector for PlayerRoot
-✓5. Implement switching of ActivePlayer component
-✓6. Implement authoring MonoBehaviours
+1. Implement ShadowContactStore
 
 Later TODOs:
 1. Remove edge mounts past the contact point when calculating partial constraints
