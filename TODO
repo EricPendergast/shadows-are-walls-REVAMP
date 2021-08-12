@@ -3,7 +3,7 @@ TODOs:
 ✓2. Make PlayerControls a singleton
 ✓3. Make ActivePlayer determine what object is controled
 ✓3. Implement detecting swap key press
-4. Implement swappable detector for PlayerRoot
+✓4. Implement swappable detector for PlayerRoot
 ✓5. Implement switching of ActivePlayer component
 ✓6. Implement authoring MonoBehaviours
 

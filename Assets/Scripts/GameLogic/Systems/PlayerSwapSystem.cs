@@ -14,13 +14,18 @@ public class PlayerSwapSystem : SystemBase {
         var controls = GetSingleton<PlayerControlInputs>();
 
         if (controls.swapAttempted) {
-            var ecb = World.GetOrCreateSystem<EndSimulationEntityCommandBufferSystem>().CreateCommandBuffer().AsParallelWriter();
+            var ecbSystem = World.GetOrCreateSystem<EndSimulationEntityCommandBufferSystem>();
+            var ecb = ecbSystem.CreateCommandBuffer().AsParallelWriter();
             
+            var directContactStores = GetBufferFromEntity<DirectContactStore>(isReadOnly: true);
             var playerBranches = GetComponentDataFromEntity<PlayerBranch>(isReadOnly: true);
             Entities
             .WithAll<ActivePlayer, PlayerRoot>()
             .WithReadOnly(playerBranches)
-            .ForEach((Entity playerRootEntity, int entityInQueryIndex, in DynamicBuffer<DirectContactStore> contacts) => {
+            .WithReadOnly(directContactStores)
+            .ForEach((Entity playerRootEntity, int entityInQueryIndex, in PlayerRoot playerRoot) => {
+                var contacts = directContactStores[playerRoot.swappableDetector];
+
                 if (contacts.IsEmpty) {
                     return;
                 }
@@ -53,6 +58,8 @@ public class PlayerSwapSystem : SystemBase {
                     playerRoot = Entity.Null
                 });
             }).ScheduleParallel();
+
+            ecbSystem.AddJobHandleForProducer(Dependency);
         }
     }
 }

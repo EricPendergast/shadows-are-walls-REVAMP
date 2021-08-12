@@ -4,19 +4,93 @@ using Unity.Mathematics;
 
 using Physics.Math;
 
-//[UpdateInGroup(typeof(PreContactGenerationGroup))]
-//public class PlayerFrictionSystem : SystemBase {
-//
-//    protected override void OnUpdate() {
-//        var em = World.EntityManager;
-//        Entities
-//        .WithStructuralChanges()
-//        .WithAll<PlayerComponent, Friction>()
-//        .ForEach((Entity e, in PlayerComponent pc, in Friction f) => {
-//            em.RemoveComponent<Friction>(e);
-//        }).Run();
-//    }
-//}
+[UpdateInGroup(typeof(PreContactGenerationGroup))]
+public class PlayerNearbyDetectorSystem : SystemBase {
+    private struct SetPosition {
+        public Entity e;
+        public Position p;
+    }
+    private struct SetBox {
+        public Entity e;
+        public Box b;
+    }
+    protected override void OnUpdate() {
+
+        var settings = GetSingleton<PlayerSettings>();
+
+        var positionChanges = new NativeList<SetPosition>(Allocator.TempJob);
+        var boxChanges = new NativeList<SetBox>(Allocator.TempJob);
+
+        // make the player's swappable detector follow the player position
+        Entities.WithAll<ActivePlayer>().ForEach((in PlayerRoot playerRoot, in Position pos, in Box box) => {
+            
+            positionChanges.Add(new SetPosition{e=playerRoot.swappableDetector, p = pos});
+            boxChanges.Add(
+                new SetBox{e=playerRoot.swappableDetector, b=new Box {
+                    height = box.height + settings.swapDetectorBorder*2,
+                    width = box.width + settings.swapDetectorBorder*2,
+                    id = playerRoot.swappableDetector.GetHashCode()
+                }
+            });
+        }).Schedule();
+
+        var positions = GetComponentDataFromEntity<Position>(isReadOnly: false);
+        var boxes = GetComponentDataFromEntity<Box>(isReadOnly: false);
+
+        Job.WithCode(() => {
+            foreach (var pos in positionChanges) {
+                positions[pos.e] = pos.p;
+            }
+            foreach (var box in boxChanges) {
+                boxes[box.e] = box.b;
+            }
+        }).Schedule();
+
+        positionChanges.Dispose(Dependency);
+        boxChanges.Dispose(Dependency);
+    }
+}
+
+// This system ensures that the active player has friction disabled
+[UpdateInGroup(typeof(PreContactGenerationGroup))]
+public class PlayerFrictionSystem : SystemBase {
+    private struct PreviousPlayerFriction : IComponentData {
+        public Friction prevFriction;
+    }
+
+    protected override void OnUpdate() {
+        var ecbSystem = World.GetOrCreateSystem<EndFixedStepSimulationEntityCommandBufferSystem>();
+        var ecb = ecbSystem.CreateCommandBuffer().AsParallelWriter();
+
+        Entities
+            .WithAll<ActivePlayer>()
+            .WithNone<PreviousPlayerFriction>()
+            .ForEach((int entityInQueryIndex, Entity e, in Friction friction) => {
+                ecb.AddComponent(entityInQueryIndex, e, new PreviousPlayerFriction {
+                    prevFriction = friction
+                });
+                ecb.RemoveComponent<Friction>(entityInQueryIndex, e);
+            }).ScheduleParallel();
+
+        Entities
+            .WithNone<ActivePlayer, Friction>()
+            .ForEach((int entityInQueryIndex, Entity e, in PreviousPlayerFriction prevFriction) => {
+                ecb.AddComponent<Friction>(entityInQueryIndex, e,
+                    prevFriction.prevFriction
+                );
+                ecb.RemoveComponent<PreviousPlayerFriction>(entityInQueryIndex, e);
+            }).ScheduleParallel();
+
+        Entities
+            .WithNone<ActivePlayer>()
+            .WithAll<Friction, PreviousPlayerFriction>()
+            .ForEach((int entityInQueryIndex, Entity e) => {
+                ecb.RemoveComponent<PreviousPlayerFriction>(entityInQueryIndex, e);
+            }).ScheduleParallel();
+
+        ecbSystem.AddJobHandleForProducer(Dependency);
+    }
+}
 
 [UpdateInGroup(typeof(PostContactGenerationGroup))]
 public class PlayerPhysicsSystem : SystemBase {
@@ -38,12 +112,28 @@ public class PlayerPhysicsSystem : SystemBase {
         var positions = GetComponentDataFromEntity<Position>();
         var dt = Time.DeltaTime;
 
+
         var settings = GetSingleton<PlayerSettings>();
         var controls = GetSingleton<PlayerControlInputs>();
 
         Entities
             .WithAll<ActivePlayer>()
             .ForEach((Entity e, in Box playerBox, in Position playerPos, in DynamicBuffer<DirectContactStore> contacts) => {
+
+            {
+                float rotationTarget = math.round(playerPos.rot / (math.PI/2))*(math.PI/2);
+                float rotationOffset = rotationTarget - playerPos.rot;
+                float rotationOffsetSign = math.sign(rotationOffset);
+                var manifold = new TargetAngularVelocityManifold {
+                    e = e,
+                    id = e.GetHashCode() ^ 286091097,
+                    softness = settings.rotationCorrectionSoftness,
+                    targetAngVel = math.min(rotationOffset/dt, rotationOffsetSign*settings.rotationCorrectionSpeed)
+                };
+
+                input.Add(new OneWayOneDOFConstraint(manifold, masses, dt));
+            }
+
 
             bool canJump = false;
             foreach (var contact in contacts) {
@@ -61,18 +151,15 @@ public class PlayerPhysicsSystem : SystemBase {
                     }
 
                     if (controls.moveDirection != 0) {
-                        var manifold = new MinRelativeVelocityManifold {
-                            e1 = e,
-                            e2 = contact.other,
-                            id = uniqueHash ^ 347979364, // This id doesn't need to be consistent across frames.
-                            minSpeedE1AlongNormal = settings.groundMoveSpeed,
+                        var manifold = new TargetVelocityManifold {
                             softness = settings.groundMoveSoftness,
-                            normal = moveDir,
-                            r1 = r1,
-                            r2 = r2
+                            id = uniqueHash ^ 127490702,
+                            r = float2.zero,
+                            e = e,
+                            normal = new float2(controls.moveDirection, 0),
+                            targetSpeed = settings.groundMoveSpeed
                         };
-
-                        input2.Add(new TwoWayPenConstraint(manifold, masses, dt));
+                        input.Add(new OneWayOneDOFConstraint(manifold, masses, dt));
                     } else {
                         var manifold = new RelativeVelocityManifold {
                             e1 = e,

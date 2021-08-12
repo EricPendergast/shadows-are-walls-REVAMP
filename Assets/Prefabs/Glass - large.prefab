@@ -12,7 +12,6 @@ GameObject:
   - component: {fileID: 1671306782317601630}
   - component: {fileID: 1671306782317601631}
   - component: {fileID: 1671306782317601616}
-  - component: {fileID: 2288021292399954167}
   m_Layer: 0
   m_Name: Glass - large
   m_TagString: Untagged
@@ -50,7 +49,7 @@ MonoBehaviour:
   isTrigger: 0
   velocity: {x: 0, y: 0}
   angularVelocity: 0
-  mass: 1
+  mass: 2
   fixPosition: 0
   fixRotation: 0
   width: 1
@@ -107,15 +106,3 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1671306782317601618}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
---- !u!114 &2288021292399954167
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1671306782317601618}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c52d30b9b51f71171aaa4d863abe0278, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 

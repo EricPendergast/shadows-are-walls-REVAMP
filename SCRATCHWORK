@@ -1,0 +1,10 @@
+How to implement swappable detector
+It is a trigger box which registers contacts that should follow the player.
+It is referenced by PlayerRoot
+
+Behavior is similar to the pullable detector.
+Pullable detector is a different shape.
+It is referenced by something common to root and branch players
+
+If I implemented these with a generic Follower component, then it wouldn't be
+clear exactly when in the frame they are supposed to follow.

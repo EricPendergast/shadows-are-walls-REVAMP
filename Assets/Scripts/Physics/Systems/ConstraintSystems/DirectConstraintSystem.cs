@@ -144,10 +144,47 @@ public class DirectConstraintSystem : SystemBase {
     }
 
     private static void AddConstraint(in Emitter emitter, in Env env, Entity e1, Entity e2, Geometry.Manifold manifold, bool useContact1) {
+        bool e1IsTrigger = env.isTrigger.HasComponent(e1);
+        bool e2IsTrigger = env.isTrigger.HasComponent(e2);
         Box box1 = env.boxes[e1];
         Box box2 = env.boxes[e2];
 
-        if (env.masses[e1].mass == math.INFINITY && env.masses[e2].mass == math.INFINITY) {
+        {
+            var contactPoint = useContact1 ? manifold.contact1.point : manifold.contact2.Value.point;
+
+            // Emit a contact only if the other entity is solid (not a trigger)
+            if (!e2IsTrigger) {
+                emitter.EmitContact(e1,
+                    new DirectContactStore {
+                        normal = -manifold.normal,
+                        other = e2,
+                        point = contactPoint
+                    }
+                );
+            }
+
+            if (!e1IsTrigger) {
+                emitter.EmitContact(e2,
+                    new DirectContactStore {
+                        normal = manifold.normal,
+                        other = e1,
+                        point = contactPoint
+                    }
+                );
+            }
+        }
+
+        if (e1IsTrigger || e2IsTrigger) {
+            return;
+        }
+
+        bool missingMass = !env.masses.HasComponent(e1) || !env.masses.HasComponent(e2);
+        if (missingMass) {
+            return;
+        }
+
+        bool bothStatic = env.masses[e1].mass == math.INFINITY && env.masses[e2].mass == math.INFINITY;
+        if (bothStatic) {
             return;
         }
 
@@ -170,29 +207,8 @@ public class DirectConstraintSystem : SystemBase {
             friction: fric1 * fric2
         );
 
-        bool triggerInvolved = env.isTrigger.HasComponent(e1) || env.isTrigger.HasComponent(e2);
-
-        if (!triggerInvolved) {
-            emitter.EmitConstraint(c);
-            emitter.EmitDebuggableConstraint(manifold, partial, c, useContact1, env.dt);
-        }
-
-        var contactPoint = useContact1 ? manifold.contact1.point : manifold.contact2.Value.point;
-
-        emitter.EmitContact(e1,
-            new DirectContactStore {
-                normal = -manifold.normal,
-                other = e2,
-                point = contactPoint
-            }
-        );
-        emitter.EmitContact(e2,
-            new DirectContactStore {
-                normal = manifold.normal,
-                other = e1,
-                point = contactPoint
-            }
-        );
+        emitter.EmitConstraint(c);
+        emitter.EmitDebuggableConstraint(manifold, partial, c, useContact1, env.dt);
     }
 
     private struct DebuggableConstraint : IDebuggableConstraint {
