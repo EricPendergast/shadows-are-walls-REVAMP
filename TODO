@@ -1,5 +1,5 @@
 TODOs:
-1. Turn on burst for shadow edge calculator
+✓1. Turn on burst for shadow edge calculator
 2. Implement ShadowContactStore
 3. Implement shadow friction
 

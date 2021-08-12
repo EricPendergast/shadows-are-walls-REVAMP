@@ -12,7 +12,7 @@ public class ShadowConstraintSystem : SystemBase {
     private EntityQuery opaqueBoxesQuery;
     private EntityQuery shadHitBoxesQuery;
 
-    Dictionary<Entity, ShadowEdgeCalculator> lightManagers;
+    Dictionary<Entity, ShadowEdgeCalculatorClassWrapper> shadowEdgeCalculators;
 
     NativeList<TwoWayPenConstraint.Partial> partialEdgeConstraints;
     NativeList<ThreeWayPenConstraint.Partial> partialCornerConstraints;
@@ -27,7 +27,7 @@ public class ShadowConstraintSystem : SystemBase {
         lightSourceQuery = GetEntityQuery(typeof(LightSource), typeof(Position));
         opaqueBoxesQuery = GetEntityQuery(typeof(Box), typeof(Position), typeof(OpaqueObject));
         shadHitBoxesQuery = GetEntityQuery(typeof(Box), typeof(Position), typeof(HitShadowsObject));
-        lightManagers = new Dictionary<Entity, ShadowEdgeCalculator>();
+        shadowEdgeCalculators = new Dictionary<Entity, ShadowEdgeCalculatorClassWrapper>();
 
         partialCornerConstraints = new NativeList<ThreeWayPenConstraint.Partial>(Allocator.Persistent);
         partialEdgeConstraints = new NativeList<TwoWayPenConstraint.Partial>(Allocator.Persistent);
@@ -39,7 +39,7 @@ public class ShadowConstraintSystem : SystemBase {
     }
 
     protected override void OnDestroy() {
-        Clear(lightManagers);
+        Clear(shadowEdgeCalculators);
         partialCornerConstraints.Dispose();
         partialEdgeConstraints.Dispose();
 
@@ -67,9 +67,9 @@ public class ShadowConstraintSystem : SystemBase {
 
         var lightSourceEntities = lightSourceQuery.ToEntityArray(Allocator.TempJob);
 
-        Clear(lightManagers);
+        Clear(shadowEdgeCalculators);
         for (int i = 0; i < lightSources.Length; i++) {
-            lightManagers[lightSourceEntities[i]] = new ShadowEdgeCalculator(lightSources[i], lightSourceEntities[i], lightAngleCalculators[i], i);
+            shadowEdgeCalculators[lightSourceEntities[i]] = new ShadowEdgeCalculatorClassWrapper(lightSources[i], lightSourceEntities[i], lightAngleCalculators[i], i);
         }
 
         boxOverlappingEdges.Clear();
@@ -79,7 +79,7 @@ public class ShadowConstraintSystem : SystemBase {
             new ShadowEdgeCalculator.Emitter {
                 boxOverlappingEdges = boxOverlappingEdges,
                 edgeMounts = edgeMounts
-            }, true
+            }, useBurst: true
         );
 
         partialCornerConstraints.Clear();
@@ -126,7 +126,6 @@ public class ShadowConstraintSystem : SystemBase {
     }
 
     private void ComputeShadowEdges(ShadowEdgeCalculator.Emitter emitter, bool useBurst) {
-        // TODO: Implement burst
         var shadowEdgeCalculatorEnv = new ShadowEdgeCalculator.Env {
             opaqueBoxes = opaqueBoxesQuery.ToComponentDataArray<Box>(Allocator.TempJob),
             opaquePositions = opaqueBoxesQuery.ToComponentDataArray<Position>(Allocator.TempJob),
@@ -134,14 +133,28 @@ public class ShadowConstraintSystem : SystemBase {
 
             shadHitBoxes = shadHitBoxesQuery.ToComponentDataArray<Box>(Allocator.TempJob),
             shadHitPositions = shadHitBoxesQuery.ToComponentDataArray<Position>(Allocator.TempJob),
-            shadHitBoxEntities = shadHitBoxesQuery.ToEntityArray(Allocator.TempJob),
+            shadHitBoxEntities = shadHitBoxesQuery.ToEntityArray(Allocator.TempJob)
         };
 
-        foreach (var lm in lightManagers.Values) {
-            lm.ComputeShadowEdgeContacts(
-                shadowEdgeCalculatorEnv,
-                emitter
-            );
+        foreach (var lm in shadowEdgeCalculators.Values) {
+            var shadowEdgeCalculator = lm.shadowEdgeCalculator;
+            if (useBurst) {
+                Job.WithBurst().WithCode(() => {
+                    shadowEdgeCalculator.ComputeShadowEdgeContacts(
+                        shadowEdgeCalculatorEnv,
+                        emitter
+                    );
+                }).Run();
+            } else {
+                Job.WithoutBurst().WithCode(() => {
+                    shadowEdgeCalculator.ComputeShadowEdgeContacts(
+                        shadowEdgeCalculatorEnv,
+                        emitter
+                    );
+                }).Run();
+            }
+
+            lm.shadowEdgeCalculator = shadowEdgeCalculator;
         }
 
         shadowEdgeCalculatorEnv.Dispose();
@@ -249,11 +262,11 @@ public class ShadowConstraintSystem : SystemBase {
             }).Run();
     }
 
-    private void Clear(Dictionary<Entity, ShadowEdgeCalculator> lightManagers) {
-        foreach (var lightManager in lightManagers.Values) {
+    private void Clear(Dictionary<Entity, ShadowEdgeCalculatorClassWrapper> shadowEdgeCalculators) {
+        foreach (var lightManager in shadowEdgeCalculators.Values) {
             lightManager.Dispose();
         }
-        lightManagers.Clear();
+        shadowEdgeCalculators.Clear();
     }
 }
 

@@ -1,6 +1,7 @@
 using Unity.Entities;
 using Unity.Collections;
 using Unity.Mathematics;
+using Unity.Burst;
 using System.Collections.Generic;
 
 using Physics.Math;
@@ -13,14 +14,36 @@ using Rect = Physics.Math.Rect;
 using EdgeMountsMap = Unity.Collections.NativeMultiHashMap<ShadowCornerCalculator.Edge.EdgeKey, ShadowCornerCalculator.EdgeMount>;
 using EdgeMount = ShadowCornerCalculator.EdgeMount;
 
-using FloatPair = System.ValueTuple<float, float>;
+public class ShadowEdgeCalculatorClassWrapper {
+    public ShadowEdgeCalculator shadowEdgeCalculator;
+    public ShadowEdgeCalculatorClassWrapper(in LightSource source, in Entity sourceEntity, in AngleCalculator angleCalc, int sourceIndex) {
+        shadowEdgeCalculator = new ShadowEdgeCalculator(in source, in sourceEntity, in angleCalc, sourceIndex);
+    }
+    public void Dispose() {
+        shadowEdgeCalculator.Dispose();
+    }
+}
 
-public class ShadowEdgeCalculator {
+public struct FloatPair {
+    public float Item1;
+    public float Item2;
+    public FloatPair(float Item1, float Item2) {
+        this.Item1 = Item1;
+        this.Item2 = Item2;
+    }
+    public void Deconstruct(out float Item1, out float Item2) {
+        Item1 = this.Item1;
+        Item2 = this.Item2;
+    }
+}
+
+public struct ShadowEdgeCalculator {
     public struct Emitter {
         public NativeMultiHashMap<Entity, ShadowCornerCalculator.Edge>? boxOverlappingEdges;
         public EdgeMountsMap? edgeMounts;
         public static List<ShadowEdgeDebugInfo> shadowEdgeDebugInfo;
 
+        [BurstDiscard]
         public void DebugEmit(ShadowEdgeDebugInfo i) {
             if (shadowEdgeDebugInfo != null) {
                 shadowEdgeDebugInfo.Add(i);
@@ -167,10 +190,16 @@ public class ShadowEdgeCalculator {
         shadHitWorkingSet.Dispose();
     }
 
+    private void Reset() {
+        shapeEdges.Clear();
+        opaqueWorkingSet.Clear();
+        shadHitWorkingSet.Clear();
+    }
+
     // TODO: Rename to something better. (This does not compute the manifolds anymore)
-    public void ComputeShadowEdgeContacts(
-            Env env,
-            Emitter emitter) {
+    public void ComputeShadowEdgeContacts(Env env, Emitter emitter) {
+
+        Reset();
 
         StoreShapeEdges(env);
         shapeEdges.Sort();
@@ -388,7 +417,7 @@ public class ShadowEdgeCalculator {
         }
     }
 
-    public void StoreShapeEdges(Env env) {
+    private void StoreShapeEdges(Env env) {
 
         Debug.Assert(env.opaqueBoxes.Length == env.opaqueBoxEntities.Length);
         Debug.Assert(env.shadHitBoxes.Length == env.shadHitBoxEntities.Length);

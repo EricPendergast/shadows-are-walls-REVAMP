@@ -50,7 +50,7 @@ MonoBehaviour:
   isTrigger: 0
   velocity: {x: 0, y: 0}
   angularVelocity: 0
-  mass: 5
+  mass: 1
   fixPosition: 0
   fixRotation: 0
   width: 1
