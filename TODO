@@ -1,5 +1,7 @@
 TODOs:
-1. Implement ShadowContactStore
+1. Turn on burst for shadow edge calculator
+2. Implement ShadowContactStore
+3. Implement shadow friction
 
 Later TODOs:
 1. Remove edge mounts past the contact point when calculating partial constraints

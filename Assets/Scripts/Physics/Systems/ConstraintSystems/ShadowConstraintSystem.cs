@@ -67,36 +67,20 @@ public class ShadowConstraintSystem : SystemBase {
 
         var lightSourceEntities = lightSourceQuery.ToEntityArray(Allocator.TempJob);
 
-        var opaqueBoxes = opaqueBoxesQuery.ToComponentDataArray<Box>(Allocator.TempJob);
-        var opaquePositions = opaqueBoxesQuery.ToComponentDataArray<Position>(Allocator.TempJob);
-        var opaqueBoxEntities = opaqueBoxesQuery.ToEntityArray(Allocator.TempJob);
-
-        var shadHitBoxes = shadHitBoxesQuery.ToComponentDataArray<Box>(Allocator.TempJob);
-        var shadHitPositions = shadHitBoxesQuery.ToComponentDataArray<Position>(Allocator.TempJob);
-        var shadHitBoxEntities = shadHitBoxesQuery.ToEntityArray(Allocator.TempJob);
-
-        // Step 1: Initialization
-        // Can be optimized
         Clear(lightManagers);
         for (int i = 0; i < lightSources.Length; i++) {
             lightManagers[lightSourceEntities[i]] = new ShadowEdgeCalculator(lightSources[i], lightSourceEntities[i], lightAngleCalculators[i], i);
         }
 
-
         boxOverlappingEdges.Clear();
         edgeMounts.Clear();
-        // Step 2: Computing initial contact manifolds
-        foreach (var lm in lightManagers.Values) {
-            // Compute the sorted shadow list
-            // 2.a, 2.b, 2.c
-            lm.ComputeManifolds(
-                opaqueBoxes, opaquePositions, opaqueBoxEntities,
-                shadHitBoxes, shadHitPositions, shadHitBoxEntities,
-                ref boxOverlappingEdges,
-                ref edgeMounts);
-        }
 
-        // Step 5: Store all non illuminated manifolds
+        ComputeShadowEdges(
+            new ShadowEdgeCalculator.Emitter {
+                boxOverlappingEdges = boxOverlappingEdges,
+                edgeMounts = edgeMounts
+            }, true
+        );
 
         partialCornerConstraints.Clear();
         partialEdgeConstraints.Clear();
@@ -139,20 +123,40 @@ public class ShadowConstraintSystem : SystemBase {
         }
 
         lightSourceEntities.Dispose();
-        opaqueBoxes.Dispose();
-        opaquePositions.Dispose();
-        opaqueBoxEntities.Dispose();
-        shadHitBoxes.Dispose();
-        shadHitPositions.Dispose();
-        shadHitBoxEntities.Dispose();
+    }
+
+    private void ComputeShadowEdges(ShadowEdgeCalculator.Emitter emitter, bool useBurst) {
+        // TODO: Implement burst
+        var shadowEdgeCalculatorEnv = new ShadowEdgeCalculator.Env {
+            opaqueBoxes = opaqueBoxesQuery.ToComponentDataArray<Box>(Allocator.TempJob),
+            opaquePositions = opaqueBoxesQuery.ToComponentDataArray<Position>(Allocator.TempJob),
+            opaqueBoxEntities = opaqueBoxesQuery.ToEntityArray(Allocator.TempJob),
+
+            shadHitBoxes = shadHitBoxesQuery.ToComponentDataArray<Box>(Allocator.TempJob),
+            shadHitPositions = shadHitBoxesQuery.ToComponentDataArray<Position>(Allocator.TempJob),
+            shadHitBoxEntities = shadHitBoxesQuery.ToEntityArray(Allocator.TempJob),
+        };
+
+        foreach (var lm in lightManagers.Values) {
+            lm.ComputeShadowEdgeContacts(
+                shadowEdgeCalculatorEnv,
+                emitter
+            );
+        }
+
+        shadowEdgeCalculatorEnv.Dispose();
     }
 
     public IEnumerable<ShadowEdgeCalculator.ShadowEdgeDebugInfo> GetShadowEdgesForDebug() {
-        foreach (var lightManager in lightManagers.Values) {
-            foreach (var edge in lightManager.IterShadowEdgeDebugInfo()) {
-                yield return edge;
-            }
+        ShadowEdgeCalculator.Emitter.shadowEdgeDebugInfo = new List<ShadowEdgeCalculator.ShadowEdgeDebugInfo>();
+
+        ComputeShadowEdges(new ShadowEdgeCalculator.Emitter{}, useBurst: false);
+
+        foreach (var info in ShadowEdgeCalculator.Emitter.shadowEdgeDebugInfo) {
+            yield return info;
         }
+
+        ShadowEdgeCalculator.Emitter.shadowEdgeDebugInfo = null;
     }
 
     public List<ShadowCornerCalculator.Corner> GetShadowIslandsForDebug() {

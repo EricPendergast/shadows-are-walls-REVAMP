@@ -16,6 +16,48 @@ using EdgeMount = ShadowCornerCalculator.EdgeMount;
 using FloatPair = System.ValueTuple<float, float>;
 
 public class ShadowEdgeCalculator {
+    public struct Emitter {
+        public NativeMultiHashMap<Entity, ShadowCornerCalculator.Edge>? boxOverlappingEdges;
+        public EdgeMountsMap? edgeMounts;
+        public static List<ShadowEdgeDebugInfo> shadowEdgeDebugInfo;
+
+        public void DebugEmit(ShadowEdgeDebugInfo i) {
+            if (shadowEdgeDebugInfo != null) {
+                shadowEdgeDebugInfo.Add(i);
+            }
+        }
+
+        public void EmitOverlappingEdge(Entity e, ShadowCornerCalculator.Edge edge) {
+            if (boxOverlappingEdges != null) {
+                boxOverlappingEdges.Value.Add(e, edge);
+            }
+        }
+
+        public void EmitEdgeMount(ShadowCornerCalculator.Edge.EdgeKey edgeKey, ShadowCornerCalculator.EdgeMount edgeMount) {
+            if (edgeMounts != null) {
+                edgeMounts.Value.Add(edgeKey, edgeMount);
+            }
+        }
+    }
+
+    public struct Env {
+        public NativeArray<Box> opaqueBoxes;
+        public NativeArray<Position> opaquePositions;
+        public NativeArray<Entity> opaqueBoxEntities;
+        public NativeArray<Box> shadHitBoxes;
+        public NativeArray<Position> shadHitPositions;
+        public NativeArray<Entity> shadHitBoxEntities;
+
+        public void Dispose() {
+            opaqueBoxes.Dispose();
+            opaquePositions.Dispose();
+            opaqueBoxEntities.Dispose();
+            shadHitBoxes.Dispose();
+            shadHitPositions.Dispose();
+            shadHitBoxEntities.Dispose();
+        }
+    }
+
     private AngleCalculator angleCalc;
     private float2 sourcePos {get => angleCalc.SourcePos;}
     private LightSource lightSource;
@@ -25,8 +67,6 @@ public class ShadowEdgeCalculator {
     private NativeList<ShapeEdge.OpaqueData> opaqueWorkingSet;
     private NativeList<ShapeEdge.ShadHitData> shadHitWorkingSet;
 
-    private List<ShadowEdgeDebugInfo> shadowEdgeDebugInfo;
-    //private ComponentDataFromEntity<Box> boxes;
 
     [StructLayout(LayoutKind.Explicit)]
     private struct ShapeEdge : System.IComparable<ShapeEdge> {
@@ -118,8 +158,6 @@ public class ShadowEdgeCalculator {
         opaqueWorkingSet = new NativeList<ShapeEdge.OpaqueData>(Allocator.TempJob);
         shadHitWorkingSet = new NativeList<ShapeEdge.ShadHitData>(Allocator.TempJob);
 
-        shadowEdgeDebugInfo = new List<ShadowEdgeDebugInfo>();
-
         this.sourceIndex = sourceIndex;
     }
 
@@ -130,25 +168,20 @@ public class ShadowEdgeCalculator {
     }
 
     // TODO: Rename to something better. (This does not compute the manifolds anymore)
-    public void ComputeManifolds(
-            NativeArray<Box> opaqueBoxes, NativeArray<Position> opaquePositions, NativeArray<Entity> opaqueBoxEntities, 
-            NativeArray<Box> shadHitBoxes, NativeArray<Position> shadHitPositions, NativeArray<Entity> shadHitBoxEntities,
-            ref NativeMultiHashMap<Entity, ShadowCornerCalculator.Edge> boxOverlappingEdges,
-            ref EdgeMountsMap edgeMounts) {
+    public void ComputeShadowEdgeContacts(
+            Env env,
+            Emitter emitter) {
 
-        // FOR DEBUG
-        shadowEdgeDebugInfo.Clear();
-
-        StoreShapeEdges(opaqueBoxes, opaquePositions, opaqueBoxEntities, shadHitBoxes, shadHitPositions, shadHitBoxEntities);
+        StoreShapeEdges(env);
         shapeEdges.Sort();
 
         foreach (ShapeEdge edge in shapeEdges) {
             if (edge.type == ShapeEdge.Owner.Light) {
-                HandleLightEdge(in edge.lightData, ref boxOverlappingEdges, ref edgeMounts);
+                HandleLightEdge(in edge.lightData, emitter);
             } else if (edge.type == ShapeEdge.Owner.Opaque) {
-                HandleOpaqueEdge(edge.opaqueData, ref boxOverlappingEdges, ref edgeMounts);
+                HandleOpaqueEdge(edge.opaqueData, emitter);
             } else if (edge.type == ShapeEdge.Owner.ShadHit) {
-                HandleShadHitEdge(in edge.shadHitData, ref boxOverlappingEdges, ref edgeMounts);
+                HandleShadHitEdge(in edge.shadHitData, emitter);
             }
         }
     }
@@ -170,7 +203,7 @@ public class ShadowEdgeCalculator {
         }
     }
 
-    private void HandleLightEdge(in ShapeEdge.LightData lightEdge, ref NativeMultiHashMap<Entity, ShadowCornerCalculator.Edge> boxOverlappingEdges, ref EdgeMountsMap edgeMounts) {
+    private void HandleLightEdge(in ShapeEdge.LightData lightEdge, Emitter emitter) {
         float edgeStart = 0;
         float edgeEnd = 100;
         float2 edgeDir = lightEdge.direction;
@@ -185,9 +218,7 @@ public class ShadowEdgeCalculator {
             float2 startPoint = sourcePos + edgeDir*edgeStart;
             float2 endPoint = sourcePos + edgeDir*edgeEnd;
 
-            // FOR DEBUG //
-            shadowEdgeDebugInfo.Add(new ShadowEdgeDebugInfo{endpoint = endPoint, id1 = lightEdge.id, id2 = null, mount1 = startPoint, mount2 = null});
-            ///////////////
+            emitter.DebugEmit(new ShadowEdgeDebugInfo{endpoint = endPoint, id1 = lightEdge.id, id2 = null, mount1 = startPoint, mount2 = null});
 
             bool addedToOverlapping = false;
 
@@ -210,7 +241,7 @@ public class ShadowEdgeCalculator {
 
                 if (intersecting) {
                     Debug.Assert(lightEdge.angle == angleCalc.MinAngle() || lightEdge.angle == angleCalc.MaxAngle());
-                    boxOverlappingEdges.Add(shadHitObject.source, edge);
+                    emitter.EmitOverlappingEdge(shadHitObject.source, edge);
                     addedToOverlapping = true;
                 }
 
@@ -218,7 +249,7 @@ public class ShadowEdgeCalculator {
             // Only add the edge mounts if there is an object which will need
             // them.
             if (addedToOverlapping) {
-                edgeMounts.Add(edge.GetEdgeKey(), new EdgeMount {
+                emitter.EmitEdgeMount(edge.GetEdgeKey(), new EdgeMount {
                     castingEntity = sourceEntity,
                     castingShapeType = EdgeSourceType.Light,
                     point = sourcePos,
@@ -229,7 +260,7 @@ public class ShadowEdgeCalculator {
         }
     }
 
-    private void HandleOpaqueEdge(in ShapeEdge.OpaqueData opaqueEdge, ref NativeMultiHashMap<Entity, ShadowCornerCalculator.Edge> boxOverlappingEdges, ref EdgeMountsMap edgeMounts) {
+    private void HandleOpaqueEdge(in ShapeEdge.OpaqueData opaqueEdge, Emitter emitter) {
         bool removed = TryRemove(ref opaqueWorkingSet, opaqueEdge.source);
         bool leading = !removed;
 
@@ -249,7 +280,7 @@ public class ShadowEdgeCalculator {
                 float2 endPoint = sourcePos + edgeDir*edgeEnd;
 
                 // FOR DEBUG //
-                shadowEdgeDebugInfo.Add(new ShadowEdgeDebugInfo{endpoint = endPoint, id1 = opaqueEdge.id1, id2 = opaqueEdge.id2, mount1 = opaqueEdge.mount1, mount2 = opaqueEdge.mount2});
+                emitter.DebugEmit(new ShadowEdgeDebugInfo{endpoint = endPoint, id1 = opaqueEdge.id1, id2 = opaqueEdge.id2, mount1 = opaqueEdge.mount1, mount2 = opaqueEdge.mount2});
                 ///////////////
 
                 bool addedToOverlapping = false;
@@ -272,7 +303,7 @@ public class ShadowEdgeCalculator {
                     );
 
                     if (intersecting) {
-                        boxOverlappingEdges.Add(shadHitObject.source, edge);
+                        emitter.EmitOverlappingEdge(shadHitObject.source, edge);
                         addedToOverlapping = true;
                     }
                 }
@@ -280,7 +311,7 @@ public class ShadowEdgeCalculator {
                 // Only add the edge mounts if there is an object which will need
                 // them.
                 if (addedToOverlapping) {
-                    edgeMounts.Add(edge.GetEdgeKey(), new EdgeMount{
+                    emitter.EmitEdgeMount(edge.GetEdgeKey(), new EdgeMount{
                         castingEntity = opaqueEdge.source,
                         castingShapeType = EdgeSourceType.Box,
                         point = opaqueEdge.mount1,
@@ -288,7 +319,7 @@ public class ShadowEdgeCalculator {
                         id = opaqueEdge.id1
                     });
                     if (opaqueEdge.mount2 is float2 mount) {
-                        edgeMounts.Add(edge.GetEdgeKey(), new EdgeMount{
+                        emitter.EmitEdgeMount(edge.GetEdgeKey(), new EdgeMount{
                             castingEntity = opaqueEdge.source,
                             castingShapeType = EdgeSourceType.Box,
                             point = mount,
@@ -305,7 +336,7 @@ public class ShadowEdgeCalculator {
         }
     }
 
-    private void HandleShadHitEdge(in ShapeEdge.ShadHitData shadHitEdge, ref NativeMultiHashMap<Entity, ShadowCornerCalculator.Edge> boxOverlappingEdges, ref EdgeMountsMap edgeMounts) {
+    private void HandleShadHitEdge(in ShapeEdge.ShadHitData shadHitEdge, Emitter emitter) {
         bool removed = TryRemove(ref shadHitWorkingSet, shadHitEdge.source);
         if (!removed) {
             shadHitWorkingSet.Add(shadHitEdge);
@@ -345,8 +376,8 @@ public class ShadowEdgeCalculator {
                         lightSide = -1,
                     };
                 }
-                boxOverlappingEdges.Add(shadHitEdge.source, edge);
-                edgeMounts.Add(edge.GetEdgeKey(), new ShadowCornerCalculator.EdgeMount{
+                emitter.EmitOverlappingEdge(shadHitEdge.source, edge);
+                emitter.EmitEdgeMount(edge.GetEdgeKey(), new ShadowCornerCalculator.EdgeMount{
                     castingEntity = sourceEntity,
                     castingShapeType = EdgeSourceType.Light,
                     id =  new int2(lightSource.id, edge.lightSide).GetHashCode(),
@@ -357,14 +388,13 @@ public class ShadowEdgeCalculator {
         }
     }
 
-    public void StoreShapeEdges(
-            NativeArray<Box> opaqueBoxes, NativeArray<Position> opaquePositions, NativeArray<Entity> opaqueBoxEntities, 
-            NativeArray<Box> shadHitBoxes, NativeArray<Position> shadHitPositions, NativeArray<Entity> shadHitBoxEntities) {
-        Debug.Assert(opaqueBoxes.Length == opaqueBoxEntities.Length);
-        Debug.Assert(shadHitBoxes.Length == shadHitBoxEntities.Length);
+    public void StoreShapeEdges(Env env) {
+
+        Debug.Assert(env.opaqueBoxes.Length == env.opaqueBoxEntities.Length);
+        Debug.Assert(env.shadHitBoxes.Length == env.shadHitBoxEntities.Length);
         
-        for (int i = 0; i < opaqueBoxes.Length; i++) {
-            Rect rect = opaqueBoxes[i].ToRect(opaquePositions[i]);
+        for (int i = 0; i < env.opaqueBoxes.Length; i++) {
+            Rect rect = env.opaqueBoxes[i].ToRect(env.opaquePositions[i]);
             Geometry.CalculateShadowGeometry(rect, sourcePos, .005f, out var sg1, out var sg2);
 
             var fp = angleCalc.Angles(sg1.contact1, sg2.contact1);
@@ -372,7 +402,7 @@ public class ShadowEdgeCalculator {
             float a2 = fp.Item2;
 
             if (!math.isnan(a1)) {
-                Entity opaqueEntity = opaqueBoxEntities[i];
+                Entity opaqueEntity = env.opaqueBoxEntities[i];
                 shapeEdges.Add(new ShapeEdge.OpaqueData{
                     angle = a1, 
                     source = opaqueEntity,
@@ -394,10 +424,10 @@ public class ShadowEdgeCalculator {
             }
         }
 
-        for (int i = 0; i < shadHitBoxes.Length; i++) {
-            Rect rect = shadHitBoxes[i].ToRect(shadHitPositions[i]);
+        for (int i = 0; i < env.shadHitBoxes.Length; i++) {
+            Rect rect = env.shadHitBoxes[i].ToRect(env.shadHitPositions[i]);
             if (rect.Contains(sourcePos)) {
-                Entity shadHitEntity = shadHitBoxEntities[i];
+                Entity shadHitEntity = env.shadHitBoxEntities[i];
                 shapeEdges.Add(new ShapeEdge.ShadHitData{
                     angle = -math.INFINITY, 
                     source = shadHitEntity,
@@ -420,7 +450,7 @@ public class ShadowEdgeCalculator {
             float a1 = fp.Item1;
             float a2 = fp.Item2;
             if (!math.isnan(a1)) {
-                Entity shadHitEntity = shadHitBoxEntities[i];
+                Entity shadHitEntity = env.shadHitBoxEntities[i];
                 shapeEdges.Add(new ShapeEdge.ShadHitData{
                     angle = a1, 
                     source = shadHitEntity,
@@ -483,10 +513,6 @@ public class ShadowEdgeCalculator {
         public float2 endpoint;
         public int id1;
         public int? id2;
-    }
-
-    public IEnumerable<ShadowEdgeDebugInfo> IterShadowEdgeDebugInfo() {
-        return this.shadowEdgeDebugInfo;
     }
 }
 
