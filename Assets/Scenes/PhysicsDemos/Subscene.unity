@@ -1803,7 +1803,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 7403690264415542584, guid: 5e2665a9d0121e75db4efe97068ce130, type: 3}
       propertyPath: m_Name
-      value: Player
+      value: Player - 18
       objectReference: {fileID: 0}
     - target: {fileID: 7403690264415542589, guid: 5e2665a9d0121e75db4efe97068ce130, type: 3}
       propertyPath: m_RootOrder

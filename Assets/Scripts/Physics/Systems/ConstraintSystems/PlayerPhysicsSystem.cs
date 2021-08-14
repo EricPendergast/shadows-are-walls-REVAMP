@@ -62,30 +62,48 @@ public class PlayerFrictionSystem : SystemBase {
         var ecbSystem = World.GetOrCreateSystem<EndFixedStepSimulationEntityCommandBufferSystem>();
         var ecb = ecbSystem.CreateCommandBuffer().AsParallelWriter();
 
+        // If ActivePlayer, set friction to zero and store its previous value in PreviousPlayerFriction
         Entities
             .WithAll<ActivePlayer>()
             .WithNone<PreviousPlayerFriction>()
+            .WithAll<Friction>()
             .ForEach((int entityInQueryIndex, Entity e, in Friction friction) => {
                 ecb.AddComponent(entityInQueryIndex, e, new PreviousPlayerFriction {
                     prevFriction = friction
                 });
-                ecb.RemoveComponent<Friction>(entityInQueryIndex, e);
+                ecb.SetComponent(entityInQueryIndex, e, new Friction{friction=0});
             }).ScheduleParallel();
 
+        // If ActivePlayer is removed, revert back to the friction stored in PreviousPlayerFriction
         Entities
-            .WithNone<ActivePlayer, Friction>()
+            .WithNone<ActivePlayer>()
+            .WithAll<PreviousPlayerFriction>()
+            .WithNone<Friction>()
             .ForEach((int entityInQueryIndex, Entity e, in PreviousPlayerFriction prevFriction) => {
-                ecb.AddComponent<Friction>(entityInQueryIndex, e,
-                    prevFriction.prevFriction
-                );
+                ecb.AddComponent<Friction>(entityInQueryIndex, e, prevFriction.prevFriction);
                 ecb.RemoveComponent<PreviousPlayerFriction>(entityInQueryIndex, e);
             }).ScheduleParallel();
 
         Entities
             .WithNone<ActivePlayer>()
-            .WithAll<Friction, PreviousPlayerFriction>()
-            .ForEach((int entityInQueryIndex, Entity e) => {
+            .WithAll<PreviousPlayerFriction>()
+            .WithAll<Friction>()
+            .ForEach((int entityInQueryIndex, Entity e, in PreviousPlayerFriction prevFriction) => {
+                ecb.SetComponent(entityInQueryIndex, e, prevFriction.prevFriction);
                 ecb.RemoveComponent<PreviousPlayerFriction>(entityInQueryIndex, e);
+            }).ScheduleParallel();
+
+        var controls = GetSingleton<PlayerControlInputs>();
+
+        // Restore player friction when not moving
+        Entities
+            .WithAll<ActivePlayer, Friction, PreviousPlayerFriction>()
+            .ForEach((ref Friction fric, in PreviousPlayerFriction prevFric) => {
+                if (controls.moveDirection == 0) {
+                    fric = prevFric.prevFriction;
+                } else {
+                    fric.friction = 0;
+                }
             }).ScheduleParallel();
 
         ecbSystem.AddJobHandleForProducer(Dependency);
@@ -118,9 +136,9 @@ public class PlayerPhysicsSystem : SystemBase {
 
         Entities
             .WithAll<ActivePlayer>()
-            .ForEach((Entity e, in Box playerBox, in Position playerPos, in DynamicBuffer<DirectContactStore> contacts) => {
+            .ForEach((Entity e, ref Velocity v, in Box playerBox, in Position playerPos, in DynamicBuffer<DirectContactStore> contacts, in DynamicBuffer<ShadowContactStore> shadowContacts) => {
 
-            {
+            {// Adding a constraint to rotate the player to be axis aligned
                 float rotationTarget = math.round(playerPos.rot / (math.PI/2))*(math.PI/2);
                 float rotationOffset = rotationTarget - playerPos.rot;
                 float rotationOffsetSign = math.sign(rotationOffset);
@@ -134,18 +152,17 @@ public class PlayerPhysicsSystem : SystemBase {
                 input.Add(new OneWayOneDOFConstraint(manifold, masses, dt));
             }
 
-
             bool canJump = false;
-            foreach (var contact in contacts) {
-                if (math.dot(contact.normal, new float2(0, 1)) > settings.minJumpDotProd) {
+            void HandleContact(float2 point, float2 normal, Entity other) {
+                if (math.dot(normal, new float2(0, 1)) > settings.minJumpDotProd) {
                     canJump = true;
 
-                    int uniqueHash = e.GetHashCode() ^ contact.other.GetHashCode() ^ contact.point.GetHashCode();
+                    int uniqueHash = e.GetHashCode() ^ other.GetHashCode() ^ point.GetHashCode();
 
                     float2 r1 = 0;
-                    float2 r2 = contact.point - positions[contact.other].pos;
+                    float2 r2 = point - positions[other].pos;
 
-                    var moveDir = Lin.Cross(contact.normal, 1);
+                    var moveDir = Lin.Cross(normal, 1);
                     if (math.dot(moveDir, new float2(controls.moveDirection)) < 0) {
                         moveDir *= -1;
                     }
@@ -160,35 +177,16 @@ public class PlayerPhysicsSystem : SystemBase {
                             targetSpeed = settings.groundMoveSpeed
                         };
                         input.Add(new OneWayOneDOFConstraint(manifold, masses, dt));
-                    } else {
-                        var manifold = new RelativeVelocityManifold {
-                            e1 = e,
-                            e2 = contact.other,
-                            id = uniqueHash ^ 207704982, // This id doesn't need to be consistent across frames.
-                            speedE1AlongNormal = 0,
-                            softness = settings.groundMoveSoftness,
-                            normal = moveDir,
-                            r1 = r1,
-                            r2 = r2
-                        };
-                        input3.Add(new TwoWayOneDOFConstraint(manifold, masses, dt));
-                    }
-
-                    if (controls.jumpPressed) {
-                        var manifold = new MinRelativeVelocityManifold {
-                            e1 = e,
-                            e2 = contact.other,
-                            id = uniqueHash ^ 416936944, // This id doesn't need to be consistent across frames.
-                            minSpeedE1AlongNormal = settings.jumpSpeed,
-                            softness = settings.jumpSoftness,
-                            normal = new float2(0, 1),
-                            r1 = r1,
-                            r2 = r2
-                        };
-
-                        input2.Add(new TwoWayPenConstraint(manifold, masses, dt));
                     }
                 }
+            }
+
+
+            foreach (var contact in contacts) {
+                HandleContact(point: contact.point, normal: contact.normal, other: contact.other);
+            }
+            foreach (var contact in shadowContacts) {
+                HandleContact(point: contact.point, normal: contact.normal, other: contact.other);
             }
 
             if (!canJump && controls.moveDirection != 0) {
@@ -203,6 +201,18 @@ public class PlayerPhysicsSystem : SystemBase {
                 input.Add(new OneWayOneDOFConstraint(manifold, masses, dt));
             }
 
+            if (controls.jumpPressed && canJump) {
+                var manifold = new TargetVelocityManifold {
+                    e = e,
+                    id = e.GetHashCode() ^ 404018171,
+                    softness = settings.jumpSoftness,
+                    normal = new float2(0, 1),
+                    r = float2.zero,
+                    targetSpeed = settings.jumpSpeed
+                };
+            
+                input.Add(new OneWayOneDOFConstraint(manifold, masses, dt));
+            }
         }).Run();
     }
 }

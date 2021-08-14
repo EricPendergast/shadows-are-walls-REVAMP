@@ -85,7 +85,9 @@ public class ShadowConstraintSystem : SystemBase {
         partialCornerConstraints.Clear();
         partialEdgeConstraints.Clear();
 
-        Entities.WithAll<HitShadowsObject>()
+        Entities
+            .WithNone<ShadowContactStore>()
+            .WithAll<HitShadowsObject>()
             .WithReadOnly(boxOverlappingEdges)
             .WithReadOnly(edgeMounts)
             .ForEach((in Box box, in Position pos, in Entity entity) => {
@@ -100,6 +102,30 @@ public class ShadowConstraintSystem : SystemBase {
                     new ShadowCornerCalculator.Outputs{
                         partialEdgeConstraints = partialEdgeConstraints,
                         partialCornerConstraints = partialCornerConstraints
+                    }
+                );
+            }).Run();
+
+        Entities
+            .WithAll<ShadowContactStore>()
+            .WithAll<HitShadowsObject>()
+            .WithReadOnly(boxOverlappingEdges)
+            .WithReadOnly(edgeMounts)
+            .ForEach((ref DynamicBuffer<ShadowContactStore> shadowContacts, in Box box, in Position pos, in Entity entity) => {
+                shadowContacts.Clear();
+
+                var cc = new ShadowCornerCalculator(
+                    box,
+                    pos,
+                    entity,
+                    lightSources,
+                    lightAngleCalculators,
+                    It.Iterate(boxOverlappingEdges, entity),
+                    ref edgeMounts,
+                    new ShadowCornerCalculator.Outputs{
+                        partialEdgeConstraints = partialEdgeConstraints,
+                        partialCornerConstraints = partialCornerConstraints,
+                        shadowContacts = shadowContacts
                     }
                 );
             }).Run();
@@ -174,6 +200,15 @@ public class ShadowConstraintSystem : SystemBase {
 
     public List<ShadowCornerCalculator.Corner> GetShadowIslandsForDebug() {
         var ret = new List<ShadowCornerCalculator.Corner>();
+
+        var emitter = new ShadowEdgeCalculator.Emitter { 
+            boxOverlappingEdges = new NativeMultiHashMap<Entity, ShadowCornerCalculator.Edge>(0, Allocator.TempJob),
+            edgeMounts = new EdgeMountsMap(0, Allocator.TempJob)
+        };
+        ComputeShadowEdges(emitter, useBurst: false);
+        var boxOverlappingEdges = emitter.boxOverlappingEdges.Value;
+        var edgeMounts = emitter.edgeMounts.Value;
+
         // TODO: Put islands in CornerCalculator.Outputs
         Entities.WithAll<Box, HitShadowsObject>()
             .WithoutBurst()
@@ -193,6 +228,9 @@ public class ShadowConstraintSystem : SystemBase {
                     ret.Add(item);
                 }
             }).Run();
+
+        emitter.boxOverlappingEdges.Value.Dispose();
+        emitter.edgeMounts.Value.Dispose();
         return ret;
     }
 

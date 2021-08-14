@@ -16,6 +16,7 @@ public struct ShadowCornerCalculator {
     public struct Outputs {
         public NativeList<TwoWayPenConstraint.Partial>? partialEdgeConstraints;
         public NativeList<ThreeWayPenConstraint.Partial>? partialCornerConstraints;
+        public DynamicBuffer<ShadowContactStore>? shadowContacts;
 
         public static List<ShadowEdgeManifold> debugEdgeManifoldCollector {get; set;}
         public static List<ShadowCornerManifold> debugCornerManifolds {get; set;}
@@ -81,9 +82,16 @@ public struct ShadowCornerCalculator {
                 partialEdgeConstraints.Value.Add(c);
             }
         }
+
         public void Collect(in ThreeWayPenConstraint.Partial c) {
             if (partialCornerConstraints != null) {
                 partialCornerConstraints.Value.Add(c);
+            }
+        }
+
+        public void CollectShadowContact(ShadowContactStore contact) {
+            if (shadowContacts != null) {
+                shadowContacts.Value.Add(contact);
             }
         }
     }
@@ -533,6 +541,11 @@ public struct ShadowCornerCalculator {
             foreach (EdgeMount mount in It.Iterate(edgeMounts, e.GetEdgeKey())) {
                 var p = new TwoWayPenConstraint.Partial(in prototype, in mount, in manifold);
                 o.Collect(p);
+                o.CollectShadowContact(new ShadowContactStore {
+                    normal = -manifold.n,
+                    other = manifold.e2,
+                    point = manifold.p
+                });
                 o.DebugCollect(manifold, mount, p);
             }
         } else {

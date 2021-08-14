@@ -19,5 +19,6 @@ public class PlayerRootAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
 
         dstManager.AddComponent<ActivePlayer>(entity);
         dstManager.AddBuffer<DirectContactStore>(entity);
+        dstManager.AddBuffer<ShadowContactStore>(entity);
     }
 }

@@ -11,5 +11,6 @@ public class BranchPlayerAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
         );
 
         dstManager.AddBuffer<DirectContactStore>(entity);
+        dstManager.AddBuffer<ShadowContactStore>(entity);
     }
 }
