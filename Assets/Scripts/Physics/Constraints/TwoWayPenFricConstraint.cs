@@ -60,6 +60,9 @@ public struct TwoWayPenFricConstraint : IWarmStartConstraint<LambdaNT> {
         lambdaAccum = new LambdaNT();
     }
 
+    public TwoWayPenFricConstraint(in Partial p, ComponentDataFromEntity<Mass> masses, float dt, float friction) :
+        this(in p, masses, dt, CollisionSystem.positionCorrection ? .1f : 0, -.01f, friction) {}
+
     public IConstraint Clone() {
         return this;
     }
@@ -99,6 +102,45 @@ public struct TwoWayPenFricConstraint : IWarmStartConstraint<LambdaNT> {
                     new float3(-tangent, -Lin.Cross(contact-pos2.pos, tangent)));
             }
 
+        }
+
+        public Partial(in Prototype p, in ShadowCornerCalculator.EdgeMount mount, in ShadowEdgeManifold m) {
+            e1 = mount.castingEntity;
+            e2 = m.e2;
+            id = new int2(m.contactIdOn2, mount.id).GetHashCode();
+            J_n = p.J_n;
+            delta = p.delta;
+            if (mount.castingShapeType == EdgeSourceType.Box) {
+                float2 velMult = Lin.Cross(1, mount.point - m.x1)/math.lengthsq(mount.point - m.x1);
+                float angVelMult = math.dot(mount.point - mount.shapeCenter, mount.point - m.x1)/math.lengthsq(mount.point - m.x1);
+                J_n.v1 = new float3(
+                    J_n.v1.z * velMult,
+                    J_n.v1.z * angVelMult
+                );
+            } else {
+                // Do nothing
+            }
+
+            float2 tangent = Lin.Cross(m.n, -1);
+
+            J_t = new Float6(
+                new float3(tangent, Lin.Cross(mount.point - m.x1, tangent)),
+                new float3(-tangent, -Lin.Cross(m.p - m.x2, tangent))
+            );
+        }
+
+        public struct Prototype {
+            public Float6 J_n;
+            public float delta;
+
+            public Prototype(in ShadowEdgeManifold m) {
+                J_n = new Float6(
+                    new float3(0, 0, Lin.Cross(m.p - m.x1, m.n)), 
+                    new float3(-m.n, -Lin.Cross(m.p - m.x2, m.n))
+                );
+
+                delta = m.delta;
+            }
         }
     }
 

@@ -14,7 +14,7 @@ using Utilities;
 public struct ShadowCornerCalculator {
 
     public struct Outputs {
-        public NativeList<TwoWayPenConstraint.Partial>? partialEdgeConstraints;
+        public NativeList<TwoWayPenFricConstraint.Partial>? partialEdgeConstraints;
         public NativeList<ThreeWayPenConstraint.Partial>? partialCornerConstraints;
         public DynamicBuffer<ShadowContactStore>? shadowContacts;
 
@@ -42,9 +42,9 @@ public struct ShadowCornerCalculator {
         public struct EdgeMountTuple {
             public ShadowEdgeManifold m;
             public EdgeMount mount;
-            public TwoWayPenConstraint.Partial partialConstraint;
+            public TwoWayPenFricConstraint.Partial partialConstraint;
 
-            public void Deconstruct(out ShadowEdgeManifold m, out EdgeMount mount, out TwoWayPenConstraint.Partial partialConstraint) {
+            public void Deconstruct(out ShadowEdgeManifold m, out EdgeMount mount, out TwoWayPenFricConstraint.Partial partialConstraint) {
                 m = this.m;
                 mount = this.mount;
                 partialConstraint = this.partialConstraint;
@@ -65,7 +65,7 @@ public struct ShadowCornerCalculator {
         }
 
         [BurstDiscard]
-        public void DebugCollect(ShadowEdgeManifold manifold, EdgeMount mount, TwoWayPenConstraint.Partial partial) {
+        public void DebugCollect(ShadowEdgeManifold manifold, EdgeMount mount, TwoWayPenFricConstraint.Partial partial) {
             if (debugEdgeMounts != null) {
                 debugEdgeMounts.Add(new EdgeMountTuple{m=manifold, mount=mount, partialConstraint=partial});
             }
@@ -77,7 +77,7 @@ public struct ShadowCornerCalculator {
             }
         }
 
-        public void Collect(in TwoWayPenConstraint.Partial c) {
+        public void Collect(in TwoWayPenFricConstraint.Partial c) {
             if (partialEdgeConstraints != null) {
                 partialEdgeConstraints.Value.Add(c);
             }
@@ -536,10 +536,10 @@ public struct ShadowCornerCalculator {
 
             o.DebugCollect(manifold);
         
-            var prototype = new TwoWayPenConstraint.Partial.Prototype(manifold);
+            var prototype = new TwoWayPenFricConstraint.Partial.Prototype(manifold);
 
             foreach (EdgeMount mount in It.Iterate(edgeMounts, e.GetEdgeKey())) {
-                var p = new TwoWayPenConstraint.Partial(in prototype, in mount, in manifold);
+                var p = new TwoWayPenFricConstraint.Partial(in prototype, in mount, in manifold);
                 o.Collect(p);
                 o.CollectShadowContact(new ShadowContactStore {
                     normal = -manifold.n,

@@ -14,7 +14,7 @@ public class ShadowConstraintSystem : SystemBase {
 
     Dictionary<Entity, ShadowEdgeCalculatorClassWrapper> shadowEdgeCalculators;
 
-    NativeList<TwoWayPenConstraint.Partial> partialEdgeConstraints;
+    NativeList<TwoWayPenFricConstraint.Partial> partialEdgeConstraints;
     NativeList<ThreeWayPenConstraint.Partial> partialCornerConstraints;
 
     NativeMultiHashMap<Entity, ShadowCornerCalculator.Edge> boxOverlappingEdges;
@@ -30,7 +30,7 @@ public class ShadowConstraintSystem : SystemBase {
         shadowEdgeCalculators = new Dictionary<Entity, ShadowEdgeCalculatorClassWrapper>();
 
         partialCornerConstraints = new NativeList<ThreeWayPenConstraint.Partial>(Allocator.Persistent);
-        partialEdgeConstraints = new NativeList<TwoWayPenConstraint.Partial>(Allocator.Persistent);
+        partialEdgeConstraints = new NativeList<TwoWayPenFricConstraint.Partial>(Allocator.Persistent);
 
         boxOverlappingEdges = new NativeMultiHashMap<Entity, ShadowCornerCalculator.Edge>(0, Allocator.Persistent);
         edgeMounts = new EdgeMountsMap(0, Allocator.Persistent);
@@ -132,13 +132,16 @@ public class ShadowConstraintSystem : SystemBase {
 
         {
             var masses = GetComponentDataFromEntity<Mass>();
+            var frictions = GetComponentDataFromEntity<Friction>();
 
-            var edgeConstraintsOut = World.GetOrCreateSystem<ConstraintGatherSystem>().GetTwoWayPenConstraintsInput();
+            var edgeConstraintsOut = World.GetOrCreateSystem<ConstraintGatherSystem>().GetTwoWayPenFricConstraintsInput();
 
             float dt = Time.DeltaTime;
 
             foreach (var pec in partialEdgeConstraints) {
-                edgeConstraintsOut.Add(new TwoWayPenConstraint(pec, masses, dt));
+                var f1 = frictions.HasComponent(pec.e1) ? frictions[pec.e1].friction : 0;
+                var f2 = frictions.HasComponent(pec.e2) ? frictions[pec.e2].friction : 0;
+                edgeConstraintsOut.Add(new TwoWayPenFricConstraint(pec, masses, dt: dt, friction: f1*f2));
             }
 
             var cornerConstraintsOut = World.GetOrCreateSystem<ConstraintGatherSystem>().GetThreeWayPenConstraintsInput();
