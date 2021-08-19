@@ -8,6 +8,11 @@ public struct TargetAngularVelocityManifold {
     public int id;
     public float targetAngVel;
     public float softness;
+
+    public static float AngVelForTargetOffset(float offset, float maxSpeed, float dt) {
+        float rotationOffsetSign = math.sign(offset);
+        return rotationOffsetSign * math.min(math.abs(offset/dt), maxSpeed);
+    }
 }
 
 public struct TargetVelocityManifold {

@@ -141,12 +141,15 @@ public class PlayerPhysicsSystem : SystemBase {
             {// Adding a constraint to rotate the player to be axis aligned
                 float rotationTarget = math.round(playerPos.rot / (math.PI/2))*(math.PI/2);
                 float rotationOffset = rotationTarget - playerPos.rot;
-                float rotationOffsetSign = math.sign(rotationOffset);
                 var manifold = new TargetAngularVelocityManifold {
                     e = e,
                     id = e.GetHashCode() ^ 286091097,
                     softness = settings.rotationCorrectionSoftness,
-                    targetAngVel = math.min(rotationOffset/dt, rotationOffsetSign*settings.rotationCorrectionSpeed)
+                    targetAngVel = TargetAngularVelocityManifold.AngVelForTargetOffset(
+                        offset: rotationOffset,
+                        maxSpeed: settings.rotationCorrectionSpeed,
+                        dt: dt
+                    )
                 };
 
                 input.Add(new OneWayOneDOFConstraint(manifold, masses, dt));

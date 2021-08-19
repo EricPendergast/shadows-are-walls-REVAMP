@@ -1,9 +1,5 @@
 TODOs:
-✓1. Turn on burst for shadow edge calculator
-✓2. Implement ShadowContactStore
-✓3. Implement shadow friction
-✓4. Implement dynamic friction for shadows
-✓5. Implement ShadowContactStore for opaque objects detecting what their shadows are hitting
+✓1. Implement tracking lights
 
 Later TODOs:
 1. Remove edge mounts past the contact point when calculating partial constraints

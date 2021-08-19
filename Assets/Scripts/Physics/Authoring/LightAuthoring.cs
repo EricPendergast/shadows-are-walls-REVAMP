@@ -19,6 +19,10 @@ public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
 
     public float snapRadius = 1;
 
+    public GameObject toTrack;
+    public float trackSpeed;
+    public float trackSoftness;
+
     [System.Serializable]
     public struct SnapInfo {
         public Vector2 pos;
@@ -58,6 +62,16 @@ public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
         );
 
         dstManager.AddComponentData(entity, new IgnoreHierarchyTag());
+
+        if (toTrack != null) {
+            dstManager.AddComponentData(entity,
+                new LightTrackingJoint {
+                    toTrack = conversionSystem.GetPrimaryEntity(toTrack),
+                    trackSpeed = math.radians(trackSpeed),
+                    trackSoftness = trackSoftness
+                }
+            );
+        }
 
         foreach (var snapInfo in snapInfos) {
             var joint = conversionSystem.CreateAdditionalEntity(gameObject);
@@ -116,6 +130,11 @@ public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
             Gizmos.DrawRay(pos, snapInfo.mount.transform.TransformDirection(snapInfo.cw));
             Gizmos.DrawRay(pos, snapInfo.mount.transform.TransformDirection(snapInfo.ccw));
         }
+
+        if (toTrack != null) {
+            Gizmos.color = Color.green;
+            Gizmos.DrawLine(transform.position, toTrack.transform.position);
+        }
     }
 
     static SnapInfo[] GetSnapInfo(Transform transform, float snapRadius) {
@@ -167,9 +186,16 @@ public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
 
             serializedObject.Update();
 
+            var t = target as LightAuthoring;
+
             DrawProperty("angularVelocity");
             DrawProperty("inertia");
             DrawProperty("aperture");
+            DrawProperty("toTrack");
+            if (t.toTrack != null) {
+                DrawProperty("trackSpeed");
+                DrawProperty("trackSoftness");
+            }
             GUILayout.Label("");
             DrawProperty("snapRadius");
 
@@ -179,7 +205,6 @@ public class LightAuthoring : MonoBehaviour, IConvertGameObjectToEntity {
 
             serializedObject.Update();
 
-            var t = target as LightAuthoring;
 
             if (GUI.changed || t.transform.hasChanged) {
                 snapInfosField.ClearArray();

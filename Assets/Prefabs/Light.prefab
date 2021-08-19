@@ -47,4 +47,7 @@ MonoBehaviour:
   inertia: 1000
   aperture: 24.8
   snapRadius: 1
+  toTrack: {fileID: 0}
+  trackSpeed: 20
+  trackSoftness: 0.01
   snapInfos: []
