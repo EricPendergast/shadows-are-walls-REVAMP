@@ -12,11 +12,18 @@ using Rect = Physics.Math.Rect;
 using Utilities;
 
 public struct ShadowCornerCalculator {
+    public struct Env {
+        public NativeArray<LightSource> lights;
+        public NativeArray<AngleCalculator> lightAngleCalculators;
+        public MultiHashMapIterator<Entity, Edge> edges;
+        public NativeMultiHashMap<Edge.EdgeKey, EdgeMount> edgeMounts;
+        public BufferFromEntity<ShadowContactStore>? knownShadowContactStores;
+    }
 
     public struct Outputs {
         public NativeList<TwoWayPenFricConstraint.Partial>? partialEdgeConstraints;
         public NativeList<ThreeWayPenConstraint.Partial>? partialCornerConstraints;
-        public DynamicBuffer<ShadowContactStore>? shadowContacts;
+        public NativeMultiHashMap<Entity, ShadowContactStore>? shadowContactStores;
 
         public static List<ShadowEdgeManifold> debugEdgeManifoldCollector {get; set;}
         public static List<ShadowCornerManifold> debugCornerManifolds {get; set;}
@@ -89,9 +96,9 @@ public struct ShadowCornerCalculator {
             }
         }
 
-        public void CollectShadowContact(ShadowContactStore contact) {
-            if (shadowContacts != null) {
-                shadowContacts.Value.Add(contact);
+        public void CollectShadowContact(Entity belongsTo, ShadowContactStore contact) {
+            if (shadowContactStores != null) {
+                shadowContactStores.Value.Add(belongsTo, contact);
             }
         }
     }
@@ -171,12 +178,9 @@ public struct ShadowCornerCalculator {
 
         public static Corner Null => new Corner{isNull = true};
     }
-    private NativeArray<LightSource> lights;
-    private NativeArray<AngleCalculator> lightAngleCalculators;
     private FixedList512<Edge> edges;
     private FixedList512<Corner> islands;
     private Entity boxEntity;
-    private NativeMultiHashMap<Edge.EdgeKey, EdgeMount> edgeMounts;
 
     public FixedList512<Corner> GetIslandsForDebug() {
         return islands;
@@ -184,28 +188,27 @@ public struct ShadowCornerCalculator {
     private Rect box;
 
     private Outputs o;
+    private Env env;
 
-    public ShadowCornerCalculator(Box box, Position boxPos, Entity boxEntity, NativeArray<LightSource> lights, NativeArray<AngleCalculator> lightAngleCalculators, MultiHashMapIterator<Entity, Edge> edges, ref NativeMultiHashMap<Edge.EdgeKey, EdgeMount> edgeMounts, in Outputs o) {
+    public ShadowCornerCalculator(Box box, Position boxPos, Entity boxEntity, in Env env, in Outputs o) {
         this.box = box.ToRect(boxPos);
         this.boxEntity = boxEntity;
-        this.lights = lights;
         this.edges = new FixedList512<Edge>();
-        foreach (var edge in edges) {
+        foreach (var edge in env.edges) {
             this.edges.Add(edge);
         }
 
-        this.lightAngleCalculators = lightAngleCalculators;
         islands = new FixedList512<Corner>();
-        this.edgeMounts = edgeMounts;
 
         this.o = o;
+        this.env = env;
 
         Compute();
         ComputeManifolds();
     }
 
     public float2 GetLightPos(int lightIdx) {
-        return lightAngleCalculators[lightIdx].SourcePos;
+        return env.lightAngleCalculators[lightIdx].SourcePos;
     }
 
     public float2 GetEdgeDirectionUnnormalized(int edgeIdx) {
@@ -328,7 +331,7 @@ public struct ShadowCornerCalculator {
             return;
         }
         float2 lightPos = GetLightPos(edge.lightSource);
-        var angleCalculator = lightAngleCalculators[edge.lightSource];
+        var angleCalculator = env.lightAngleCalculators[edge.lightSource];
 
         float2 lightNormal = angleCalculator.NormalTowardsLight(edge.direction, edge.lightSide);
 
@@ -408,7 +411,7 @@ public struct ShadowCornerCalculator {
                 continue;
             }
             Edge edge = edges[edgeIdx];
-            var edgeLightAngleCalc = this.lightAngleCalculators[edge.lightSource];
+            var edgeLightAngleCalc = env.lightAngleCalculators[edge.lightSource];
             float2 edgeLightPos = GetLightPos(edge.lightSource);
 
             EdgeCornerIdx? worstPairIdx = null;
@@ -514,7 +517,7 @@ public struct ShadowCornerCalculator {
             }
             Edge e = edges[shadowEdge];
 
-            float2 normal = -lightAngleCalculators[e.lightSource].NormalTowardsLight(e.direction, e.lightSide);
+            float2 normal = -env.lightAngleCalculators[e.lightSource].NormalTowardsLight(e.direction, e.lightSide);
             float2 lightSource = GetLightPos(e.lightSource);
         
             float delta = -math.dot(corner - lightSource, normal);
@@ -538,14 +541,10 @@ public struct ShadowCornerCalculator {
         
             var prototype = new TwoWayPenFricConstraint.Partial.Prototype(manifold);
 
-            foreach (EdgeMount mount in It.Iterate(edgeMounts, e.GetEdgeKey())) {
+            foreach (EdgeMount mount in It.Iterate(env.edgeMounts, e.GetEdgeKey())) {
                 var p = new TwoWayPenFricConstraint.Partial(in prototype, in mount, in manifold);
                 o.Collect(p);
-                o.CollectShadowContact(new ShadowContactStore {
-                    normal = -manifold.n,
-                    other = manifold.e2,
-                    point = manifold.p
-                });
+                EmitShadowContacts(in manifold, in mount);
                 o.DebugCollect(manifold, mount, p);
             }
         } else {
@@ -583,8 +582,8 @@ public struct ShadowCornerCalculator {
 
                 o.DebugCollect(m);
                 // TODO: Check if edge mounts will participate
-                foreach (EdgeMount mount1 in It.Iterate(edgeMounts, shadowEdge1.GetEdgeKey())) {
-                    foreach (EdgeMount mount2 in It.Iterate(edgeMounts, shadowEdge2.GetEdgeKey())) {
+                foreach (EdgeMount mount1 in It.Iterate(env.edgeMounts, shadowEdge1.GetEdgeKey())) {
+                    foreach (EdgeMount mount2 in It.Iterate(env.edgeMounts, shadowEdge2.GetEdgeKey())) {
                         var p = new ThreeWayPenConstraint.Partial(in prototype, in mount1, in mount2, boxEntity, in m);
                         o.Collect(p);
                         o.DebugCollect(m, mount1, mount2, null, p);
@@ -593,15 +592,15 @@ public struct ShadowCornerCalculator {
             } else {
                 var shadowEdge3Idx = lineIdx;
                 Edge shadowEdge3 = edges[shadowEdge3Idx];
-                m.n = lightAngleCalculators[shadowEdge3.lightSource].NormalTowardsLight(shadowEdge3.direction, shadowEdge3.lightSide);
+                m.n = env.lightAngleCalculators[shadowEdge3.lightSource].NormalTowardsLight(shadowEdge3.direction, shadowEdge3.lightSide);
                 m.x3 = GetLightPos(shadowEdge3.lightSource);
                 m.s = m.x3;
 
                 o.DebugCollect(m);
                 var prototype = new ThreeWayPenConstraint.Partial.Prototype(m);
-                foreach (EdgeMount mount1 in It.Iterate(edgeMounts, shadowEdge1.GetEdgeKey())) {
-                    foreach (EdgeMount mount2 in It.Iterate(edgeMounts, shadowEdge2.GetEdgeKey())) {
-                        foreach (EdgeMount mount3 in It.Iterate(edgeMounts, shadowEdge3.GetEdgeKey())) {
+                foreach (EdgeMount mount1 in It.Iterate(env.edgeMounts, shadowEdge1.GetEdgeKey())) {
+                    foreach (EdgeMount mount2 in It.Iterate(env.edgeMounts, shadowEdge2.GetEdgeKey())) {
+                        foreach (EdgeMount mount3 in It.Iterate(env.edgeMounts, shadowEdge3.GetEdgeKey())) {
                             var p = new ThreeWayPenConstraint.Partial(in prototype, in mount1, in mount2, in mount3, shadowEdge3.direction, in m);
                             o.Collect(p);
                             o.DebugCollect(m, mount1, mount2, mount3, p);
@@ -609,6 +608,26 @@ public struct ShadowCornerCalculator {
                     }
                 }
             }
+        }
+    }
+
+    private void EmitShadowContacts(in ShadowEdgeManifold manifold, in EdgeMount mount) {
+        if (env.knownShadowContactStores == null) {
+            return;
+        }
+        if (env.knownShadowContactStores.Value.HasComponent(boxEntity)) {
+            o.CollectShadowContact(boxEntity, new ShadowContactStore {
+                normal = -manifold.n,
+                other = mount.castingEntity,
+                point = manifold.p
+            });
+        }
+        if (env.knownShadowContactStores.Value.HasComponent(mount.castingEntity)) {
+            o.CollectShadowContact(mount.castingEntity, new ShadowContactStore {
+                normal = manifold.n,
+                other = boxEntity,
+                point = mount.point
+            });
         }
     }
 }

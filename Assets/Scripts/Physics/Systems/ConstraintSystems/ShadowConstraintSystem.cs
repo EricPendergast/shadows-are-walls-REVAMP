@@ -17,6 +17,8 @@ public class ShadowConstraintSystem : SystemBase {
     NativeList<TwoWayPenFricConstraint.Partial> partialEdgeConstraints;
     NativeList<ThreeWayPenConstraint.Partial> partialCornerConstraints;
 
+    NativeMultiHashMap<Entity, ShadowContactStore> shadowContactStores;
+
     NativeMultiHashMap<Entity, ShadowCornerCalculator.Edge> boxOverlappingEdges;
     EdgeMountsMap edgeMounts;
 
@@ -32,6 +34,8 @@ public class ShadowConstraintSystem : SystemBase {
         partialCornerConstraints = new NativeList<ThreeWayPenConstraint.Partial>(Allocator.Persistent);
         partialEdgeConstraints = new NativeList<TwoWayPenFricConstraint.Partial>(Allocator.Persistent);
 
+        shadowContactStores = new NativeMultiHashMap<Entity, ShadowContactStore>(0, Allocator.Persistent);
+
         boxOverlappingEdges = new NativeMultiHashMap<Entity, ShadowCornerCalculator.Edge>(0, Allocator.Persistent);
         edgeMounts = new EdgeMountsMap(0, Allocator.Persistent);
         lightSources = new NativeList<LightSource>(Allocator.Persistent);
@@ -42,6 +46,8 @@ public class ShadowConstraintSystem : SystemBase {
         Clear(shadowEdgeCalculators);
         partialCornerConstraints.Dispose();
         partialEdgeConstraints.Dispose();
+        
+        shadowContactStores.Dispose();
 
         boxOverlappingEdges.Dispose();
         edgeMounts.Dispose();
@@ -57,6 +63,7 @@ public class ShadowConstraintSystem : SystemBase {
         var edgeMounts = this.edgeMounts;
         var partialEdgeConstraints = this.partialEdgeConstraints;
         var partialCornerConstraints = this.partialCornerConstraints;
+        var shadowContactStores = this.shadowContactStores;
 
         lightSources.Clear();
         lightAngleCalculators.Clear();
@@ -84,55 +91,47 @@ public class ShadowConstraintSystem : SystemBase {
 
         partialCornerConstraints.Clear();
         partialEdgeConstraints.Clear();
+        shadowContactStores.Clear();
+        var shadowContactStoresWriter = shadowContactStores.AsParallelWriter();
+        var knownShadowContactStores = GetBufferFromEntity<ShadowContactStore>(isReadOnly:true);
 
         Entities
-            .WithNone<ShadowContactStore>()
             .WithAll<HitShadowsObject>()
             .WithReadOnly(boxOverlappingEdges)
             .WithReadOnly(edgeMounts)
+            .WithReadOnly(knownShadowContactStores)
             .ForEach((in Box box, in Position pos, in Entity entity) => {
                 var cc = new ShadowCornerCalculator(
                     box,
                     pos,
                     entity,
-                    lightSources,
-                    lightAngleCalculators,
-                    It.Iterate(boxOverlappingEdges, entity),
-                    ref edgeMounts,
+                    new ShadowCornerCalculator.Env{
+                        lights = lightSources,
+                        lightAngleCalculators = lightAngleCalculators,
+                        edges = It.Iterate(boxOverlappingEdges, entity),
+                        edgeMounts = edgeMounts,
+                        knownShadowContactStores = knownShadowContactStores
+                    },
                     new ShadowCornerCalculator.Outputs{
                         partialEdgeConstraints = partialEdgeConstraints,
-                        partialCornerConstraints = partialCornerConstraints
+                        partialCornerConstraints = partialCornerConstraints,
+                        shadowContactStores = shadowContactStores
                     }
                 );
             }).Run();
 
         Entities
-            .WithAll<ShadowContactStore>()
-            .WithAll<HitShadowsObject>()
-            .WithReadOnly(boxOverlappingEdges)
-            .WithReadOnly(edgeMounts)
-            .ForEach((ref DynamicBuffer<ShadowContactStore> shadowContacts, in Box box, in Position pos, in Entity entity) => {
-                shadowContacts.Clear();
-
-                var cc = new ShadowCornerCalculator(
-                    box,
-                    pos,
-                    entity,
-                    lightSources,
-                    lightAngleCalculators,
-                    It.Iterate(boxOverlappingEdges, entity),
-                    ref edgeMounts,
-                    new ShadowCornerCalculator.Outputs{
-                        partialEdgeConstraints = partialEdgeConstraints,
-                        partialCornerConstraints = partialCornerConstraints,
-                        shadowContacts = shadowContacts
-                    }
-                );
+            .WithReadOnly(shadowContactStores)
+            .ForEach((Entity e, ref DynamicBuffer<ShadowContactStore> contacts) => {
+                contacts.Clear();
+                foreach (var contact in It.Iterate(shadowContactStores, e)) {
+                    contacts.Add(contact);
+                }
             }).Run();
 
         {
-            var masses = GetComponentDataFromEntity<Mass>();
-            var frictions = GetComponentDataFromEntity<Friction>();
+            var masses = GetComponentDataFromEntity<Mass>(isReadOnly: true);
+            var frictions = GetComponentDataFromEntity<Friction>(isReadOnly: true);
 
             var edgeConstraintsOut = World.GetOrCreateSystem<ConstraintGatherSystem>().GetTwoWayPenFricConstraintsInput();
 
@@ -220,10 +219,12 @@ public class ShadowConstraintSystem : SystemBase {
                     box,
                     pos,
                     entity,
-                    lightSources,
-                    lightAngleCalculators,
-                    It.Iterate(boxOverlappingEdges, entity),
-                    ref edgeMounts,
+                    new ShadowCornerCalculator.Env{
+                        lights = lightSources,
+                        lightAngleCalculators = lightAngleCalculators,
+                        edges = It.Iterate(boxOverlappingEdges, entity),
+                        edgeMounts = edgeMounts
+                    },
                     new ShadowCornerCalculator.Outputs{}
                 );
 
@@ -294,10 +295,12 @@ public class ShadowConstraintSystem : SystemBase {
                     box,
                     pos,
                     entity,
-                    lightSources,
-                    lightAngleCalculators,
-                    It.Iterate(boxOverlappingEdges, entity),
-                    ref edgeMounts,
+                    new ShadowCornerCalculator.Env{
+                        lights = lightSources,
+                        lightAngleCalculators = lightAngleCalculators,
+                        edges = It.Iterate(boxOverlappingEdges, entity),
+                        edgeMounts = edgeMounts
+                    },
                     outputs
                 );
             }).Run();
