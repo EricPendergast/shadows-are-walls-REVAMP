@@ -37,7 +37,7 @@ If a box hits a shadow corner and the two lights involved are able to move, the 
 
 ### Opaque objects can move
 
-This is the part where it starts to get interesting. If an object is penetrating on the edge of a shadow casted by an opaque object, the opaque object can move in such a way that the collision is resolved. These collisions are robust enough to allow for stacking behavior.
+If an object is penetrating on the edge of a shadow casted by an opaque object, the opaque object can move in such a way that the collision is resolved. These collisions are robust enough to allow for stacking behavior.
 
 ![](https://github.com/EricPendergast/shadows-are-walls-REVAMP/blob/main/Gifs/7.gif)
 ![](https://github.com/EricPendergast/shadows-are-walls-REVAMP/blob/main/Gifs/8.gif)
@@ -49,3 +49,17 @@ This is the part where it starts to get confusing. If two lights are shining on 
 
 ![](https://github.com/EricPendergast/shadows-are-walls-REVAMP/blob/main/Gifs/10.gif)
 ![](https://github.com/EricPendergast/shadows-are-walls-REVAMP/blob/main/Gifs/11.gif)
+
+### Shadow slicing
+
+The engine is able to handle shadow corners with extremely small angles, that will quickly "slice" through objects. In the first two examples, the two lights are arranged so that the shadow slices from the left and from the from the right. In the last example, the lights are at the exact same position. 
+
+![](https://github.com/EricPendergast/shadows-are-walls-REVAMP/blob/main/Gifs/12.gif)
+![](https://github.com/EricPendergast/shadows-are-walls-REVAMP/blob/main/Gifs/13.gif)
+![](https://github.com/EricPendergast/shadows-are-walls-REVAMP/blob/main/Gifs/13.5.gif)
+
+### Shadow triangle
+
+This might be the most confusing physical property of the engine. If you have three shadow edges that overlap, you can have a situation where there is a small triangle of shadow. Such a triangle can open up inside of an object. The engine is able to elegantly resolve that situation by "cinching" the triangle shut.
+
+![](https://github.com/EricPendergast/shadows-are-walls-REVAMP/blob/main/Gifs/14.gif)
