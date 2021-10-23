@@ -25,7 +25,7 @@ If an object is penetrating a shadow, there are two ways to resolve the penetrat
 
 ### Boxes can collide with light corners
 
-When two lights overlap, they form a corner of shadow. Collisions with these corners are supported. However, friction during these collisions is not yet implemnted.
+When two lights overlap, they form a corner of shadow. Collisions with these corners are supported. However, friction during these collisions is not yet implemented.
 
 ![](https://github.com/EricPendergast/shadows-are-walls-REVAMP/blob/main/Gifs/5.gif)
 
