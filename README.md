@@ -4,7 +4,7 @@ This is a rewrite of my original shadows-are-walls project. Runs on (mostly) pur
 The goal of this project is to make a puzzle-platformer game which revolves around the mechanic of shadows being solid. This mechanic turns out to have some really interesting (and confusing) behavior when you take the idea to its extremes.
 
 
-## Capabilities
+## Capabilities of the Physics Engine
 
 ### Boxes can stack stably
 
@@ -50,7 +50,7 @@ This is the part where it starts to get confusing. If two lights are shining on 
 ![](https://github.com/EricPendergast/shadows-are-walls-REVAMP/blob/main/Gifs/10.gif)
 ![](https://github.com/EricPendergast/shadows-are-walls-REVAMP/blob/main/Gifs/11.gif)
 
-### Shadow slicing
+### Shadow slices can be resolved robustly
 
 The engine is able to handle shadow corners with extremely small angles, that will quickly "slice" through objects. In the first two examples, the two lights are arranged so that the shadow slices from the left and from the from the right. In the last example, the lights are at the exact same position. 
 
@@ -58,7 +58,7 @@ The engine is able to handle shadow corners with extremely small angles, that wi
 ![](https://github.com/EricPendergast/shadows-are-walls-REVAMP/blob/main/Gifs/13.gif)
 ![](https://github.com/EricPendergast/shadows-are-walls-REVAMP/blob/main/Gifs/13.5.gif)
 
-### Shadow triangle
+### Shadow triangles can react to collisions
 
 This might be the most confusing physical property of the engine. If you have three shadow edges that overlap, you can have a situation where there is a small triangle of shadow. Such a triangle can open up inside of an object. The engine is able to elegantly resolve that situation by "cinching" the triangle shut.
 
