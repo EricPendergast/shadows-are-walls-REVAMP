@@ -3,6 +3,13 @@ This is a rewrite of my original shadows-are-walls project. Runs on (mostly) pur
 
 The goal of this project is to make a puzzle-platformer game which revolves around the mechanic of shadows being solid. This mechanic turns out to have some really interesting (and confusing) behavior when you take the idea to its extremes.
 
+## Features
+
+- Efficient physics engine built from scratch
+- Physics debugger that shows how impulses are applied during sub-steps within a frame
+- Springs
+- Pixel perfect shadow rendering (using geometry shaders)
+- Player physics (running and jumping)
 
 ## Capabilities of the Physics Engine
 
