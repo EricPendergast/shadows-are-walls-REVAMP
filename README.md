@@ -1,7 +1,10 @@
 # shadows-are-walls-REVAMP
 This is a rewrite of my original shadows-are-walls project. Runs on (mostly) pure ECS in Unity, and has a fully custom physics engine. 
 
-The goal of this project is to make a puzzle-platformer game which revolves around the mechanic of shadows being solid. This mechanic turns out to have some really interesting (and confusing) behavior when you take the idea to its extremes.
+The goal of this project is to make a puzzle-platformer game which revolves around the mechanic of shadows being solid. This mechanic turns out to have some really interesting (and confusing) behavior when you take the idea to its extremes. My hope for the completed game is a collection of engaging puzzles that gradually let the player figure out how the physics works. Ideally, the game would require the player to think in a way that is totally unique and have realizations that are very satisfying.
+
+The current state of the project is a mostly-implemented game engine, with some levels designed. There are still many game design problems that must be resolved in order to make this engine into a good game.
+
 
 ## Features
 
@@ -38,7 +41,7 @@ When two lights overlap, they form a corner of shadow. Collisions with these cor
 
 ### Shadow corners can react to collisions
 
-If a box hits a shadow corner and the two lights involved are able to move, the shadow corner responds in a way that "makes sense."
+If a box hits a shadow corner and the two lights involved are able to move, the shadow corner respond in a way that "makes sense." In the example, the white block is pushing down on the two shadow corners, so the corners move down (by rotating the lights towards the center.)
 
 ![](https://github.com/EricPendergast/shadows-are-walls-REVAMP/blob/main/Gifs/6.gif)
 
@@ -52,7 +55,7 @@ If an object is penetrating on the edge of a shadow casted by an opaque object, 
 
 ### Shadow corners from opaque objects can react to collisions
 
-This is the part where it starts to get confusing. If two lights are shining on an opaque object, they form two shadows. But the only solid part of the shadow is where the two shadows overlap. This creates a triangle of shadow that comes out of the opaque object. And this shadow is able to react to collisions in a way that "makes sense." The way the math worked out caused there to be a force on the opaque object such that it is pushed to the lowest possible point, similar to a ball rolling down a hill.
+This is the part where it starts to get confusing. If two lights are shining on an opaque object, they form two shadows. But the only solid part of the shadow is where the two shadows overlap. This creates a triangle of shadow that comes out of the opaque object. And this shadow is able to react to collisions in a way that "makes sense." The way the math worked out caused there to be a force on the opaque object such that it is pushed to the lowest possible point, similar to a ball rolling down a hill. The simulation looks so slippery because friction is not implemented for shadow corners yet.
 
 ![](https://github.com/EricPendergast/shadows-are-walls-REVAMP/blob/main/Gifs/10.gif)
 ![](https://github.com/EricPendergast/shadows-are-walls-REVAMP/blob/main/Gifs/11.gif)
